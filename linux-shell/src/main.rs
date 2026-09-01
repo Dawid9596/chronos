@@ -163,6 +163,7 @@ pub fn build_document_table(
         "Treatment Notes",
         "Material",
         "Location/Epoch",
+        "",
     ];
 
     for (col, title) in headers.iter().enumerate() {
@@ -176,7 +177,7 @@ pub fn build_document_table(
     for (i, row) in view_model.rows.iter().enumerate() {
         let grid_row = (i + 1) as i32;
 
-        // Col 0: Item ID (Single Cell Edit)
+        // Col 0: Item ID
         let item_id_widget = create_editable_widget(
             &row.item_id,
             core.clone(),
@@ -205,7 +206,7 @@ pub fn build_document_table(
         );
         grid.attach(&interactive_bar, 1, grid_row, 1, 1);
 
-        // Col 2: Treatment Notes (Single Cell Edit)
+        // Col 2: Treatment Notes
         let notes_widget = create_editable_widget(
             &row.treatment_notes,
             core.clone(),
@@ -223,7 +224,7 @@ pub fn build_document_table(
         );
         grid.attach(&notes_widget, 2, grid_row, 1, 1);
 
-        // Col 3: Material Group (Grouped Edit)
+        // Col 3: Material Group
         if let Some(mat) = &row.material_group {
             let mat_widget = create_editable_widget(
                 &mat.value,
@@ -243,7 +244,7 @@ pub fn build_document_table(
             grid.attach(&mat_widget, 3, grid_row, 1, mat.span as i32);
         }
 
-        // Col 4: Location Group (Grouped Edit)
+        // Col 4: Location Group
         if let Some(loc) = &row.location_group {
             let loc_widget = create_editable_widget(
                 &loc.value,
@@ -262,6 +263,36 @@ pub fn build_document_table(
             );
             grid.attach(&loc_widget, 4, grid_row, 1, loc.span as i32);
         }
+
+        // Col 5: Delete Button
+        let delete_btn = gtk4::Button::builder()
+            .label("×")
+            .has_frame(false)
+            .valign(gtk4::Align::Center)
+            .build();
+
+        // flat destructive button
+        delete_btn.add_css_class("flat");
+        delete_btn.add_css_class("destructive-action");
+
+        let core_clone = core.clone();
+        let status_clone = status.clone();
+        let export_btn_clone = export_btn.clone();
+        let scrolled_clone = scrolled_window.clone();
+        let row_id = row.id;
+
+        delete_btn.connect_clicked(move |_| {
+            let effects = core_clone.process_event(Event::DeleteLayer(row_id));
+            process_effects(
+                core_clone.clone(),
+                effects,
+                status_clone.clone(),
+                export_btn_clone.clone(),
+                scrolled_clone.clone(),
+            );
+        });
+
+        grid.attach(&delete_btn, 5, grid_row, 1, 1);
     }
     grid
 }

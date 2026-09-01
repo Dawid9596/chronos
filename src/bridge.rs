@@ -98,6 +98,7 @@ pub enum Event {
         field: EditableField,
         new_value: String,
     },
+    DeleteLayer(u32),
 }
 
 // The App's capabilities
@@ -164,15 +165,23 @@ impl App for ConservationApp {
             Event::CyclePattern { id } => {
                 if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     entry.condition.pattern = match entry.condition.pattern {
-                        crate::storage::BarPattern::Solid => crate::storage::BarPattern::DiagonalHatch,
-                        crate::storage::BarPattern::DiagonalHatch => crate::storage::BarPattern::CrossedOut,
+                        crate::storage::BarPattern::Solid => {
+                            crate::storage::BarPattern::DiagonalHatch
+                        }
+                        crate::storage::BarPattern::DiagonalHatch => {
+                            crate::storage::BarPattern::CrossedOut
+                        }
                         crate::storage::BarPattern::CrossedOut => crate::storage::BarPattern::Wavy,
                         crate::storage::BarPattern::Wavy => crate::storage::BarPattern::Solid,
                     };
                 }
                 caps.render.render();
             }
-            Event::UpdateText { id, field, new_value } => {
+            Event::UpdateText {
+                id,
+                field,
+                new_value,
+            } => {
                 if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     match field {
                         EditableField::ItemId => entry.item_id = new_value,
@@ -183,16 +192,28 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::UpdateGroupText { member_ids, field, new_value } => {
+            Event::UpdateGroupText {
+                member_ids,
+                field,
+                new_value,
+            } => {
                 for entry in model.document.entries.iter_mut() {
                     if member_ids.contains(&entry.id) {
                         match field {
-                            EditableField::MaterialCategory => entry.material_category = new_value.clone(),
-                            EditableField::EpochOrLocation => entry.epoch_or_location = new_value.clone(),
+                            EditableField::MaterialCategory => {
+                                entry.material_category = new_value.clone()
+                            }
+                            EditableField::EpochOrLocation => {
+                                entry.epoch_or_location = new_value.clone()
+                            }
                             _ => {}
                         }
                     }
                 }
+                caps.render.render();
+            }
+            Event::DeleteLayer(id) => {
+                model.document.entries.retain(|e| e.id != id);
                 caps.render.render();
             }
         }
