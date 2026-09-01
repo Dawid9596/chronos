@@ -62,6 +62,14 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum EditableField {
+    ItemId,
+    TreatmentNotes,
+    MaterialCategory,
+    EpochOrLocation,
+}
+
 #[derive(Default)]
 pub struct ConservationApp;
 
@@ -74,11 +82,21 @@ pub enum Event {
     // The capability returned the result from the Shell
     PdfExportFinished(ExportPdfResponse),
     UpdateConditionFill {
-        item_id: String,
+        id: u32,
         new_percentage: f32,
     },
     CyclePattern {
-        item_id: String,
+        id: u32,
+    },
+    UpdateText {
+        id: u32,
+        field: EditableField,
+        new_value: String,
+    },
+    UpdateGroupText {
+        member_ids: Vec<u32>,
+        field: EditableField,
+        new_value: String,
     },
 }
 
@@ -137,42 +155,47 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::UpdateConditionFill {
-                item_id,
-                new_percentage,
-            } => {
-                if let Some(entry) = model
-                    .document
-                    .entries
-                    .iter_mut()
-                    .find(|e| e.item_id == item_id)
-                {
+            Event::UpdateConditionFill { id, new_percentage } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     entry.condition.fill_percentage = new_percentage;
                 }
                 caps.render.render();
             }
-            Event::CyclePattern { item_id } => {
-                if let Some(entry) = model
-                    .document
-                    .entries
-                    .iter_mut()
-                    .find(|e| e.item_id == item_id)
-                {
+            Event::CyclePattern { id } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     entry.condition.pattern = match entry.condition.pattern {
-                        crate::storage::BarPattern::Solid => {
-                            crate::storage::BarPattern::DiagonalHatch
-                        }
-                        crate::storage::BarPattern::DiagonalHatch => {
-                            crate::storage::BarPattern::CrossedOut
-                        }
+                        crate::storage::BarPattern::Solid => crate::storage::BarPattern::DiagonalHatch,
+                        crate::storage::BarPattern::DiagonalHatch => crate::storage::BarPattern::CrossedOut,
                         crate::storage::BarPattern::CrossedOut => crate::storage::BarPattern::Wavy,
                         crate::storage::BarPattern::Wavy => crate::storage::BarPattern::Solid,
                     };
                 }
                 caps.render.render();
             }
+            Event::UpdateText { id, field, new_value } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    match field {
+                        EditableField::ItemId => entry.item_id = new_value,
+                        EditableField::TreatmentNotes => entry.treatment_notes = new_value,
+                        EditableField::MaterialCategory => entry.material_category = new_value,
+                        EditableField::EpochOrLocation => entry.epoch_or_location = new_value,
+                    }
+                }
+                caps.render.render();
+            }
+            Event::UpdateGroupText { member_ids, field, new_value } => {
+                for entry in model.document.entries.iter_mut() {
+                    if member_ids.contains(&entry.id) {
+                        match field {
+                            EditableField::MaterialCategory => entry.material_category = new_value.clone(),
+                            EditableField::EpochOrLocation => entry.epoch_or_location = new_value.clone(),
+                            _ => {}
+                        }
+                    }
+                }
+                caps.render.render();
+            }
         }
-
         Command::done()
     }
 

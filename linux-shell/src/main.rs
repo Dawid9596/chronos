@@ -1,9 +1,9 @@
-use chronos::bridge::{ConservationApp, Effect, Event, ExportPdfResponse};
+use chronos::bridge::{ConservationApp, EditableField, Effect, Event, ExportPdfResponse};
 use chronos::storage::{BarPattern, ConditionBar};
 use chronos::view::DocumentViewModel;
 use crux_core::Core;
-use gtk4::{Align, DrawingArea, GestureDrag, Grid, Label, glib, prelude::*};
 use gtk4::{Application, ApplicationWindow, Box as GtkBox, Button, Orientation, ScrolledWindow};
+use gtk4::{DrawingArea, GestureDrag, Grid, Label, glib, prelude::*};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
 const APP_ID: &str = "org.conservation.Editor";
@@ -164,6 +164,7 @@ pub fn build_document_table(
         "Material",
         "Location/Epoch",
     ];
+
     for (col, title) in headers.iter().enumerate() {
         let label = Label::builder()
             .use_markup(true)
@@ -175,10 +176,27 @@ pub fn build_document_table(
     for (i, row) in view_model.rows.iter().enumerate() {
         let grid_row = (i + 1) as i32;
 
-        grid.attach(&Label::new(Some(&row.item_id)), 0, grid_row, 1, 1);
+        // Col 0: Item ID (Single Cell Edit)
+        let item_id_widget = create_editable_widget(
+            &row.item_id,
+            core.clone(),
+            status.clone(),
+            export_btn.clone(),
+            scrolled_window.clone(),
+            {
+                let id = row.id;
+                move |new_val| Event::UpdateText {
+                    id,
+                    field: EditableField::ItemId,
+                    new_value: new_val,
+                }
+            },
+        );
+        grid.attach(&item_id_widget, 0, grid_row, 1, 1);
 
+        // Col 1: Condition Bar
         let interactive_bar = build_interactive_condition_bar(
-            row.item_id.clone(),
+            row.id,
             row.condition.clone(),
             core.clone(),
             status.clone(),
@@ -187,26 +205,62 @@ pub fn build_document_table(
         );
         grid.attach(&interactive_bar, 1, grid_row, 1, 1);
 
-        let notes_label = Label::builder()
-            .label(&row.treatment_notes)
-            .wrap(true)
-            .max_width_chars(30)
-            .build();
-        grid.attach(&notes_label, 2, grid_row, 1, 1);
+        // Col 2: Treatment Notes (Single Cell Edit)
+        let notes_widget = create_editable_widget(
+            &row.treatment_notes,
+            core.clone(),
+            status.clone(),
+            export_btn.clone(),
+            scrolled_window.clone(),
+            {
+                let id = row.id;
+                move |new_val| Event::UpdateText {
+                    id,
+                    field: EditableField::TreatmentNotes,
+                    new_value: new_val,
+                }
+            },
+        );
+        grid.attach(&notes_widget, 2, grid_row, 1, 1);
 
+        // Col 3: Material Group (Grouped Edit)
         if let Some(mat) = &row.material_group {
-            let label = Label::builder()
-                .label(&mat.value)
-                .valign(Align::Center)
-                .build();
-            grid.attach(&label, 3, grid_row, 1, mat.span as i32);
+            let mat_widget = create_editable_widget(
+                &mat.value,
+                core.clone(),
+                status.clone(),
+                export_btn.clone(),
+                scrolled_window.clone(),
+                {
+                    let member_ids = mat.member_ids.clone();
+                    move |new_val| Event::UpdateGroupText {
+                        member_ids: member_ids.clone(),
+                        field: EditableField::MaterialCategory,
+                        new_value: new_val,
+                    }
+                },
+            );
+            grid.attach(&mat_widget, 3, grid_row, 1, mat.span as i32);
         }
+
+        // Col 4: Location Group (Grouped Edit)
         if let Some(loc) = &row.location_group {
-            let label = Label::builder()
-                .label(&loc.value)
-                .valign(Align::Center)
-                .build();
-            grid.attach(&label, 4, grid_row, 1, loc.span as i32);
+            let loc_widget = create_editable_widget(
+                &loc.value,
+                core.clone(),
+                status.clone(),
+                export_btn.clone(),
+                scrolled_window.clone(),
+                {
+                    let member_ids = loc.member_ids.clone();
+                    move |new_val| Event::UpdateGroupText {
+                        member_ids: member_ids.clone(),
+                        field: EditableField::EpochOrLocation,
+                        new_value: new_val,
+                    }
+                },
+            );
+            grid.attach(&loc_widget, 4, grid_row, 1, loc.span as i32);
         }
     }
     grid
@@ -295,7 +349,7 @@ pub fn build_condition_drawing_area(condition: ConditionBar) -> DrawingArea {
 }
 
 pub fn build_interactive_condition_bar(
-    item_id: String,
+    id: u32,
     condition: ConditionBar,
     core: Rc<Core<ConservationApp>>,
     status: gtk4::Label,
@@ -490,7 +544,7 @@ pub fn build_interactive_condition_bar(
     let drag_end_area = drawing_area.clone();
     let drag_end_pct = local_pct.clone();
     let drag_end_core = core.clone();
-    let drag_end_item_id = item_id.clone();
+    let drag_end_id = id;
     let drag_end_started = started_on_handle.clone();
     let drag_end_did_drag = did_drag.clone();
 
@@ -507,13 +561,11 @@ pub fn build_interactive_condition_bar(
         drag_end_area.queue_draw();
 
         let event = if !was_drag {
-            Event::CyclePattern {
-                item_id: drag_end_item_id.clone(),
-            }
+            Event::CyclePattern { id: drag_end_id }
         } else if was_on_handle {
             let final_pct = *drag_end_pct.borrow();
             Event::UpdateConditionFill {
-                item_id: drag_end_item_id.clone(),
+                id: drag_end_id,
                 new_percentage: final_pct,
             }
         } else {
@@ -529,7 +581,115 @@ pub fn build_interactive_condition_bar(
             drag_end_scrolled_window.clone(),
         );
     });
-
     drawing_area.add_controller(drag);
     drawing_area
+}
+
+/// Helper to create an inline editable text cell
+fn create_editable_widget(
+    initial_text: &str,
+    core: Rc<Core<ConservationApp>>,
+    status: gtk4::Label,
+    export_btn: gtk4::Button,
+    scrolled_window: gtk4::ScrolledWindow,
+    on_commit: impl Fn(String) -> Event + 'static,
+) -> gtk4::Widget {
+    let on_commit = Rc::new(on_commit);
+
+    let stack = gtk4::Stack::new();
+    stack.set_transition_type(gtk4::StackTransitionType::None);
+
+    let label = gtk4::Label::new(Some(initial_text));
+    label.set_wrap(true);
+    label.set_max_width_chars(30);
+    label.set_halign(gtk4::Align::Start);
+    label.set_valign(gtk4::Align::Center);
+    // Add a slight left margin to match the internal text padding of the Entry
+    label.set_margin_start(2);
+
+    let entry = gtk4::Entry::new();
+    entry.set_text(initial_text);
+    entry.set_has_frame(false);
+    entry.set_valign(gtk4::Align::Center);
+
+    stack.add_named(&label, Some("label"));
+    stack.add_named(&entry, Some("entry"));
+    stack.set_visible_child_name("label");
+
+    // --- Double click to enter edit mode ---
+    let click_gesture = gtk4::GestureClick::new();
+    click_gesture.set_button(1);
+
+    let stack_clone = stack.clone();
+    let entry_clone = entry.clone();
+    click_gesture.connect_pressed(move |_gesture, n_press, _x, _y| {
+        if n_press == 2 {
+            stack_clone.set_visible_child_name("entry");
+            entry_clone.grab_focus();
+            entry_clone.select_region(0, -1);
+        }
+    });
+
+    label.add_controller(click_gesture);
+
+    // --- Commit Logic ---
+    let commit_and_switch = {
+        let stack = stack.clone();
+        let entry = entry.clone();
+        let label = label.clone();
+        let core = core.clone();
+        let status = status.clone();
+        let export_btn = export_btn.clone();
+        let scrolled_window = scrolled_window.clone();
+        let on_commit = on_commit.clone();
+        move || {
+            if stack.visible_child_name().as_deref() == Some("entry") {
+                let new_text = entry.text().to_string();
+                stack.set_visible_child_name("label");
+                label.set_text(&new_text);
+
+                let event = on_commit(new_text);
+                let effects = core.process_event(event);
+                process_effects(
+                    core.clone(),
+                    effects,
+                    status.clone(),
+                    export_btn.clone(),
+                    scrolled_window.clone(),
+                );
+            }
+        }
+    };
+
+    // --- Commit on Enter ---
+    let commit_clone = commit_and_switch.clone();
+    entry.connect_activate(move |_| {
+        commit_clone();
+    });
+
+    // --- Cancel on Esc ---
+    let key_controller = gtk4::EventControllerKey::new();
+    let stack_clone = stack.clone();
+    let entry_clone = entry.clone();
+    let label_clone = label.clone();
+    key_controller.connect_key_pressed(move |_controller, key, _keycode, _state| {
+        if key == gtk4::gdk::Key::Escape {
+            stack_clone.set_visible_child_name("label");
+            entry_clone.set_text(label_clone.text().as_str());
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    entry.add_controller(key_controller);
+
+    // --- Commit on focus out (clicking outside) ---
+    let focus_controller = gtk4::EventControllerFocus::new();
+    let commit_clone2 = commit_and_switch;
+    focus_controller.connect_leave(move |_controller| {
+        commit_clone2();
+    });
+    entry.add_controller(focus_controller);
+
+    stack.upcast()
 }
