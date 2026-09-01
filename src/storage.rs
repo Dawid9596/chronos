@@ -1,29 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ConservationDocument {
-    pub project_name: String,
-    pub date: String,
-    pub entries: Vec<ConservationEntry>,
-}
-
-/// Represents a single un-merged row in the document
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ConservationEntry {
-    pub id: u32,
-    pub graphical_representation: ConditionBar,
-    pub woven_trim: ConditionBar,
-    pub layer_characteristics: String,
-    pub layer_thickness: String,
-    pub chronological_phase: String,
-    pub dating_period: String,
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Slot {
+    pub start_pct: f32,
+    pub end_pct: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ConditionBar {
-    /// 0.0 to 100.0
-    pub fill_percentage: f32,
     pub pattern: BarPattern,
+    pub slots: Vec<Slot>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -53,12 +39,18 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 1,
                         graphical_representation: ConditionBar {
-                            fill_percentage: 75.0,
                             pattern: BarPattern::DiagonalHatch,
+                            slots: vec![Slot {
+                                start_pct: 0.0,
+                                end_pct: 75.0,
+                            }],
                         },
                         woven_trim: ConditionBar {
-                            fill_percentage: 40.0,
                             pattern: BarPattern::Wavy,
+                            slots: vec![Slot {
+                                start_pct: 0.0,
+                                end_pct: 75.0,
+                            }],
                         },
                         layer_characteristics: "Compact clay".to_string(),
                         layer_thickness: "12 cm".to_string(),
@@ -68,12 +60,18 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 2,
                         graphical_representation: ConditionBar {
-                            fill_percentage: 30.0,
                             pattern: BarPattern::CrossedOut,
+                            slots: vec![Slot {
+                                start_pct: 0.0,
+                                end_pct: 30.0,
+                            }],
                         },
                         woven_trim: ConditionBar {
-                            fill_percentage: 10.0,
                             pattern: BarPattern::Solid,
+                            slots: vec![Slot {
+                                start_pct: 0.0,
+                                end_pct: 10.0,
+                            }],
                         },
                         layer_characteristics: "Ash layer".to_string(),
                         layer_thickness: "5 cm".to_string(),
@@ -82,9 +80,27 @@ impl Default for AppState {
                     },
                 ],
             },
-            next_id: 3, // Start counting after the default entries
+            next_id: 3,
             last_error: None,
             is_exporting: false,
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ConservationDocument {
+    pub project_name: String,
+    pub date: String,
+    pub entries: Vec<ConservationEntry>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ConservationEntry {
+    pub id: u32,
+    pub graphical_representation: ConditionBar,
+    pub woven_trim: ConditionBar,
+    pub layer_characteristics: String,
+    pub layer_thickness: String,
+    pub chronological_phase: String,
+    pub dating_period: String,
 }

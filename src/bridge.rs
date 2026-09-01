@@ -1,4 +1,4 @@
-use crate::storage::AppState;
+use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -6,21 +6,18 @@ use crux_core::{App, macros::Effect, render::Render};
 use crux_macros::Capability;
 use serde::{Deserialize, Serialize};
 
-/// The request sent from Core to Shell
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ExportPdfRequest {
     pub file_name: String,
     pub pdf_bytes: Vec<u8>,
 }
 
-/// The response sent from Shell back to Core
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ExportPdfResponse {
-    Success(String), // Returns the saved file path
+    Success(String),
     Error(String),
 }
 
-// The operation that binds our request and response types
 impl Operation for ExportPdfRequest {
     type Output = ExportPdfResponse;
 }
@@ -38,7 +35,6 @@ where
         Self { context }
     }
 
-    /// The method called by the Core to trigger the export
     pub fn export(
         &self,
         file_name: String,
@@ -49,13 +45,10 @@ where
             file_name,
             pdf_bytes,
         };
-
         self.context.spawn({
             let context = self.context.clone();
             async move {
-                // Yield the request to the Shell and await the response
                 let response = context.request_from_shell(request).await;
-                // Dispatch the Core event with the result
                 context.update_app(on_complete(response));
             }
         });
@@ -76,26 +69,19 @@ pub enum BarType {
     WovenTrim,
 }
 
-#[derive(Default)]
-pub struct ConservationApp;
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotEdge {
+    Start,
+    End,
+}
 
-// The events the Core can process
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
-    // User clicked "Export to PDF" in the UI
     RequestPdfExport,
-    // The capability returned the result from the Shell
     PdfExportFinished(ExportPdfResponse),
-    UpdateConditionFill {
-        id: u32,
-        bar_type: BarType,
-        new_percentage: f32,
-    },
-    CyclePattern {
-        id: u32,
-        bar_type: BarType,
-    },
+    DeleteLayer(u32),
+    InsertLayerAfter(Option<u32>),
     UpdateText {
         id: u32,
         field: EditableField,
@@ -106,11 +92,32 @@ pub enum Event {
         field: EditableField,
         new_value: String,
     },
-    DeleteLayer(u32),
-    InsertLayerAfter(Option<u32>),
+    CyclePattern {
+        id: u32,
+        bar_type: BarType,
+    },
+    AddSlot {
+        id: u32,
+        bar_type: BarType,
+        at_pct: f32,
+    },
+    DeleteSlot {
+        id: u32,
+        bar_type: BarType,
+        slot_index: usize,
+    },
+    UpdateSlotEdge {
+        id: u32,
+        bar_type: BarType,
+        slot_index: usize,
+        edge: SlotEdge,
+        new_pct: f32,
+    },
 }
 
-// The App's capabilities
+#[derive(Default)]
+pub struct ConservationApp;
+
 #[derive(Effect)]
 pub struct Capabilities {
     pub render: Render<Event>,
@@ -132,14 +139,12 @@ impl App for ConservationApp {
     ) -> Command<Self::Effect, Self::Event> {
         match event {
             Event::Init => {
-                caps.render.render(); // Just draw the UI, don't export
+                caps.render.render();
             }
             Event::RequestPdfExport => {
                 model.is_exporting = true;
                 model.last_error = None;
-
                 let view_model = model.document.to_view_model();
-
                 match crate::generate_pdf::typst_compile_to_bytes(&view_model) {
                     Ok(pdf_bytes) => {
                         let file_name = format!("{}.pdf", model.document.project_name);
@@ -161,39 +166,37 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::UpdateConditionFill {
-                id,
-                bar_type,
-                new_percentage,
-            } => {
-                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
-                    match bar_type {
-                        BarType::GraphicalRepresentation => {
-                            entry.graphical_representation.fill_percentage = new_percentage
-                        }
-                        BarType::WovenTrim => entry.woven_trim.fill_percentage = new_percentage,
-                    }
-                }
+            Event::DeleteLayer(id) => {
+                model.document.entries.retain(|e| e.id != id);
                 caps.render.render();
             }
-            Event::CyclePattern { id, bar_type } => {
-                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
-                    let pattern = match bar_type {
-                        BarType::GraphicalRepresentation => {
-                            &mut entry.graphical_representation.pattern
-                        }
-                        BarType::WovenTrim => &mut entry.woven_trim.pattern,
-                    };
-                    *pattern = match pattern {
-                        crate::storage::BarPattern::Solid => {
-                            crate::storage::BarPattern::DiagonalHatch
-                        }
-                        crate::storage::BarPattern::DiagonalHatch => {
-                            crate::storage::BarPattern::CrossedOut
-                        }
-                        crate::storage::BarPattern::CrossedOut => crate::storage::BarPattern::Wavy,
-                        crate::storage::BarPattern::Wavy => crate::storage::BarPattern::Solid,
-                    };
+            Event::InsertLayerAfter(after_id) => {
+                let new_id = model.next_id;
+                model.next_id += 1;
+                let new_entry = ConservationEntry {
+                    id: new_id,
+                    graphical_representation: ConditionBar {
+                        pattern: BarPattern::Solid,
+                        slots: vec![],
+                    },
+                    woven_trim: ConditionBar {
+                        pattern: BarPattern::Solid,
+                        slots: vec![],
+                    },
+                    layer_characteristics: String::new(),
+                    layer_thickness: String::new(),
+                    chronological_phase: String::new(),
+                    dating_period: String::new(),
+                };
+                if let Some(idx) = model
+                    .document
+                    .entries
+                    .iter()
+                    .position(|e| e.id == after_id.unwrap_or(0))
+                {
+                    model.document.entries.insert(idx + 1, new_entry);
+                } else {
+                    model.document.entries.push(new_entry);
                 }
                 caps.render.render();
             }
@@ -208,8 +211,7 @@ impl App for ConservationApp {
                             entry.layer_characteristics = new_value
                         }
                         EditableField::LayerThickness => entry.layer_thickness = new_value,
-                        EditableField::ChronologicalPhase => entry.chronological_phase = new_value,
-                        EditableField::DatingPeriod => entry.dating_period = new_value,
+                        _ => {}
                     }
                 }
                 caps.render.render();
@@ -232,39 +234,101 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::DeleteLayer(id) => {
-                model.document.entries.retain(|e| e.id != id);
+            Event::CyclePattern { id, bar_type } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    let pattern = match bar_type {
+                        BarType::GraphicalRepresentation => {
+                            &mut entry.graphical_representation.pattern
+                        }
+                        BarType::WovenTrim => &mut entry.woven_trim.pattern,
+                    };
+                    *pattern = match pattern {
+                        BarPattern::Solid => BarPattern::DiagonalHatch,
+                        BarPattern::DiagonalHatch => BarPattern::CrossedOut,
+                        BarPattern::CrossedOut => BarPattern::Wavy,
+                        BarPattern::Wavy => BarPattern::Solid,
+                    };
+                }
                 caps.render.render();
             }
-            Event::InsertLayerAfter(maybe_id) => {
-                let insert_index = match maybe_id {
-                    Some(id) => model
-                        .document
-                        .entries
-                        .iter()
-                        .position(|e| e.id == id)
-                        .map(|i| i + 1)
-                        .unwrap_or(0),
-                    None => 0,
-                };
+            Event::AddSlot {
+                id,
+                bar_type,
+                at_pct,
+            } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    let bar = match bar_type {
+                        BarType::GraphicalRepresentation => &mut entry.graphical_representation,
+                        BarType::WovenTrim => &mut entry.woven_trim,
+                    };
+                    const MIN_GAP_PCT: f32 = 2.0;
+                    let clashes = bar.slots.iter().any(|s| {
+                        at_pct >= s.start_pct - MIN_GAP_PCT && at_pct <= s.end_pct + MIN_GAP_PCT
+                    });
+                    if !clashes {
+                        bar.slots.push(Slot {
+                            start_pct: at_pct,
+                            end_pct: at_pct,
+                        });
+                        bar.slots
+                            .sort_by(|a, b| a.start_pct.partial_cmp(&b.start_pct).unwrap());
+                    }
+                }
+                caps.render.render();
+            }
+            Event::DeleteSlot {
+                id,
+                bar_type,
+                slot_index,
+            } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    let bar = match bar_type {
+                        BarType::GraphicalRepresentation => &mut entry.graphical_representation,
+                        BarType::WovenTrim => &mut entry.woven_trim,
+                    };
+                    if slot_index < bar.slots.len() {
+                        bar.slots.remove(slot_index);
+                    }
+                }
+                caps.render.render();
+            }
+            Event::UpdateSlotEdge {
+                id,
+                bar_type,
+                slot_index,
+                edge,
+                new_pct,
+            } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    let bar = match bar_type {
+                        BarType::GraphicalRepresentation => &mut entry.graphical_representation,
+                        BarType::WovenTrim => &mut entry.woven_trim,
+                    };
+                    let prev_end = if slot_index > 0 {
+                        bar.slots[slot_index - 1].end_pct
+                    } else {
+                        0.0
+                    };
+                    let next_start = bar
+                        .slots
+                        .get(slot_index + 1)
+                        .map(|s| s.start_pct)
+                        .unwrap_or(100.0);
+                    const MIN_GAP_PCT: f32 = 2.0;
 
-                let new_entry = crate::storage::ConservationEntry {
-                    id: model.next_id,
-                    graphical_representation: crate::storage::ConditionBar {
-                        fill_percentage: 50.0,
-                        pattern: crate::storage::BarPattern::Solid,
-                    },
-                    woven_trim: crate::storage::ConditionBar {
-                        fill_percentage: 50.0,
-                        pattern: crate::storage::BarPattern::Solid,
-                    },
-                    layer_characteristics: "".to_string(),
-                    layer_thickness: "".to_string(),
-                    chronological_phase: "Unknown".to_string(),
-                    dating_period: "Unknown".to_string(),
-                };
-                model.document.entries.insert(insert_index, new_entry);
-                model.next_id += 1;
+                    if let Some(slot) = bar.slots.get_mut(slot_index) {
+                        match edge {
+                            SlotEdge::Start => {
+                                slot.start_pct =
+                                    new_pct.clamp(prev_end + MIN_GAP_PCT, slot.end_pct);
+                            }
+                            SlotEdge::End => {
+                                slot.end_pct =
+                                    new_pct.clamp(slot.start_pct, next_start - MIN_GAP_PCT);
+                            }
+                        }
+                    }
+                }
                 caps.render.render();
             }
         }

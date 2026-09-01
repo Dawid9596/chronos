@@ -6,13 +6,10 @@
 #let hatch-pattern = pattern(size: (8pt, 8pt))[
   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
 ]
-
 #let crossed-pattern = pattern(size: (8pt, 8pt))[
   #line(start: (0pt, 0pt), end: (8pt, 8pt), stroke: 0.5pt + black)
   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
 ]
-
-// A zig-zag/wavy line drawn inside a repeating pattern box
 #let wavy-pattern = pattern(size: (12pt, 12pt))[
   #path(
     stroke: 0.5pt + black,
@@ -22,14 +19,12 @@
     (12pt, 6pt),
   )
 ]
-
 #let solid-pattern = rgb("555555")
 
 // ---------------------------------------------------------
 // Bar Renderer
 // ---------------------------------------------------------
 #let render-bar(condition) = {
-  let pct = condition.fill_percentage * 1%
   let fill-style = if condition.pattern == "solid" { solid-pattern } else if condition.pattern == "diagonalHatch" {
     hatch-pattern
   } else if condition.pattern == "crossedOut" { crossed-pattern } else if condition.pattern == "wavy" {
@@ -37,7 +32,11 @@
   } else { solid-pattern }
 
   box(width: 100%, height: 1.2em, stroke: 0.5pt + luma(150), {
-    box(width: pct, height: 100%, fill: fill-style, stroke: none)
+    for slot in condition.slots {
+      let x0 = slot.start_pct * 1%
+      let w = calc.max(slot.end_pct - slot.start_pct, 0.3) * 1%
+      place(left, dx: x0, box(width: w, height: 100%, fill: fill-style, stroke: none))
+    }
   })
 }
 
@@ -47,7 +46,6 @@
 #let conservation-report(data) = {
   set page("a4", margin: (x: 1.5cm, y: 2cm))
   set text(font: "Linux Libertine", size: 10pt)
-
   align(center)[
     #text(size: 16pt, weight: "bold")[#data.project_name] \
     #v(0.5em)
