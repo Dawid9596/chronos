@@ -1,4 +1,4 @@
-#let data = json("view_model.json")
+#let data = json.decode(sys.inputs.json_data)
 
 // ---------------------------------------------------------
 // Define Patterns for the Condition Bars

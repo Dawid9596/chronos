@@ -24,8 +24,8 @@ typst-pdf.workspace = true
 crux_core = "0.14" 
 crux_macros = "0.10"
 serde = { version = "1.0.229", features = ["derive"] }
-typst = "0.11"
-typst-pdf = "0.11"
+typst = "0.12"
+typst-pdf = "0.12"
 chrono = "0.4"
 comemo = "0.4"
 serde_json = "1.0.151"

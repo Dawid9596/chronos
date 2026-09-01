@@ -279,8 +279,12 @@ fn process_effects(
                     "Export PDF"
                 });
 
-                if let Some(err) = &view.last_error {
-                    status.set_markup(&format!("<span foreground='red'>Error: {}</span>", err));
+                if let Some(msg) = &view.last_error {
+                    if msg.starts_with("Error") {
+                        status.set_markup(&format!("<span foreground='red'>{}</span>", msg));
+                    } else {
+                        status.set_markup(&format!("<span foreground='green'>{}</span>", msg));
+                    }
                 } else {
                     status.set_text(&format!("Project: {}", view.document.project_name));
                 }
@@ -303,6 +307,7 @@ fn process_effects(
                 let scrolled_window = scrolled_window.clone();
                 let vis = vis.clone();
                 let tool = tool.clone();
+
                 glib::spawn_future_local(async move {
                     let file_name = request.operation.file_name.clone();
                     let pdf_bytes = request.operation.pdf_bytes.clone();
@@ -311,9 +316,13 @@ fn process_effects(
 
                     let response = match fs::write(&file_path, pdf_bytes) {
                         Ok(_) => {
-                            ExportPdfResponse::Success(file_path.to_string_lossy().to_string())
+                            let _ = std::process::Command::new("xdg-open")
+                                .arg(&file_path)
+                                .spawn();
+
+                            ExportPdfResponse::Success(format!("Saved to {}", file_path.display()))
                         }
-                        Err(e) => ExportPdfResponse::Error(e.to_string()),
+                        Err(e) => ExportPdfResponse::Error(format!("Error: {}", e)),
                     };
 
                     let next_effects = core

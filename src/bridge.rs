@@ -161,7 +161,7 @@ impl App for ConservationApp {
             Event::PdfExportFinished(response) => {
                 model.is_exporting = false;
                 match response {
-                    ExportPdfResponse::Success(_) => model.last_error = None,
+                    ExportPdfResponse::Success(path) => model.last_error = Some(path),
                     ExportPdfResponse::Error(err) => model.last_error = Some(err),
                 }
                 caps.render.render();
