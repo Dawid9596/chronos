@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "linux-shell"
+]
+
+
+[package]
+name = "chronos"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono.workspace = true
+comemo.workspace = true
+crux_core.workspace = true
+crux_macros.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+typst.workspace = true
+typst-pdf.workspace = true
+
+[workspace.dependencies]
+crux_core = "0.14" 
+crux_macros = "0.10"
+serde = { version = "1.0.229", features = ["derive"] }
+typst = "0.11"
+typst-pdf = "0.11"
+chrono = "0.4"
+comemo = "0.4"
+serde_json = "1.0.151"
