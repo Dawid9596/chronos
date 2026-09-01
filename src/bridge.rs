@@ -99,6 +99,7 @@ pub enum Event {
         new_value: String,
     },
     DeleteLayer(u32),
+    InsertLayerAfter(Option<u32>),
 }
 
 // The App's capabilities
@@ -214,6 +215,34 @@ impl App for ConservationApp {
             }
             Event::DeleteLayer(id) => {
                 model.document.entries.retain(|e| e.id != id);
+                caps.render.render();
+            }
+            Event::InsertLayerAfter(maybe_id) => {
+                let insert_index = match maybe_id {
+                    Some(id) => model
+                        .document
+                        .entries
+                        .iter()
+                        .position(|e| e.id == id)
+                        .map(|i| i + 1)
+                        .unwrap_or(0),
+                    None => 0,
+                };
+
+                let new_entry = crate::storage::ConservationEntry {
+                    id: model.next_id,
+                    item_id: "New Item".to_string(),
+                    condition: crate::storage::ConditionBar {
+                        fill_percentage: 50.0,
+                        pattern: crate::storage::BarPattern::Solid,
+                    },
+                    treatment_notes: "".to_string(),
+                    material_category: "Unknown".to_string(), // "Unknown" prevents accidental merging with existing groups
+                    epoch_or_location: "Unknown".to_string(),
+                };
+
+                model.document.entries.insert(insert_index, new_entry);
+                model.next_id += 1;
                 caps.render.render();
             }
         }

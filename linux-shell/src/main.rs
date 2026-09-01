@@ -2,18 +2,38 @@ use chronos::bridge::{ConservationApp, EditableField, Effect, Event, ExportPdfRe
 use chronos::storage::{BarPattern, ConditionBar};
 use chronos::view::DocumentViewModel;
 use crux_core::Core;
-use gtk4::{Application, ApplicationWindow, Box as GtkBox, Button, Orientation, ScrolledWindow};
 use gtk4::{DrawingArea, GestureDrag, Grid, Label, glib, prelude::*};
+use gtk4::{Application, ApplicationWindow, Box as GtkBox, Button, Orientation, ScrolledWindow};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() {
-    let app = Application::builder().application_id(APP_ID).build();
+    gtk4::init().expect("Failed to initialize GTK4");
 
+    let css_provider = gtk4::CssProvider::new();
+    css_provider.load_from_data(
+        "button.insert-gap { \
+            min-height: 4px; \
+            padding: 0; \
+            margin: 0px 0; \
+            background-color: transparent; \
+            transition: all 0.15s ease-out; \
+        } \
+        button.insert-gap:hover { \
+            background-color: alpha(@theme_selected_bg_color, 0.3); \
+            min-height: 6px; \
+        }",
+    );
+    gtk4::style_context_add_provider_for_display(
+        &gtk4::gdk::Display::default().unwrap(),
+        &css_provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+
+    let app = Application::builder().application_id(APP_ID).build();
     app.connect_activate(|app| {
         let core = Rc::new(Core::<ConservationApp>::default());
-
         let export_btn = Button::builder().label("Export PDF").build();
         let status_label = Label::new(Some("Ready"));
 
@@ -148,7 +168,7 @@ pub fn build_document_table(
 ) -> Grid {
     let grid = Grid::builder()
         .column_spacing(16)
-        .row_spacing(8)
+        .row_spacing(4) // Tight spacing to accommodate slim gap rows
         .margin_top(12)
         .margin_bottom(12)
         .margin_start(12)
@@ -163,7 +183,7 @@ pub fn build_document_table(
         "Treatment Notes",
         "Material",
         "Location/Epoch",
-        "",
+        "", // Delete column header
     ];
 
     for (col, title) in headers.iter().enumerate() {
@@ -174,8 +194,20 @@ pub fn build_document_table(
         grid.attach(&label, col as i32, 0, 1, 1);
     }
 
-    for (i, row) in view_model.rows.iter().enumerate() {
-        let grid_row = (i + 1) as i32;
+    let mut current_grid_row = 1;
+
+    let top_gap = build_insert_row(
+        None,
+        core.clone(),
+        status.clone(),
+        export_btn.clone(),
+        scrolled_window.clone(),
+    );
+    grid.attach(&top_gap, 0, current_grid_row, 6, 1);
+    current_grid_row += 1;
+
+    for row in view_model.rows.iter() {
+        let grid_row = current_grid_row;
 
         // Col 0: Item ID
         let item_id_widget = create_editable_widget(
@@ -293,8 +325,58 @@ pub fn build_document_table(
         });
 
         grid.attach(&delete_btn, 5, grid_row, 1, 1);
+
+        current_grid_row += 1;
+
+        if row.is_last_in_group {
+            let gap = build_insert_row(
+                Some(row.id),
+                core.clone(),
+                status.clone(),
+                export_btn.clone(),
+                scrolled_window.clone(),
+            );
+            grid.attach(&gap, 0, current_grid_row, 6, 1);
+            current_grid_row += 1;
+        }
     }
+
     grid
+}
+
+/// Helper to create the ultra-slim, hover-revealed insert row (no "+" symbol)
+fn build_insert_row(
+    after_id: Option<u32>,
+    core: Rc<Core<ConservationApp>>,
+    status: gtk4::Label,
+    export_btn: gtk4::Button,
+    scrolled_window: gtk4::ScrolledWindow,
+) -> gtk4::Widget {
+    let btn = gtk4::Button::builder()
+        .has_frame(false)
+        .hexpand(true)
+        .build();
+
+    // This class is targeted by the CSS provider injected in main()
+    btn.add_css_class("insert-gap");
+
+    let core_clone = core.clone();
+    let status_clone = status.clone();
+    let export_btn_clone = export_btn.clone();
+    let scrolled_clone = scrolled_window.clone();
+
+    btn.connect_clicked(move |_| {
+        let effects = core_clone.process_event(Event::InsertLayerAfter(after_id));
+        process_effects(
+            core_clone.clone(),
+            effects,
+            status_clone.clone(),
+            export_btn_clone.clone(),
+            scrolled_clone.clone(),
+        );
+    });
+
+    btn.upcast()
 }
 
 pub fn build_condition_drawing_area(condition: ConditionBar) -> DrawingArea {
