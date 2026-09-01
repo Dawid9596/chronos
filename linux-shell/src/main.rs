@@ -2,8 +2,8 @@ use chronos::bridge::{ConservationApp, EditableField, Effect, Event, ExportPdfRe
 use chronos::storage::{BarPattern, ConditionBar};
 use chronos::view::DocumentViewModel;
 use crux_core::Core;
-use gtk4::{DrawingArea, GestureDrag, Grid, Label, glib, prelude::*};
 use gtk4::{Application, ApplicationWindow, Box as GtkBox, Button, Orientation, ScrolledWindow};
+use gtk4::{DrawingArea, GestureDrag, Grid, Label, glib, prelude::*};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
 const APP_ID: &str = "org.conservation.Editor";
@@ -14,15 +14,14 @@ fn main() {
     let css_provider = gtk4::CssProvider::new();
     css_provider.load_from_data(
         "button.insert-gap { \
-            min-height: 4px; \
+            min-height: 6px; \
             padding: 0; \
-            margin: 0px 0; \
             background-color: transparent; \
             transition: all 0.15s ease-out; \
         } \
         button.insert-gap:hover { \
             background-color: alpha(@theme_selected_bg_color, 0.3); \
-            min-height: 6px; \
+            min-height: 12px; \
         }",
     );
     gtk4::style_context_add_provider_for_display(
@@ -166,9 +165,10 @@ pub fn build_document_table(
     export_btn: gtk4::Button,
     scrolled_window: gtk4::ScrolledWindow,
 ) -> Grid {
+    // CHANGE 1: Set row_spacing to 0 to take manual control of vertical spacing via margins
     let grid = Grid::builder()
         .column_spacing(16)
-        .row_spacing(4) // Tight spacing to accommodate slim gap rows
+        .row_spacing(0)
         .margin_top(12)
         .margin_bottom(12)
         .margin_start(12)
@@ -196,6 +196,7 @@ pub fn build_document_table(
 
     let mut current_grid_row = 1;
 
+    // 1. Top insert row
     let top_gap = build_insert_row(
         None,
         core.clone(),
@@ -301,6 +302,8 @@ pub fn build_document_table(
             .label("×")
             .has_frame(false)
             .valign(gtk4::Align::Center)
+            .margin_top(4)
+            .margin_bottom(4)
             .build();
 
         // flat destructive button
@@ -344,7 +347,7 @@ pub fn build_document_table(
     grid
 }
 
-/// Helper to create the ultra-slim, hover-revealed insert row (no "+" symbol)
+/// Helper to create the ultra-slim, hover-revealed insert row
 fn build_insert_row(
     after_id: Option<u32>,
     core: Rc<Core<ConservationApp>>,
@@ -355,9 +358,10 @@ fn build_insert_row(
     let btn = gtk4::Button::builder()
         .has_frame(false)
         .hexpand(true)
+        .margin_top(1)
+        .margin_bottom(1)
         .build();
 
-    // This class is targeted by the CSS provider injected in main()
     btn.add_css_class("insert-gap");
 
     let core_clone = core.clone();
@@ -391,7 +395,6 @@ pub fn build_condition_drawing_area(condition: ConditionBar) -> DrawingArea {
     drawing_area.set_draw_func(move |_area, cr, width, height| {
         let w = width as f64;
         let h = height as f64;
-
         if w == 0.0 || h == 0.0 {
             return;
         }
@@ -712,11 +715,17 @@ fn create_editable_widget(
     let stack = gtk4::Stack::new();
     stack.set_transition_type(gtk4::StackTransitionType::None);
 
+    stack.set_margin_top(4);
+    stack.set_margin_bottom(4);
+
     let label = gtk4::Label::new(Some(initial_text));
     label.set_wrap(true);
     label.set_max_width_chars(30);
-    label.set_halign(gtk4::Align::Start);
-    label.set_valign(gtk4::Align::Center);
+    label.set_width_chars(5);
+
+    label.set_halign(gtk4::Align::Fill);
+    label.set_valign(gtk4::Align::Fill);
+    label.set_xalign(0.0);
     // Add a slight left margin to match the internal text padding of the Entry
     label.set_margin_start(2);
 
@@ -724,6 +733,7 @@ fn create_editable_widget(
     entry.set_text(initial_text);
     entry.set_has_frame(false);
     entry.set_valign(gtk4::Align::Center);
+    entry.set_width_chars(5);
 
     stack.add_named(&label, Some("label"));
     stack.add_named(&entry, Some("entry"));
