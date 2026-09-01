@@ -11,11 +11,12 @@ pub struct ConservationDocument {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ConservationEntry {
     pub id: u32,
-    pub item_id: String,
-    pub condition: ConditionBar,
-    pub treatment_notes: String,
-    pub material_category: String,
-    pub epoch_or_location: String,
+    pub graphical_representation: ConditionBar,
+    pub woven_trim: ConditionBar,
+    pub layer_characteristics: String,
+    pub layer_thickness: String,
+    pub chronological_phase: String,
+    pub dating_period: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -51,25 +52,33 @@ impl Default for AppState {
                 entries: vec![
                     ConservationEntry {
                         id: 1,
-                        item_id: "ART-001".to_string(),
-                        condition: ConditionBar {
+                        graphical_representation: ConditionBar {
                             fill_percentage: 75.0,
                             pattern: BarPattern::DiagonalHatch,
                         },
-                        treatment_notes: "Surface cleaning required".to_string(),
-                        material_category: "Ceramic".to_string(),
-                        epoch_or_location: "Site A, Layer 2".to_string(),
+                        woven_trim: ConditionBar {
+                            fill_percentage: 40.0,
+                            pattern: BarPattern::Wavy,
+                        },
+                        layer_characteristics: "Compact clay".to_string(),
+                        layer_thickness: "12 cm".to_string(),
+                        chronological_phase: "Iron Age".to_string(),
+                        dating_period: "500 BC".to_string(),
                     },
                     ConservationEntry {
                         id: 2,
-                        item_id: "ART-002".to_string(),
-                        condition: ConditionBar {
+                        graphical_representation: ConditionBar {
                             fill_percentage: 30.0,
                             pattern: BarPattern::CrossedOut,
                         },
-                        treatment_notes: "Consolidation needed".to_string(),
-                        material_category: "Ceramic".to_string(),
-                        epoch_or_location: "Site A, Layer 2".to_string(),
+                        woven_trim: ConditionBar {
+                            fill_percentage: 10.0,
+                            pattern: BarPattern::Solid,
+                        },
+                        layer_characteristics: "Ash layer".to_string(),
+                        layer_thickness: "5 cm".to_string(),
+                        chronological_phase: "Iron Age".to_string(),
+                        dating_period: "400 BC".to_string(),
                     },
                 ],
             },

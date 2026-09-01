@@ -64,10 +64,16 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum EditableField {
-    ItemId,
-    TreatmentNotes,
-    MaterialCategory,
-    EpochOrLocation,
+    LayerCharacteristics,
+    LayerThickness,
+    ChronologicalPhase,
+    DatingPeriod,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum BarType {
+    GraphicalRepresentation,
+    WovenTrim,
 }
 
 #[derive(Default)]
@@ -83,10 +89,12 @@ pub enum Event {
     PdfExportFinished(ExportPdfResponse),
     UpdateConditionFill {
         id: u32,
+        bar_type: BarType,
         new_percentage: f32,
     },
     CyclePattern {
         id: u32,
+        bar_type: BarType,
     },
     UpdateText {
         id: u32,
@@ -148,24 +156,35 @@ impl App for ConservationApp {
             Event::PdfExportFinished(response) => {
                 model.is_exporting = false;
                 match response {
-                    ExportPdfResponse::Success(_path) => {
-                        model.last_error = None;
-                    }
-                    ExportPdfResponse::Error(err) => {
-                        model.last_error = Some(err);
+                    ExportPdfResponse::Success(_) => model.last_error = None,
+                    ExportPdfResponse::Error(err) => model.last_error = Some(err),
+                }
+                caps.render.render();
+            }
+            Event::UpdateConditionFill {
+                id,
+                bar_type,
+                new_percentage,
+            } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    match bar_type {
+                        BarType::GraphicalRepresentation => {
+                            entry.graphical_representation.fill_percentage = new_percentage
+                        }
+                        BarType::WovenTrim => entry.woven_trim.fill_percentage = new_percentage,
                     }
                 }
                 caps.render.render();
             }
-            Event::UpdateConditionFill { id, new_percentage } => {
+            Event::CyclePattern { id, bar_type } => {
                 if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
-                    entry.condition.fill_percentage = new_percentage;
-                }
-                caps.render.render();
-            }
-            Event::CyclePattern { id } => {
-                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
-                    entry.condition.pattern = match entry.condition.pattern {
+                    let pattern = match bar_type {
+                        BarType::GraphicalRepresentation => {
+                            &mut entry.graphical_representation.pattern
+                        }
+                        BarType::WovenTrim => &mut entry.woven_trim.pattern,
+                    };
+                    *pattern = match pattern {
                         crate::storage::BarPattern::Solid => {
                             crate::storage::BarPattern::DiagonalHatch
                         }
@@ -185,10 +204,12 @@ impl App for ConservationApp {
             } => {
                 if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     match field {
-                        EditableField::ItemId => entry.item_id = new_value,
-                        EditableField::TreatmentNotes => entry.treatment_notes = new_value,
-                        EditableField::MaterialCategory => entry.material_category = new_value,
-                        EditableField::EpochOrLocation => entry.epoch_or_location = new_value,
+                        EditableField::LayerCharacteristics => {
+                            entry.layer_characteristics = new_value
+                        }
+                        EditableField::LayerThickness => entry.layer_thickness = new_value,
+                        EditableField::ChronologicalPhase => entry.chronological_phase = new_value,
+                        EditableField::DatingPeriod => entry.dating_period = new_value,
                     }
                 }
                 caps.render.render();
@@ -201,12 +222,10 @@ impl App for ConservationApp {
                 for entry in model.document.entries.iter_mut() {
                     if member_ids.contains(&entry.id) {
                         match field {
-                            EditableField::MaterialCategory => {
-                                entry.material_category = new_value.clone()
+                            EditableField::ChronologicalPhase => {
+                                entry.chronological_phase = new_value.clone()
                             }
-                            EditableField::EpochOrLocation => {
-                                entry.epoch_or_location = new_value.clone()
-                            }
+                            EditableField::DatingPeriod => entry.dating_period = new_value.clone(),
                             _ => {}
                         }
                     }
@@ -231,16 +250,19 @@ impl App for ConservationApp {
 
                 let new_entry = crate::storage::ConservationEntry {
                     id: model.next_id,
-                    item_id: "New Item".to_string(),
-                    condition: crate::storage::ConditionBar {
+                    graphical_representation: crate::storage::ConditionBar {
                         fill_percentage: 50.0,
                         pattern: crate::storage::BarPattern::Solid,
                     },
-                    treatment_notes: "".to_string(),
-                    material_category: "Unknown".to_string(), // "Unknown" prevents accidental merging with existing groups
-                    epoch_or_location: "Unknown".to_string(),
+                    woven_trim: crate::storage::ConditionBar {
+                        fill_percentage: 50.0,
+                        pattern: crate::storage::BarPattern::Solid,
+                    },
+                    layer_characteristics: "".to_string(),
+                    layer_thickness: "".to_string(),
+                    chronological_phase: "Unknown".to_string(),
+                    dating_period: "Unknown".to_string(),
                 };
-
                 model.document.entries.insert(insert_index, new_entry);
                 model.next_id += 1;
                 caps.render.render();

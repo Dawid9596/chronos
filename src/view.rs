@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use crate::storage::{ConditionBar, ConservationDocument};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DocumentViewModel {
@@ -11,19 +10,20 @@ pub struct DocumentViewModel {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RowViewModel {
     pub id: u32,
-    pub item_id: String,
-    pub condition: ConditionBar,
-    pub treatment_notes: String,
-
-    pub material_group: Option<GroupSpan>,
-    pub location_group: Option<GroupSpan>,
+    pub row_number: usize,
+    pub graphical_representation: ConditionBar,
+    pub woven_trim: ConditionBar,
+    pub layer_characteristics: String,
+    pub layer_thickness: String,
+    pub chronological_phase: Option<GroupSpan>,
+    pub dating_period: Option<GroupSpan>,
     pub is_last_in_group: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupSpan {
     pub value: String,
-    pub span: usize, // e.g., 2 means it merges this row and the next
+    pub span: usize,
     pub member_ids: Vec<u32>,
 }
 
@@ -38,29 +38,29 @@ impl ConservationDocument {
             };
         }
 
-        let mut mat_spans = vec![1; len];
-        let mut loc_spans = vec![1; len];
+        let mut chrono_spans = vec![1; len];
+        let mut dating_spans = vec![1; len];
 
         for i in (1..len).rev() {
             let current = &self.entries[i];
             let previous = &self.entries[i - 1];
-            if current.material_category == previous.material_category {
-                mat_spans[i - 1] = mat_spans[i] + 1;
-                mat_spans[i] = 0;
+            if current.chronological_phase == previous.chronological_phase {
+                chrono_spans[i - 1] = chrono_spans[i] + 1;
+                chrono_spans[i] = 0;
             }
-            if current.epoch_or_location == previous.epoch_or_location {
-                loc_spans[i - 1] = loc_spans[i] + 1;
-                loc_spans[i] = 0;
+            if current.dating_period == previous.dating_period {
+                dating_spans[i - 1] = dating_spans[i] + 1;
+                dating_spans[i] = 0;
             }
         }
 
         for i in 0..len {
             let entry = &self.entries[i];
 
-            let material_group = if mat_spans[i] > 0 {
-                let span = mat_spans[i];
+            let chronological_phase = if chrono_spans[i] > 0 {
+                let span = chrono_spans[i];
                 Some(GroupSpan {
-                    value: entry.material_category.clone(),
+                    value: entry.chronological_phase.clone(),
                     span,
                     member_ids: self.entries[i..i + span].iter().map(|e| e.id).collect(),
                 })
@@ -68,10 +68,10 @@ impl ConservationDocument {
                 None
             };
 
-            let location_group = if loc_spans[i] > 0 {
-                let span = loc_spans[i];
+            let dating_period = if dating_spans[i] > 0 {
+                let span = dating_spans[i];
                 Some(GroupSpan {
-                    value: entry.epoch_or_location.clone(),
+                    value: entry.dating_period.clone(),
                     span,
                     member_ids: self.entries[i..i + span].iter().map(|e| e.id).collect(),
                 })
@@ -81,19 +81,21 @@ impl ConservationDocument {
 
             let is_last_in_group = if i + 1 < len {
                 let next = &self.entries[i + 1];
-                entry.material_category != next.material_category
-                    || entry.epoch_or_location != next.epoch_or_location
+                entry.chronological_phase != next.chronological_phase
+                    || entry.dating_period != next.dating_period
             } else {
                 true
             };
 
             rows.push(RowViewModel {
                 id: entry.id,
-                item_id: entry.item_id.clone(),
-                condition: entry.condition.clone(),
-                treatment_notes: entry.treatment_notes.clone(),
-                material_group,
-                location_group,
+                row_number: i + 1,
+                graphical_representation: entry.graphical_representation.clone(),
+                woven_trim: entry.woven_trim.clone(),
+                layer_characteristics: entry.layer_characteristics.clone(),
+                layer_thickness: entry.layer_thickness.clone(),
+                chronological_phase,
+                dating_period,
                 is_last_in_group,
             });
         }

@@ -1,4 +1,4 @@
-use chronos::bridge::{ConservationApp, EditableField, Effect, Event, ExportPdfResponse};
+use chronos::bridge::{BarType, ConservationApp, EditableField, Effect, Event, ExportPdfResponse};
 use chronos::storage::{BarPattern, ConditionBar};
 use chronos::view::DocumentViewModel;
 use crux_core::Core;
@@ -68,7 +68,7 @@ fn main() {
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Conservation Editor")
-            .default_width(900)
+            .default_width(1100)
             .default_height(600)
             .child(&container)
             .build();
@@ -108,11 +108,11 @@ fn process_effects(
                 let view = core.view();
 
                 export_btn.set_sensitive(!view.is_exporting);
-                if view.is_exporting {
-                    export_btn.set_label("Exporting...");
+                export_btn.set_label(if view.is_exporting {
+                    "Exporting..."
                 } else {
-                    export_btn.set_label("Export PDF");
-                }
+                    "Export PDF"
+                });
 
                 if let Some(err) = &view.last_error {
                     status.set_markup(&format!("<span foreground='red'>Error: {}</span>", err));
@@ -165,7 +165,6 @@ pub fn build_document_table(
     export_btn: gtk4::Button,
     scrolled_window: gtk4::ScrolledWindow,
 ) -> Grid {
-    // CHANGE 1: Set row_spacing to 0 to take manual control of vertical spacing via margins
     let grid = Grid::builder()
         .column_spacing(16)
         .row_spacing(0)
@@ -178,12 +177,14 @@ pub fn build_document_table(
         .build();
 
     let headers = [
-        "Item ID",
-        "Condition",
-        "Treatment Notes",
-        "Material",
-        "Location/Epoch",
-        "", // Delete column header
+        "No.",
+        "Graphical representation\nof the",
+        "Woven trim",
+        "Layer characteristics",
+        "Layer thickness",
+        "Chronological phase",
+        "Dating period",
+        "", // Delete
     ];
 
     for (col, title) in headers.iter().enumerate() {
@@ -196,7 +197,6 @@ pub fn build_document_table(
 
     let mut current_grid_row = 1;
 
-    // 1. Top insert row
     let top_gap = build_insert_row(
         None,
         core.clone(),
@@ -204,44 +204,44 @@ pub fn build_document_table(
         export_btn.clone(),
         scrolled_window.clone(),
     );
-    grid.attach(&top_gap, 0, current_grid_row, 6, 1);
+    grid.attach(&top_gap, 0, current_grid_row, 8, 1);
     current_grid_row += 1;
 
     for row in view_model.rows.iter() {
         let grid_row = current_grid_row;
 
-        // Col 0: Item ID
-        let item_id_widget = create_editable_widget(
-            &row.item_id,
-            core.clone(),
-            status.clone(),
-            export_btn.clone(),
-            scrolled_window.clone(),
-            {
-                let id = row.id;
-                move |new_val| Event::UpdateText {
-                    id,
-                    field: EditableField::ItemId,
-                    new_value: new_val,
-                }
-            },
-        );
-        grid.attach(&item_id_widget, 0, grid_row, 1, 1);
+        let row_num_label = Label::new(Some(&row.row_number.to_string()));
+        row_num_label.set_margin_top(4);
+        row_num_label.set_margin_bottom(4);
+        row_num_label.set_valign(gtk4::Align::Center);
+        grid.attach(&row_num_label, 0, grid_row, 1, 1);
 
-        // Col 1: Condition Bar
-        let interactive_bar = build_interactive_condition_bar(
+        let graph_bar = build_interactive_condition_bar(
             row.id,
-            row.condition.clone(),
+            BarType::GraphicalRepresentation,
+            row.graphical_representation.clone(),
+            150,
             core.clone(),
             status.clone(),
             export_btn.clone(),
             scrolled_window.clone(),
         );
-        grid.attach(&interactive_bar, 1, grid_row, 1, 1);
+        grid.attach(&graph_bar, 1, grid_row, 1, 1);
 
-        // Col 2: Treatment Notes
-        let notes_widget = create_editable_widget(
-            &row.treatment_notes,
+        let woven_bar = build_interactive_condition_bar(
+            row.id,
+            BarType::WovenTrim,
+            row.woven_trim.clone(),
+            60,
+            core.clone(),
+            status.clone(),
+            export_btn.clone(),
+            scrolled_window.clone(),
+        );
+        grid.attach(&woven_bar, 2, grid_row, 1, 1);
+
+        let char_widget = create_editable_widget(
+            &row.layer_characteristics,
             core.clone(),
             status.clone(),
             export_btn.clone(),
@@ -250,54 +250,68 @@ pub fn build_document_table(
                 let id = row.id;
                 move |new_val| Event::UpdateText {
                     id,
-                    field: EditableField::TreatmentNotes,
+                    field: EditableField::LayerCharacteristics,
                     new_value: new_val,
                 }
             },
         );
-        grid.attach(&notes_widget, 2, grid_row, 1, 1);
+        grid.attach(&char_widget, 3, grid_row, 1, 1);
 
-        // Col 3: Material Group
-        if let Some(mat) = &row.material_group {
-            let mat_widget = create_editable_widget(
-                &mat.value,
+        let thick_widget = create_editable_widget(
+            &row.layer_thickness,
+            core.clone(),
+            status.clone(),
+            export_btn.clone(),
+            scrolled_window.clone(),
+            {
+                let id = row.id;
+                move |new_val| Event::UpdateText {
+                    id,
+                    field: EditableField::LayerThickness,
+                    new_value: new_val,
+                }
+            },
+        );
+        grid.attach(&thick_widget, 4, grid_row, 1, 1);
+
+        if let Some(chrono) = &row.chronological_phase {
+            let chrono_widget = create_editable_widget(
+                &chrono.value,
                 core.clone(),
                 status.clone(),
                 export_btn.clone(),
                 scrolled_window.clone(),
                 {
-                    let member_ids = mat.member_ids.clone();
+                    let member_ids = chrono.member_ids.clone();
                     move |new_val| Event::UpdateGroupText {
                         member_ids: member_ids.clone(),
-                        field: EditableField::MaterialCategory,
+                        field: EditableField::ChronologicalPhase,
                         new_value: new_val,
                     }
                 },
             );
-            grid.attach(&mat_widget, 3, grid_row, 1, mat.span as i32);
+            grid.attach(&chrono_widget, 5, grid_row, 1, chrono.span as i32);
         }
 
-        // Col 4: Location Group
-        if let Some(loc) = &row.location_group {
-            let loc_widget = create_editable_widget(
-                &loc.value,
+        if let Some(dating) = &row.dating_period {
+            let dating_widget = create_editable_widget(
+                &dating.value,
                 core.clone(),
                 status.clone(),
                 export_btn.clone(),
                 scrolled_window.clone(),
                 {
-                    let member_ids = loc.member_ids.clone();
+                    let member_ids = dating.member_ids.clone();
                     move |new_val| Event::UpdateGroupText {
                         member_ids: member_ids.clone(),
-                        field: EditableField::EpochOrLocation,
+                        field: EditableField::DatingPeriod,
                         new_value: new_val,
                     }
                 },
             );
-            grid.attach(&loc_widget, 4, grid_row, 1, loc.span as i32);
+            grid.attach(&dating_widget, 6, grid_row, 1, dating.span as i32);
         }
 
-        // Col 5: Delete Button
         let delete_btn = gtk4::Button::builder()
             .label("×")
             .has_frame(false)
@@ -310,24 +324,31 @@ pub fn build_document_table(
         delete_btn.add_css_class("flat");
         delete_btn.add_css_class("destructive-action");
 
-        let core_clone = core.clone();
-        let status_clone = status.clone();
-        let export_btn_clone = export_btn.clone();
-        let scrolled_clone = scrolled_window.clone();
         let row_id = row.id;
 
-        delete_btn.connect_clicked(move |_| {
-            let effects = core_clone.process_event(Event::DeleteLayer(row_id));
-            process_effects(
-                core_clone.clone(),
-                effects,
-                status_clone.clone(),
-                export_btn_clone.clone(),
-                scrolled_clone.clone(),
-            );
-        });
+        let core_btn = core.clone();
+        let status_btn = status.clone();
+        let export_btn_clone = export_btn.clone();
+        let scrolled_btn = scrolled_window.clone();
 
-        grid.attach(&delete_btn, 5, grid_row, 1, 1);
+        delete_btn.connect_clicked(move |_| {
+            let core_inner = core_btn.clone();
+            let status_inner = status_btn.clone();
+            let export_btn_inner = export_btn_clone.clone();
+            let scrolled_inner = scrolled_btn.clone();
+
+            glib::idle_add_local_once(move || {
+                let effects = core_inner.process_event(Event::DeleteLayer(row_id));
+                process_effects(
+                    core_inner,
+                    effects,
+                    status_inner,
+                    export_btn_inner,
+                    scrolled_inner,
+                );
+            });
+        });
+        grid.attach(&delete_btn, 7, grid_row, 1, 1);
 
         current_grid_row += 1;
 
@@ -339,15 +360,13 @@ pub fn build_document_table(
                 export_btn.clone(),
                 scrolled_window.clone(),
             );
-            grid.attach(&gap, 0, current_grid_row, 6, 1);
+            grid.attach(&gap, 0, current_grid_row, 8, 1);
             current_grid_row += 1;
         }
     }
-
     grid
 }
 
-/// Helper to create the ultra-slim, hover-revealed insert row
 fn build_insert_row(
     after_id: Option<u32>,
     core: Rc<Core<ConservationApp>>,
@@ -361,112 +380,33 @@ fn build_insert_row(
         .margin_top(1)
         .margin_bottom(1)
         .build();
-
     btn.add_css_class("insert-gap");
 
-    let core_clone = core.clone();
-    let status_clone = status.clone();
-    let export_btn_clone = export_btn.clone();
-    let scrolled_clone = scrolled_window.clone();
-
     btn.connect_clicked(move |_| {
-        let effects = core_clone.process_event(Event::InsertLayerAfter(after_id));
-        process_effects(
-            core_clone.clone(),
-            effects,
-            status_clone.clone(),
-            export_btn_clone.clone(),
-            scrolled_clone.clone(),
-        );
-    });
+        let core_inner = core.clone();
+        let status_inner = status.clone();
+        let export_btn_inner = export_btn.clone();
+        let scrolled_inner = scrolled_window.clone();
 
+        glib::idle_add_local_once(move || {
+            let effects = core_inner.process_event(Event::InsertLayerAfter(after_id));
+            process_effects(
+                core_inner,
+                effects,
+                status_inner,
+                export_btn_inner,
+                scrolled_inner,
+            );
+        });
+    });
     btn.upcast()
-}
-
-pub fn build_condition_drawing_area(condition: ConditionBar) -> DrawingArea {
-    let drawing_area = DrawingArea::builder()
-        .hexpand(true)
-        .width_request(150)
-        .height_request(24)
-        .margin_top(4)
-        .margin_bottom(4)
-        .build();
-
-    drawing_area.set_draw_func(move |_area, cr, width, height| {
-        let w = width as f64;
-        let h = height as f64;
-        if w == 0.0 || h == 0.0 {
-            return;
-        }
-
-        cr.set_source_rgb(0.9, 0.9, 0.9);
-        cr.rectangle(0.0, 0.0, w, h);
-        cr.fill().expect("Failed to fill track");
-        cr.set_source_rgb(0.7, 0.7, 0.7);
-        cr.rectangle(0.0, 0.0, w, h);
-        cr.stroke().expect("Failed to stroke track");
-
-        let fill_w = w * (condition.fill_percentage as f64 / 100.0);
-
-        if fill_w > 0.0 {
-            cr.rectangle(0.0, 0.0, fill_w, h);
-            cr.clip();
-
-            cr.set_source_rgb(0.3, 0.3, 0.3); // Dark gray for the pattern
-            cr.set_line_width(1.5);
-
-            match condition.pattern {
-                BarPattern::Solid => {
-                    cr.rectangle(0.0, 0.0, fill_w, h);
-                    cr.fill().expect("Failed to fill solid bar");
-                }
-                BarPattern::DiagonalHatch => {
-                    let step = 8.0;
-                    let mut x = -h;
-                    while x < fill_w {
-                        cr.move_to(x, h);
-                        cr.line_to(x + h, 0.0);
-                        x += step;
-                    }
-                    cr.stroke().expect("Failed to stroke hatch");
-                }
-                BarPattern::CrossedOut => {
-                    let step = 12.0;
-                    let mut x = 0.0;
-                    while x < fill_w {
-                        cr.move_to(x, 0.0);
-                        cr.line_to(x + step, h);
-                        cr.move_to(x, h);
-                        cr.line_to(x + step, 0.0);
-                        x += step;
-                    }
-                    cr.stroke().expect("Failed to stroke crosses");
-                }
-                BarPattern::Wavy => {
-                    let step = 16.0;
-                    let mut x = 0.0;
-                    let mid_y = h / 2.0;
-                    let amp = (h / 2.0) - 4.0;
-                    cr.move_to(0.0, mid_y);
-                    while x < fill_w {
-                        cr.line_to(x + (step * 0.25), mid_y - amp);
-                        cr.line_to(x + (step * 0.75), mid_y + amp);
-                        cr.line_to(x + step, mid_y);
-                        x += step;
-                    }
-                    cr.stroke().expect("Failed to stroke wavy path");
-                }
-            }
-            cr.reset_clip();
-        }
-    });
-
-    drawing_area
 }
 
 pub fn build_interactive_condition_bar(
     id: u32,
+    bar_type: BarType,
     condition: ConditionBar,
+    width_request: i32,
     core: Rc<Core<ConservationApp>>,
     status: gtk4::Label,
     export_btn: gtk4::Button,
@@ -474,6 +414,7 @@ pub fn build_interactive_condition_bar(
 ) -> DrawingArea {
     let drawing_area = DrawingArea::builder()
         .hexpand(true)
+        .width_request(width_request)
         .height_request(24)
         .margin_top(4)
         .margin_bottom(4)
@@ -483,7 +424,6 @@ pub fn build_interactive_condition_bar(
     let is_hovering_handle = Rc::new(RefCell::new(false));
     let is_dragging = Rc::new(RefCell::new(false));
 
-    // --- CAIRO DRAWING ---
     let draw_pct = local_pct.clone();
     let draw_hover = is_hovering_handle.clone();
     let draw_dragging = is_dragging.clone();
@@ -661,6 +601,7 @@ pub fn build_interactive_condition_bar(
     let drag_end_pct = local_pct.clone();
     let drag_end_core = core.clone();
     let drag_end_id = id;
+    let drag_end_bar_type = bar_type.clone();
     let drag_end_started = started_on_handle.clone();
     let drag_end_did_drag = did_drag.clone();
 
@@ -677,25 +618,37 @@ pub fn build_interactive_condition_bar(
         drag_end_area.queue_draw();
 
         let event = if !was_drag {
-            Event::CyclePattern { id: drag_end_id }
+            Event::CyclePattern {
+                id: drag_end_id,
+                bar_type: drag_end_bar_type.clone(),
+            }
         } else if was_on_handle {
             let final_pct = *drag_end_pct.borrow();
             Event::UpdateConditionFill {
                 id: drag_end_id,
+                bar_type: drag_end_bar_type.clone(),
                 new_percentage: final_pct,
             }
         } else {
             return;
         };
 
-        let effects = drag_end_core.process_event(event);
-        process_effects(
-            drag_end_core.clone(),
-            effects,
-            drag_end_status.clone(),
-            drag_end_export_btn.clone(),
-            drag_end_scrolled_window.clone(),
-        );
+        // FIX: Clone variables *inside* the Fn closure
+        let core_inner = drag_end_core.clone();
+        let status_inner = drag_end_status.clone();
+        let export_btn_inner = drag_end_export_btn.clone();
+        let scrolled_inner = drag_end_scrolled_window.clone();
+
+        glib::idle_add_local_once(move || {
+            let effects = core_inner.process_event(event);
+            process_effects(
+                core_inner,
+                effects,
+                status_inner,
+                export_btn_inner,
+                scrolled_inner,
+            );
+        });
     });
     drawing_area.add_controller(drag);
     drawing_area
@@ -717,6 +670,7 @@ fn create_editable_widget(
 
     stack.set_margin_top(4);
     stack.set_margin_bottom(4);
+    stack.set_valign(gtk4::Align::Center);
 
     let label = gtk4::Label::new(Some(initial_text));
     label.set_wrap(true);
@@ -724,7 +678,7 @@ fn create_editable_widget(
     label.set_width_chars(5);
 
     label.set_halign(gtk4::Align::Fill);
-    label.set_valign(gtk4::Align::Fill);
+    label.set_valign(gtk4::Align::Center);
     label.set_xalign(0.0);
     // Add a slight left margin to match the internal text padding of the Entry
     label.set_margin_start(2);
@@ -772,14 +726,22 @@ fn create_editable_widget(
                 label.set_text(&new_text);
 
                 let event = on_commit(new_text);
-                let effects = core.process_event(event);
-                process_effects(
-                    core.clone(),
-                    effects,
-                    status.clone(),
-                    export_btn.clone(),
-                    scrolled_window.clone(),
-                );
+
+                let core_inner = core.clone();
+                let status_inner = status.clone();
+                let export_btn_inner = export_btn.clone();
+                let scrolled_inner = scrolled_window.clone();
+
+                glib::idle_add_local_once(move || {
+                    let effects = core_inner.process_event(event);
+                    process_effects(
+                        core_inner,
+                        effects,
+                        status_inner,
+                        export_btn_inner,
+                        scrolled_inner,
+                    );
+                });
             }
         }
     };

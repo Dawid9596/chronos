@@ -1,5 +1,3 @@
-// In a real app, the Rust core will either compile this template with the
-// JSON injected, or write out a temporary .json file and compile.
 #let data = json("view_model.json")
 
 // ---------------------------------------------------------
@@ -31,17 +29,13 @@
 // Bar Renderer
 // ---------------------------------------------------------
 #let render-bar(condition) = {
-  // Convert 0-100 to a relative percentage for the box width
   let pct = condition.fill_percentage * 1%
-
-  // Note: serde camelCase makes these lowercase first letter
   let fill-style = if condition.pattern == "solid" { solid-pattern } else if condition.pattern == "diagonalHatch" {
     hatch-pattern
   } else if condition.pattern == "crossedOut" { crossed-pattern } else if condition.pattern == "wavy" {
     wavy-pattern
-  } else { solid-pattern } // Fallback
+  } else { solid-pattern }
 
-  // Outer box (the empty track), Inner box (the filled pattern)
   box(width: 100%, height: 1.2em, stroke: 0.5pt + luma(150), {
     box(width: pct, height: 100%, fill: fill-style, stroke: none)
   })
@@ -54,7 +48,6 @@
   set page("a4", margin: (x: 1.5cm, y: 2cm))
   set text(font: "Linux Libertine", size: 10pt)
 
-  // Document Header
   align(center)[
     #text(size: 16pt, weight: "bold")[#data.project_name] \
     #v(0.5em)
@@ -62,50 +55,47 @@
   ]
   v(2em)
 
-  // Initialize flat array for table cells
   let cells = (
-    [*Item ID*],
-    [*Condition Status*],
-    [*Treatment Notes*],
-    [*Material*],
-    [*Location/Epoch*],
+    [*No.*],
+    [*Graphical representation\nof the layer*],
+    [*Woven trim*],
+    [*Layer characteristics*],
+    [*Layer thickness*],
+    [*Chronological phase*],
+    [*Dating period*],
   )
 
-  // Iterate over our View Model
   for row in data.rows {
-    // Column 1 & 2 & 3: Always present
-    cells.push(row.item_id)
-    cells.push(render-bar(row.condition))
-    cells.push(row.treatment_notes)
+    cells.push(str(row.row_number))
+    cells.push(render-bar(row.graphical_representation))
+    cells.push(render-bar(row.woven_trim))
+    cells.push(row.layer_characteristics)
+    cells.push(row.layer_thickness)
 
-    // Column 4: Material Group (Merged Cell Logic)
-    let mat = row.at("material_group", default: none)
-    if mat != none {
+    let chrono = row.at("chronological_phase", default: none)
+    if chrono != none {
       cells.push(table.cell(
-        rowspan: mat.span,
+        rowspan: chrono.span,
         align: center + horizon,
-      )[#mat.value])
+      )[#chrono.value])
     }
 
-    // Column 5: Location Group (Merged Cell Logic)
-    let loc = row.at("location_group", default: none)
-    if loc != none {
+    let dating = row.at("dating_period", default: none)
+    if dating != none {
       cells.push(table.cell(
-        rowspan: loc.span,
+        rowspan: dating.span,
         align: center + horizon,
-      )[#loc.value])
+      )[#dating.value])
     }
   }
 
-  // Render the table
   table(
-    columns: (15%, 25%, 30%, 15%, 15%),
-    align: (left, left, left, center, center),
+    columns: (5%, 20%, 10%, 20%, 10%, 15%, 20%),
+    align: (center, center, center, left, center, center, center),
     stroke: (x, y) => if y == 0 { 1pt + black } else { 0.5pt + luma(200) },
     fill: (x, y) => if y == 0 { luma(240) } else { none },
     ..cells
   )
 }
 
-// Execute the report
 #conservation-report(data)
