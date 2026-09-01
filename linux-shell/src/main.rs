@@ -515,9 +515,6 @@ fn build_document_table(
                     },
                 );
                 grid.attach(&chrono_widget, col_idx, grid_row, 1, chrono.span as i32);
-            } else {
-                let empty = Label::new(None);
-                grid.attach(&empty, col_idx, grid_row, 1, 1);
             }
             col_idx += 1;
         }
@@ -542,9 +539,6 @@ fn build_document_table(
                     },
                 );
                 grid.attach(&dating_widget, col_idx, grid_row, 1, dating.span as i32);
-            } else {
-                let empty = Label::new(None);
-                grid.attach(&empty, col_idx, grid_row, 1, 1);
             }
             col_idx += 1;
         }
@@ -1079,7 +1073,7 @@ fn create_editable_widget(
 
     stack.set_margin_top(4);
     stack.set_margin_bottom(4);
-    stack.set_valign(gtk4::Align::Center);
+    stack.set_valign(gtk4::Align::Fill);
 
     let label = gtk4::Label::new(Some(initial_text));
     label.set_wrap(true);
@@ -1087,7 +1081,7 @@ fn create_editable_widget(
     label.set_width_chars(5);
 
     label.set_halign(gtk4::Align::Fill);
-    label.set_valign(gtk4::Align::Center);
+    label.set_valign(gtk4::Align::Fill);
     label.set_xalign(0.0);
     // Add a slight left margin to match the internal text padding of the Entry
     label.set_margin_start(2);
@@ -1117,7 +1111,7 @@ fn create_editable_widget(
         }
     });
 
-    label.add_controller(click_gesture);
+    stack.add_controller(click_gesture);
 
     // --- Commit Logic ---
     let commit_and_switch = {
