@@ -30,6 +30,7 @@ pub struct AppState {
     pub last_error: Option<String>,
     pub is_exporting: bool,
     pub language: Language,
+    pub current_file_path: Option<String>,
 }
 
 impl Default for AppState {
@@ -87,6 +88,7 @@ impl Default for AppState {
             last_error: None,
             is_exporting: false,
             language: Language::English,
+            current_file_path: None,
         }
     }
 }

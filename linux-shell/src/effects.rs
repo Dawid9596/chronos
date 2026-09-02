@@ -1,5 +1,6 @@
 use crate::context::AppContext;
 use chronos::bridge::{Effect, ExportPdfResponse};
+use chronos::bridge::{FilePickerRequest, FilePickerResponse};
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::path::PathBuf;
@@ -62,6 +63,78 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                         .core
                         .resolve(&mut request, response)
                         .expect("Failed to resolve effect");
+                    process_effects(&ctx, next_effects);
+                });
+            }
+            Effect::FilePicker(mut request) => {
+                let ctx = ctx.clone();
+                glib::spawn_future_local(async move {
+                    let response = match &request.operation {
+                        FilePickerRequest::OpenFile { title, filter_name } => {
+                            let dialog = gtk4::FileDialog::new();
+                            dialog.set_title(title);
+
+                            let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
+                            let filter = gtk4::FileFilter::new();
+                            filter.add_mime_type("application/json");
+                            filter.add_suffix("json");
+                            filter.set_name(Some(filter_name));
+                            filters.append(&filter);
+                            dialog.set_filters(Some(&filters));
+
+                            match dialog.open_future(None::<&gtk4::Window>).await {
+                                Ok(file) => {
+                                    let path = file.path().unwrap().to_string_lossy().to_string();
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(content) => FilePickerResponse::Opened { path, content },
+                                        Err(e) => FilePickerResponse::Error(e.to_string()),
+                                    }
+                                }
+                                Err(_) => FilePickerResponse::Cancelled,
+                            }
+                        }
+                        FilePickerRequest::SaveFile {
+                            path,
+                            content,
+                            title,
+                            filter_name,
+                        } => {
+                            let final_path: String = if let Some(p) = path {
+                                p.clone()
+                            } else {
+                                let dialog = gtk4::FileDialog::new();
+                                dialog.set_title(title);
+
+                                let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
+                                let filter = gtk4::FileFilter::new();
+                                filter.add_mime_type("application/json");
+                                filter.add_suffix("json");
+                                filter.set_name(Some(filter_name));
+                                filters.append(&filter);
+                                dialog.set_filters(Some(&filters));
+
+                                match dialog.save_future(None::<&gtk4::Window>).await {
+                                    // Return an owned String here
+                                    Ok(file) => file.path().unwrap().to_string_lossy().to_string(),
+                                    Err(_) => {
+                                        let next_effects = ctx
+                                            .core
+                                            .resolve(&mut request, FilePickerResponse::Cancelled)
+                                            .expect("resolve");
+                                        process_effects(&ctx, next_effects);
+                                        return;
+                                    }
+                                }
+                            };
+
+                            match std::fs::write(&final_path, content) {
+                                Ok(_) => FilePickerResponse::Saved { path: final_path },
+                                Err(e) => FilePickerResponse::Error(e.to_string()),
+                            }
+                        }
+                    };
+
+                    let next_effects = ctx.core.resolve(&mut request, response).expect("resolve");
                     process_effects(&ctx, next_effects);
                 });
             }

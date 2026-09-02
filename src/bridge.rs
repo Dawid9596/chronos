@@ -1,4 +1,7 @@
-use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot};
+use crate::i18n::Translations;
+use crate::storage::{
+    AppState, BarPattern, ConditionBar, ConservationDocument, ConservationEntry, Slot,
+};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -75,6 +78,60 @@ pub enum SlotEdge {
     End,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum FilePickerRequest {
+    OpenFile {
+        title: String,
+        filter_name: String,
+    },
+    SaveFile {
+        path: Option<String>,
+        content: String,
+        title: String,
+        filter_name: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum FilePickerResponse {
+    Opened { path: String, content: String },
+    Saved { path: String },
+    Cancelled,
+    Error(String),
+}
+
+impl Operation for FilePickerRequest {
+    type Output = FilePickerResponse;
+}
+
+#[derive(Capability)]
+pub struct FilePicker<Ev> {
+    context: CapabilityContext<FilePickerRequest, Ev>,
+}
+
+impl<Ev> FilePicker<Ev>
+where
+    Ev: 'static,
+{
+    pub fn new(context: CapabilityContext<FilePickerRequest, Ev>) -> Self {
+        Self { context }
+    }
+
+    pub fn pick(
+        &self,
+        request: FilePickerRequest,
+        on_complete: impl Fn(FilePickerResponse) -> Ev + Send + Sync + 'static,
+    ) {
+        self.context.spawn({
+            let context = self.context.clone();
+            async move {
+                let response = context.request_from_shell(request).await;
+                context.update_app(on_complete(response));
+            }
+        });
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
@@ -114,6 +171,11 @@ pub enum Event {
         new_pct: f32,
     },
     ToggleLanguage,
+    RequestOpen,
+    RequestSave,
+    RequestSaveAs,
+    FileOpenResponse(FilePickerResponse),
+    FileSaveResponse(FilePickerResponse),
 }
 
 #[derive(Default)]
@@ -123,6 +185,7 @@ pub struct ConservationApp;
 pub struct Capabilities {
     pub render: Render<Event>,
     pub export_pdf: ExportPdf<Event>,
+    pub file_picker: FilePicker<Event>,
 }
 
 impl App for ConservationApp {
@@ -339,6 +402,81 @@ impl App for ConservationApp {
                 };
                 caps.render.render();
             }
+            Event::RequestOpen => {
+                let t = Translations::get(model.language);
+                caps.file_picker.pick(
+                    FilePickerRequest::OpenFile {
+                        title: t.dialog_open_title,
+                        filter_name: t.filter_json_name,
+                    },
+                    Event::FileOpenResponse,
+                );
+            }
+            Event::RequestSave => {
+                let content = serde_json::to_string(&model.document).unwrap_or_default();
+                let t = Translations::get(model.language);
+                caps.file_picker.pick(
+                    FilePickerRequest::SaveFile {
+                        path: model.current_file_path.clone(),
+                        content,
+                        title: t.dialog_save_title,
+                        filter_name: t.filter_json_name,
+                    },
+                    Event::FileSaveResponse,
+                );
+            }
+            Event::RequestSaveAs => {
+                let content = serde_json::to_string(&model.document).unwrap_or_default();
+                let t = Translations::get(model.language);
+                caps.file_picker.pick(
+                    FilePickerRequest::SaveFile {
+                        path: None, // Force "Save As" by clearing path
+                        content,
+                        title: t.dialog_save_title,
+                        filter_name: t.filter_json_name,
+                    },
+                    Event::FileSaveResponse,
+                );
+            }
+            Event::FileOpenResponse(response) => {
+                let t = Translations::get(model.language);
+                match response {
+                    FilePickerResponse::Opened { path, content } => {
+                        match serde_json::from_str::<ConservationDocument>(&content) {
+                            Ok(doc) => {
+                                model.document = doc;
+                                model.current_file_path = Some(path.clone());
+                                model.last_error =
+                                    Some(format!("{}{}", t.status_loaded_prefix, path));
+                            }
+                            Err(e) => {
+                                model.last_error = Some(format!("{}{}", t.error_parse_prefix, e));
+                            }
+                        }
+                    }
+                    FilePickerResponse::Saved { .. } => {}
+                    FilePickerResponse::Cancelled => {}
+                    FilePickerResponse::Error(e) => {
+                        model.last_error = Some(format!("{}{}", t.error_open_prefix, e));
+                    }
+                }
+                caps.render.render();
+            }
+            Event::FileSaveResponse(response) => {
+                let t = crate::i18n::Translations::get(model.language);
+                match response {
+                    FilePickerResponse::Saved { path } => {
+                        model.current_file_path = Some(path.clone());
+                        model.last_error = Some(format!("{}{}", t.status_saved_prefix, path));
+                    }
+                    FilePickerResponse::Opened { .. } => {}
+                    FilePickerResponse::Cancelled => {}
+                    FilePickerResponse::Error(e) => {
+                        model.last_error = Some(format!("{}{}", t.error_save_prefix, e));
+                    }
+                }
+                caps.render.render();
+            }
         }
         Command::done()
     }
@@ -348,7 +486,7 @@ impl App for ConservationApp {
             document: model.document.to_view_model(),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
-            translations: crate::i18n::Translations::get(model.language),
+            translations: Translations::get(model.language),
         }
     }
 }
