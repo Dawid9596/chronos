@@ -1,4 +1,4 @@
-use crate::storage::{ConditionBar, ConservationDocument};
+use crate::{i18n::Translations, storage::{ConditionBar, ConservationDocument}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -112,4 +112,5 @@ pub struct AppViewModel {
     pub document: DocumentViewModel,
     pub last_error: Option<String>,
     pub is_exporting: bool,
+    pub translations: Translations,
 }

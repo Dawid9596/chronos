@@ -1,0 +1,216 @@
+use crate::context::AppContext;
+use chronos::bridge::{BarType, EditableField, Event};
+use chronos::view::AppViewModel;
+use gtk4::glib;
+use gtk4::prelude::*;
+
+pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::Grid {
+    let grid = gtk4::Grid::builder()
+        .column_spacing(16)
+        .row_spacing(0)
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+
+    let current_vis = ctx.vis.borrow();
+    let t = &app_view.translations;
+    let headers = [
+        &t.col_no,
+        &t.col_graphical,
+        &t.col_woven,
+        &t.col_char,
+        &t.col_thickness,
+        &t.col_chrono,
+        &t.col_dating,
+        &String::new(),
+    ];
+
+    let mut total_visible_cols = 0;
+    let mut col_idx = 0;
+    for (i, title) in headers.iter().enumerate() {
+        let is_visible = if i == 7 { true } else { current_vis.flags[i] };
+        if is_visible {
+            let label = gtk4::Label::builder()
+                .use_markup(true)
+                .label(&format!("<b>{}</b>", title))
+                .build();
+            grid.attach(&label, col_idx, 0, 1, 1);
+            col_idx += 1;
+            total_visible_cols += 1;
+        }
+    }
+
+    let mut current_grid_row = 1;
+    grid.attach(
+        &build_insert_row(None, ctx),
+        0,
+        current_grid_row,
+        total_visible_cols,
+        1,
+    );
+    current_grid_row += 1;
+
+    for row in app_view.document.rows.iter() {
+        let grid_row = current_grid_row;
+        let mut col_idx = 0;
+
+        if current_vis.flags[0] {
+            let row_num_label = gtk4::Label::new(Some(&row.row_number.to_string()));
+            row_num_label.set_margin_top(4);
+            row_num_label.set_margin_bottom(4);
+            row_num_label.set_valign(gtk4::Align::Center);
+            grid.attach(&row_num_label, col_idx, grid_row, 1, 1);
+            col_idx += 1;
+        }
+
+        if current_vis.flags[1] {
+            let graph_bar = crate::ui::widgets::bar::build_interactive_condition_bar(
+                row.id,
+                BarType::GraphicalRepresentation,
+                row.graphical_representation.clone(),
+                150,
+                ctx,
+            );
+            grid.attach(&graph_bar, col_idx, grid_row, 1, 1);
+            col_idx += 1;
+        }
+
+        if current_vis.flags[2] {
+            let woven_bar = crate::ui::widgets::bar::build_interactive_condition_bar(
+                row.id,
+                BarType::WovenTrim,
+                row.woven_trim.clone(),
+                60,
+                ctx,
+            );
+            grid.attach(&woven_bar, col_idx, grid_row, 1, 1);
+            col_idx += 1;
+        }
+
+        if current_vis.flags[3] {
+            let char_widget = crate::ui::widgets::editable::create_editable_widget(
+                &row.layer_characteristics,
+                ctx,
+                {
+                    let id = row.id;
+                    move |new_val| Event::UpdateText {
+                        id,
+                        field: EditableField::LayerCharacteristics,
+                        new_value: new_val,
+                    }
+                },
+            );
+            grid.attach(&char_widget, col_idx, grid_row, 1, 1);
+            col_idx += 1;
+        }
+
+        if current_vis.flags[4] {
+            let thick_widget =
+                crate::ui::widgets::editable::create_editable_widget(&row.layer_thickness, ctx, {
+                    let id = row.id;
+                    move |new_val| Event::UpdateText {
+                        id,
+                        field: EditableField::LayerThickness,
+                        new_value: new_val,
+                    }
+                });
+            grid.attach(&thick_widget, col_idx, grid_row, 1, 1);
+            col_idx += 1;
+        }
+
+        if current_vis.flags[5] {
+            if let Some(chrono) = &row.chronological_phase {
+                let chrono_widget =
+                    crate::ui::widgets::editable::create_editable_widget(&chrono.value, ctx, {
+                        let member_ids = chrono.member_ids.clone();
+                        move |new_val| Event::UpdateGroupText {
+                            member_ids: member_ids.clone(),
+                            field: EditableField::ChronologicalPhase,
+                            new_value: new_val,
+                        }
+                    });
+                grid.attach(&chrono_widget, col_idx, grid_row, 1, chrono.span as i32);
+            }
+            col_idx += 1;
+        }
+
+        if current_vis.flags[6] {
+            if let Some(dating) = &row.dating_period {
+                let dating_widget =
+                    crate::ui::widgets::editable::create_editable_widget(&dating.value, ctx, {
+                        let member_ids = dating.member_ids.clone();
+                        move |new_val| Event::UpdateGroupText {
+                            member_ids: member_ids.clone(),
+                            field: EditableField::DatingPeriod,
+                            new_value: new_val,
+                        }
+                    });
+                grid.attach(&dating_widget, col_idx, grid_row, 1, dating.span as i32);
+            }
+            col_idx += 1;
+        }
+
+        let delete_btn = gtk4::Button::builder()
+            .label("×")
+            .has_frame(false)
+            .halign(gtk4::Align::Center)
+            .valign(gtk4::Align::Center)
+            .margin_top(4)
+            .margin_bottom(4)
+            .build();
+        delete_btn.add_css_class("flat");
+        delete_btn.add_css_class("destructive-action");
+
+        let row_id = row.id;
+        let ctx_btn = ctx.clone();
+
+        delete_btn.connect_clicked(move |_| {
+            let ctx_idle = ctx_btn.clone();
+            glib::idle_add_local_once(move || {
+                let effects = ctx_idle.core.process_event(Event::DeleteLayer(row_id));
+                crate::effects::process_effects(&ctx_idle, effects);
+            });
+        });
+
+        grid.attach(&delete_btn, col_idx, grid_row, 1, 1);
+        current_grid_row += 1;
+
+        if row.is_last_in_group {
+            grid.attach(
+                &build_insert_row(Some(row.id), ctx),
+                0,
+                current_grid_row,
+                total_visible_cols,
+                1,
+            );
+            current_grid_row += 1;
+        }
+    }
+    grid
+}
+
+pub fn build_insert_row(after_id: Option<u32>, ctx: &AppContext) -> gtk4::Widget {
+    let btn = gtk4::Button::builder()
+        .has_frame(false)
+        .hexpand(true)
+        .margin_top(1)
+        .margin_bottom(1)
+        .build();
+    btn.add_css_class("insert-gap");
+
+    let ctx_btn = ctx.clone();
+
+    btn.connect_clicked(move |_| {
+        let ctx_idle = ctx_btn.clone();
+        glib::idle_add_local_once(move || {
+            let effects = ctx_idle.core.process_event(Event::InsertLayerAfter(after_id));
+            crate::effects::process_effects(&ctx_idle, effects);
+        });
+    });
+
+    btn.upcast()
+}

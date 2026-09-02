@@ -113,6 +113,7 @@ pub enum Event {
         edge: SlotEdge,
         new_pct: f32,
     },
+    ToggleLanguage,
 }
 
 #[derive(Default)]
@@ -331,6 +332,13 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
+            Event::ToggleLanguage => {
+                model.language = match model.language {
+                    crate::i18n::Language::English => crate::i18n::Language::Polish,
+                    crate::i18n::Language::Polish => crate::i18n::Language::English,
+                };
+                caps.render.render();
+            }
         }
         Command::done()
     }
@@ -340,6 +348,7 @@ impl App for ConservationApp {
             document: model.document.to_view_model(),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
+            translations: crate::i18n::Translations::get(model.language),
         }
     }
 }

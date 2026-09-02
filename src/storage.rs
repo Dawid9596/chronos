@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::Language;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Slot {
     pub start_pct: f32,
@@ -27,6 +29,7 @@ pub struct AppState {
     pub next_id: u32,
     pub last_error: Option<String>,
     pub is_exporting: bool,
+    pub language: Language,
 }
 
 impl Default for AppState {
@@ -83,6 +86,7 @@ impl Default for AppState {
             next_id: 3,
             last_error: None,
             is_exporting: false,
+            language: Language::English,
         }
     }
 }
