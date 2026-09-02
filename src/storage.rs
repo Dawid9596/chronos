@@ -17,10 +17,8 @@ pub struct ConditionBar {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum BarPattern {
-    Solid,
-    Wavy,
-    CrossedOut,
-    DiagonalHatch,
+    VerticalHatch,
+    DenseGrid,
 }
 
 #[derive(Clone, Debug)]
@@ -43,14 +41,14 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 1,
                         graphical_representation: ConditionBar {
-                            pattern: BarPattern::DiagonalHatch,
+                            pattern: BarPattern::VerticalHatch,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 75.0,
                             }],
                         },
                         woven_trim: ConditionBar {
-                            pattern: BarPattern::Wavy,
+                            pattern: BarPattern::VerticalHatch,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 75.0,
@@ -64,14 +62,14 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 2,
                         graphical_representation: ConditionBar {
-                            pattern: BarPattern::CrossedOut,
+                            pattern: BarPattern::VerticalHatch,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 30.0,
                             }],
                         },
                         woven_trim: ConditionBar {
-                            pattern: BarPattern::Solid,
+                            pattern: BarPattern::VerticalHatch,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 10.0,

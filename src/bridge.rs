@@ -242,11 +242,11 @@ impl App for ConservationApp {
                 let new_entry = ConservationEntry {
                     id: new_id,
                     graphical_representation: ConditionBar {
-                        pattern: BarPattern::Solid,
+                        pattern: BarPattern::VerticalHatch,
                         slots: vec![],
                     },
                     woven_trim: ConditionBar {
-                        pattern: BarPattern::Solid,
+                        pattern: BarPattern::VerticalHatch,
                         slots: vec![],
                     },
                     layer_characteristics: String::new(),
@@ -309,10 +309,8 @@ impl App for ConservationApp {
                         BarType::WovenTrim => &mut entry.woven_trim.pattern,
                     };
                     *pattern = match pattern {
-                        BarPattern::Solid => BarPattern::DiagonalHatch,
-                        BarPattern::DiagonalHatch => BarPattern::CrossedOut,
-                        BarPattern::CrossedOut => BarPattern::Wavy,
-                        BarPattern::Wavy => BarPattern::Solid,
+                        BarPattern::VerticalHatch => BarPattern::DenseGrid,
+                        BarPattern::DenseGrid => BarPattern::VerticalHatch,
                     };
                 }
                 caps.render.render();

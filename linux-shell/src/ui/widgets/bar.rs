@@ -70,46 +70,75 @@ pub fn build_interactive_condition_bar(
                 cr.set_source_rgb(0.3, 0.3, 0.3);
                 cr.set_line_width(1.5);
                 match &*pattern {
-                    BarPattern::Solid => {
-                        cr.rectangle(x0, 0.0, seg_w, h);
-                        cr.fill().expect("fill solid");
-                    }
-                    BarPattern::DiagonalHatch => {
+                    BarPattern::VerticalHatch => {
                         let step = 8.0;
+                        let mut x = x0;
+                        while x <= x0 + seg_w {
+                            cr.move_to(x, 0.0);
+                            cr.line_to(x, h);
+                            x += step;
+                        }
+                        cr.stroke().expect("stroke vertical hatch");
+                    }
+                    BarPattern::DenseGrid => {
+                        let step = 8.0;
+
+                        // Bottom-left to top-right
                         let mut x = x0 - h;
-                        while x < x0 + seg_w {
+                        while x <= x0 + seg_w {
                             cr.move_to(x, h);
                             cr.line_to(x + h, 0.0);
                             x += step;
                         }
-                        cr.stroke().expect("stroke hatch");
-                    }
-                    BarPattern::CrossedOut => {
-                        let step = 12.0;
-                        let mut x = x0;
-                        while x < x0 + seg_w {
-                            cr.move_to(x, 0.0);
-                            cr.line_to(x + step, h);
-                            cr.move_to(x, h);
-                            cr.line_to(x + step, 0.0);
-                            x += step;
+
+                        // Top-left to bottom-right
+                        let mut x2 = x0;
+                        while x2 <= x0 + seg_w + h {
+                            cr.move_to(x2, 0.0);
+                            cr.line_to(x2 - h, h);
+                            x2 += step;
                         }
-                        cr.stroke().expect("stroke cross");
-                    }
-                    BarPattern::Wavy => {
-                        let step = 16.0;
-                        let mut x = x0;
-                        let mid_y = h / 2.0;
-                        let amp = (h / 2.0) - 4.0;
-                        cr.move_to(x0, mid_y);
-                        while x < x0 + seg_w {
-                            cr.line_to(x + (step * 0.25), mid_y - amp);
-                            cr.line_to(x + (step * 0.75), mid_y + amp);
-                            cr.line_to(x + step, mid_y);
-                            x += step;
-                        }
-                        cr.stroke().expect("stroke wavy");
-                    }
+                        cr.stroke().expect("stroke dense grid");
+                    } // BarPattern::Solid => {
+                      //     cr.rectangle(x0, 0.0, seg_w, h);
+                      //     cr.fill().expect("fill solid");
+                      // }
+                      // BarPattern::DiagonalHatch => {
+                      //     let step = 8.0;
+                      //     let mut x = x0 - h;
+                      //     while x < x0 + seg_w {
+                      //         cr.move_to(x, h);
+                      //         cr.line_to(x + h, 0.0);
+                      //         x += step;
+                      //     }
+                      //     cr.stroke().expect("stroke hatch");
+                      // }
+                      // BarPattern::CrossedOut => {
+                      //     let step = 12.0;
+                      //     let mut x = x0;
+                      //     while x < x0 + seg_w {
+                      //         cr.move_to(x, 0.0);
+                      //         cr.line_to(x + step, h);
+                      //         cr.move_to(x, h);
+                      //         cr.line_to(x + step, 0.0);
+                      //         x += step;
+                      //     }
+                      //     cr.stroke().expect("stroke cross");
+                      // }
+                      // BarPattern::Wavy => {
+                      //     let step = 16.0;
+                      //     let mut x = x0;
+                      //     let mid_y = h / 2.0;
+                      //     let amp = (h / 2.0) - 4.0;
+                      //     cr.move_to(x0, mid_y);
+                      //     while x < x0 + seg_w {
+                      //         cr.line_to(x + (step * 0.25), mid_y - amp);
+                      //         cr.line_to(x + (step * 0.75), mid_y + amp);
+                      //         cr.line_to(x + step, mid_y);
+                      //         x += step;
+                      //     }
+                      //     cr.stroke().expect("stroke wavy");
+                      // }
                 }
                 cr.reset_clip();
             }

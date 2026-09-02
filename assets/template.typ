@@ -3,23 +3,30 @@
 // ---------------------------------------------------------
 // Define Patterns for the Condition Bars
 // ---------------------------------------------------------
-#let hatch-pattern = pattern(size: (8pt, 8pt))[
-  #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
+#let vertical-hatch = pattern(size: (4pt, 10pt))[
+  #line(start: (0pt, 0pt), end: (0pt, 10pt), stroke: 0.5pt + black)
 ]
-#let crossed-pattern = pattern(size: (8pt, 8pt))[
-  #line(start: (0pt, 0pt), end: (8pt, 8pt), stroke: 0.5pt + black)
-  #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
+#let dense-grid = pattern(size: (5pt, 5pt))[
+  #line(start: (0pt, 5pt), end: (5pt, 0pt), stroke: 0.5pt + black)
+  #line(start: (0pt, 0pt), end: (5pt, 5pt), stroke: 0.5pt + black)
 ]
-#let wavy-pattern = pattern(size: (12pt, 12pt))[
-  #path(
-    stroke: 0.5pt + black,
-    (0pt, 6pt),
-    (3pt, 2pt),
-    (9pt, 10pt),
-    (12pt, 6pt),
-  )
-]
-#let solid-pattern = rgb("555555")
+// #let hatch-pattern = pattern(size: (8pt, 8pt))[
+//   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
+// ]
+// #let crossed-pattern = pattern(size: (8pt, 8pt))[
+//   #line(start: (0pt, 0pt), end: (8pt, 8pt), stroke: 0.5pt + black)
+//   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
+// ]
+// #let wavy-pattern = pattern(size: (12pt, 12pt))[
+//   #path(
+//     stroke: 0.5pt + black,
+//     (0pt, 6pt),
+//     (3pt, 2pt),
+//     (9pt, 10pt),
+//     (12pt, 6pt),
+//   )
+// ]
+// #let solid-pattern = rgb("555555")
 
 // Function to rotate column header
 #let rotated-header(content) = {
@@ -31,11 +38,13 @@
 // Bar Renderer
 // ---------------------------------------------------------
 #let render-bar(condition) = {
-  let fill-style = if condition.pattern == "solid" { solid-pattern } else if condition.pattern == "diagonalHatch" {
-    hatch-pattern
-  } else if condition.pattern == "crossedOut" { crossed-pattern } else if condition.pattern == "wavy" {
-    wavy-pattern
-  } else { solid-pattern }
+  let fill-style = if condition.pattern == "verticalHatch" { 
+    vertical-hatch 
+  } else if condition.pattern == "denseGrid" {
+    dense-grid
+  } else { 
+    none 
+  }
 
   box(width: 100%, height: 1.2em, stroke: 0.5pt + luma(150), {
     for slot in condition.slots {
