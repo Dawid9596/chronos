@@ -32,8 +32,8 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                         .set_text(&format!("Project: {}", view.document.project_name));
                 }
 
-                ctx.lang_btn.set_label(&t.flag_emoji);
-                ctx.settings_btn.set_label(&t.settings_tooltip);
+                ctx.lang_label.set_markup(&t.flag_emoji);
+                ctx.settings_label.set_markup(&t.settings_tooltip);
                 ctx.edit_btn.set_label(&t.tool_edit);
                 ctx.create_btn.set_label(&t.tool_create);
                 ctx.delete_text_label.set_text(&t.tool_delete);
@@ -51,9 +51,7 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
 
                     let response = match std::fs::write(&file_path, pdf_bytes) {
                         Ok(_) => {
-                            let _ = std::process::Command::new("xdg-open")
-                                .arg(&file_path)
-                                .spawn();
+                            let _ = open::that(&file_path);
                             ExportPdfResponse::Success(format!("Saved to {}", file_path.display()))
                         }
                         Err(e) => ExportPdfResponse::Error(format!("Error: {}", e)),

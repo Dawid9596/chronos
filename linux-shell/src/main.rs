@@ -11,7 +11,10 @@ fn main() {
 
     let css_provider = gtk4::CssProvider::new();
     css_provider.load_from_data(
-        "button.insert-gap { \
+        "label.emoji-label { \
+            font-family: 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; \
+        } \
+        button.insert-gap { \
             min-height: 6px; \
             padding: 0; \
             background-color: transparent; \

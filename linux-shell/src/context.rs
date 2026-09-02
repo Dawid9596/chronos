@@ -25,9 +25,7 @@ pub struct ColumnVisibility {
 
 impl Default for ColumnVisibility {
     fn default() -> Self {
-        Self {
-            flags: [true; 7],
-        }
+        Self { flags: [true; 7] }
     }
 }
 
@@ -38,8 +36,8 @@ pub struct AppContext {
     pub tool: Rc<Cell<BarTool>>,
     pub status: Label,
     pub export_btn: Button,
-    pub lang_btn: Button,
-    pub settings_btn: Button,
+    pub lang_label: Label,
+    pub settings_label: Label,
     pub edit_btn: ToggleButton,
     pub create_btn: ToggleButton,
     pub delete_text_label: Label,

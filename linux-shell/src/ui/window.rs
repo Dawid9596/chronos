@@ -13,8 +13,16 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let t = &core.view().translations;
 
     let export_btn = gtk4::Button::builder().label(&t.export_pdf).build();
-    let settings_btn = gtk4::Button::builder().label(&t.settings_tooltip).build();
-    let lang_btn = gtk4::Button::builder().label(&t.flag_emoji).build();
+    let settings_label = gtk4::Label::builder()
+        .label(&t.settings_tooltip)
+        .use_markup(true)
+        .build();
+    let settings_btn = gtk4::Button::builder().child(&settings_label).build();
+    let flag_label = gtk4::Label::builder()
+        .label(&t.flag_emoji)
+        .use_markup(true)
+        .build();
+    let lang_btn = gtk4::Button::builder().child(&flag_label).build();
 
     let edit_btn = gtk4::ToggleButton::builder()
         .label(&t.tool_edit)
@@ -29,7 +37,11 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .halign(gtk4::Align::Center)
         .valign(gtk4::Align::Center)
         .build();
-    let trash_icon = gtk4::Label::builder().label("🗑").margin_top(5).build();
+    let trash_icon = gtk4::Label::builder()
+        .label("<span font_family='Segoe UI Emoji, Noto Color Emoji'>🗑</span>")
+        .use_markup(true)
+        .margin_top(5)
+        .build();
     delete_box.append(&trash_icon);
     let delete_text_label = gtk4::Label::new(Some(&t.tool_delete));
     delete_box.append(&delete_text_label);
@@ -101,8 +113,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         tool: tool.clone(),
         status: status_label.clone(),
         export_btn: export_btn.clone(),
-        lang_btn: lang_btn.clone(),
-        settings_btn: settings_btn.clone(),
+        lang_label: flag_label.clone(),
+        settings_label: settings_label.clone(),
         edit_btn: edit_btn.clone(),
         create_btn: create_btn.clone(),
         delete_text_label: delete_text_label.clone(),
@@ -169,7 +181,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let ctx_export = ctx.clone();
     export_btn.connect_clicked(move |_| {
         let current_vis = ctx_export.vis.borrow().flags;
-        let effects = ctx_export.core.process_event(Event::RequestPdfExport(current_vis));
+        let effects = ctx_export
+            .core
+            .process_event(Event::RequestPdfExport(current_vis));
         crate::effects::process_effects(&ctx_export, effects);
     });
 
