@@ -254,15 +254,17 @@ impl App for ConservationApp {
                     chronological_phase: String::new(),
                     dating_period: String::new(),
                 };
-                if let Some(idx) = model
-                    .document
-                    .entries
-                    .iter()
-                    .position(|e| e.id == after_id.unwrap_or(0))
-                {
-                    model.document.entries.insert(idx + 1, new_entry);
-                } else {
-                    model.document.entries.push(new_entry);
+                match after_id {
+                    Some(id) => {
+                        if let Some(idx) = model.document.entries.iter().position(|e| e.id == id) {
+                            model.document.entries.insert(idx + 1, new_entry);
+                        } else {
+                            model.document.entries.push(new_entry);
+                        }
+                    }
+                    None => {
+                        model.document.entries.insert(0, new_entry);
+                    }
                 }
                 caps.render.render();
             }

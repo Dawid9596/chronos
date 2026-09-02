@@ -54,7 +54,8 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
     );
     current_grid_row += 1;
 
-    for row in app_view.document.rows.iter() {
+    let doc_rows = &app_view.document.rows;
+    for (i, row) in doc_rows.iter().enumerate() {
         let grid_row = current_grid_row;
         let mut col_idx = 0;
 
@@ -124,6 +125,13 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
 
         if current_vis.flags[5] {
             if let Some(chrono) = &row.chronological_phase {
+                let mut gtk_span = chrono.span;
+                for k in i..(i + chrono.span - 1) {
+                    if doc_rows[k].is_last_in_group {
+                        gtk_span += 1;
+                    }
+                }
+
                 let chrono_widget =
                     crate::ui::widgets::editable::create_editable_widget(&chrono.value, ctx, {
                         let member_ids = chrono.member_ids.clone();
@@ -133,13 +141,25 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
                             new_value: new_val,
                         }
                     });
-                grid.attach(&chrono_widget, col_idx, grid_row, 1, chrono.span as i32);
+
+                if chrono.span > 1 {
+                    chrono_widget.add_css_class("merged-cell");
+                }
+
+                grid.attach(&chrono_widget, col_idx, grid_row, 1, gtk_span as i32);
             }
             col_idx += 1;
         }
 
         if current_vis.flags[6] {
             if let Some(dating) = &row.dating_period {
+                let mut gtk_span = dating.span;
+                for k in i..(i + dating.span - 1) {
+                    if doc_rows[k].is_last_in_group {
+                        gtk_span += 1;
+                    }
+                }
+
                 let dating_widget =
                     crate::ui::widgets::editable::create_editable_widget(&dating.value, ctx, {
                         let member_ids = dating.member_ids.clone();
@@ -149,7 +169,12 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
                             new_value: new_val,
                         }
                     });
-                grid.attach(&dating_widget, col_idx, grid_row, 1, dating.span as i32);
+
+                if dating.span > 1 {
+                    dating_widget.add_css_class("merged-cell");
+                }
+
+                grid.attach(&dating_widget, col_idx, grid_row, 1, gtk_span as i32);
             }
             col_idx += 1;
         }
@@ -207,7 +232,9 @@ pub fn build_insert_row(after_id: Option<u32>, ctx: &AppContext) -> gtk4::Widget
     btn.connect_clicked(move |_| {
         let ctx_idle = ctx_btn.clone();
         glib::idle_add_local_once(move || {
-            let effects = ctx_idle.core.process_event(Event::InsertLayerAfter(after_id));
+            let effects = ctx_idle
+                .core
+                .process_event(Event::InsertLayerAfter(after_id));
             crate::effects::process_effects(&ctx_idle, effects);
         });
     });

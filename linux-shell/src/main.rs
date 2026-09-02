@@ -20,6 +20,11 @@ fn main() {
         button.insert-gap:hover { \
             background-color: alpha(@theme_selected_bg_color, 0.3); \
             min-height: 12px; \
+        }
+        .merged-cell { \
+            border: 1px dashed alpha(@theme_fg_color, 0.3); \
+            border-radius: 3px; \
+            background-color: alpha(@theme_fg_color, 0.03); \
         }",
     );
     gtk4::style_context_add_provider_for_display(
