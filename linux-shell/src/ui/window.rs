@@ -134,15 +134,19 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             .margin_start(12)
             .margin_end(12)
             .build();
+
         let current_vis = ctx_settings.vis.borrow().clone();
+        let view = ctx_settings.core.view();
+        let t = &view.translations;
+
         let labels = [
-            "No.",
-            "Graphical representation",
-            "Woven trim",
-            "Layer characteristics",
-            "Layer thickness",
-            "Chronological phase",
-            "Dating period",
+            &t.col_no,
+            &t.col_graphical,
+            &t.col_woven,
+            &t.col_char,
+            &t.col_thickness,
+            &t.col_chrono,
+            &t.col_dating,
         ];
 
         for (i, label_text) in labels.iter().enumerate() {
@@ -168,6 +172,60 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         crate::effects::process_effects(&ctx_export, effects);
     });
 
+    let shortcut_controller = gtk4::ShortcutController::new();
+    shortcut_controller.set_scope(gtk4::ShortcutScope::Managed);
+
+    fn add_shortcut(
+        controller: &gtk4::ShortcutController,
+        keys: &[gtk4::gdk::Key],
+        mods: gtk4::gdk::ModifierType,
+        ctx: &AppContext,
+        event: chronos::bridge::Event,
+    ) {
+        for &key in keys {
+            let ctx_clone = ctx.clone();
+            let event_clone = event.clone();
+            let trigger = gtk4::KeyvalTrigger::new(key, mods);
+            let action = gtk4::CallbackAction::new(move |_, _| {
+                let ctx_idle = ctx_clone.clone();
+                let event_idle = event_clone.clone();
+                glib::idle_add_local_once(move || {
+                    let effects = ctx_idle.core.process_event(event_idle);
+                    crate::effects::process_effects(&ctx_idle, effects);
+                });
+                glib::Propagation::Stop
+            });
+            controller.add_shortcut(gtk4::Shortcut::new(Some(trigger), Some(action)));
+        }
+    }
+
+    // Ctrl+O (Open)
+    add_shortcut(
+        &shortcut_controller,
+        &[gtk4::gdk::Key::o, gtk4::gdk::Key::O],
+        gtk4::gdk::ModifierType::CONTROL_MASK,
+        &ctx,
+        Event::RequestOpen,
+    );
+
+    // Ctrl+S (Save)
+    add_shortcut(
+        &shortcut_controller,
+        &[gtk4::gdk::Key::s, gtk4::gdk::Key::S],
+        gtk4::gdk::ModifierType::CONTROL_MASK,
+        &ctx,
+        Event::RequestSave,
+    );
+
+    // Ctrl+Shift+S (Save As)
+    add_shortcut(
+        &shortcut_controller,
+        &[gtk4::gdk::Key::s, gtk4::gdk::Key::S],
+        gtk4::gdk::ModifierType::CONTROL_MASK | gtk4::gdk::ModifierType::SHIFT_MASK,
+        &ctx,
+        Event::RequestSaveAs,
+    );
+
     let window = gtk4::ApplicationWindow::builder()
         .application(app)
         .title("Conservation Editor")
@@ -175,5 +233,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .default_height(600)
         .child(&container)
         .build();
+    window.add_controller(shortcut_controller);
     (window, ctx)
 }
