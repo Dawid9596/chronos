@@ -1,10 +1,15 @@
-use crate::{i18n::Translations, storage::{ConditionBar, ConservationDocument}};
+use crate::{
+    i18n::Translations,
+    storage::{ConditionBar, ConservationDocument},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DocumentViewModel {
     pub project_name: String,
     pub rows: Vec<RowViewModel>,
+    pub translations: Translations,
+    pub visible_columns: [bool; 7],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -28,13 +33,15 @@ pub struct GroupSpan {
 }
 
 impl ConservationDocument {
-    pub fn to_view_model(&self) -> DocumentViewModel {
+    pub fn to_view_model(&self, translations: Translations, visible_columns: [bool; 7]) -> DocumentViewModel {
         let len = self.entries.len();
         let mut rows = Vec::with_capacity(len);
         if len == 0 {
             return DocumentViewModel {
                 project_name: self.project_name.clone(),
                 rows,
+                translations,
+                visible_columns
             };
         }
 
@@ -103,6 +110,8 @@ impl ConservationDocument {
         DocumentViewModel {
             project_name: self.project_name.clone(),
             rows,
+            translations,
+            visible_columns
         }
     }
 }

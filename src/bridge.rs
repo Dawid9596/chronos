@@ -135,7 +135,7 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
-    RequestPdfExport,
+    RequestPdfExport([bool; 7]),
     PdfExportFinished(ExportPdfResponse),
     DeleteLayer(u32),
     InsertLayerAfter(Option<u32>),
@@ -205,10 +205,12 @@ impl App for ConservationApp {
             Event::Init => {
                 caps.render.render();
             }
-            Event::RequestPdfExport => {
+            Event::RequestPdfExport(visible_columns) => {
                 model.is_exporting = true;
                 model.last_error = None;
-                let view_model = model.document.to_view_model();
+                let t = Translations::get(model.language);
+                let view_model = model.document.to_view_model(t, visible_columns);
+
                 match crate::generate_pdf::typst_compile_to_bytes(&view_model) {
                     Ok(pdf_bytes) => {
                         let file_name = format!("{}.pdf", model.document.project_name);
@@ -482,11 +484,12 @@ impl App for ConservationApp {
     }
 
     fn view(&self, model: &Self::Model) -> Self::ViewModel {
+        let t = Translations::get(model.language);
         AppViewModel {
-            document: model.document.to_view_model(),
+            document: model.document.to_view_model(t.clone(), [true; 7]),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
-            translations: Translations::get(model.language),
+            translations: t,
         }
     }
 }

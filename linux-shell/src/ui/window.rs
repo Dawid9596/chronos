@@ -168,7 +168,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let ctx_export = ctx.clone();
     export_btn.connect_clicked(move |_| {
-        let effects = ctx_export.core.process_event(Event::RequestPdfExport);
+        let current_vis = ctx_export.vis.borrow().flags;
+        let effects = ctx_export.core.process_event(Event::RequestPdfExport(current_vis));
         crate::effects::process_effects(&ctx_export, effects);
     });
 
