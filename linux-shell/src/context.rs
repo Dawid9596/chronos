@@ -1,6 +1,6 @@
 use chronos::bridge::{ConservationApp, SlotEdge};
 use crux_core::Core;
-use gtk4::{Button, Label, ScrolledWindow, ToggleButton};
+use gtk4::{Button, Label, ScrolledWindow};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -38,8 +38,8 @@ pub struct AppContext {
     pub export_btn: Button,
     pub lang_label: Label,
     pub settings_label: Label,
-    pub edit_btn: ToggleButton,
-    pub create_btn: ToggleButton,
+    pub edit_text_label: Label,
+    pub create_text_label: Label,
     pub delete_text_label: Label,
     pub scrolled_window: ScrolledWindow,
 }

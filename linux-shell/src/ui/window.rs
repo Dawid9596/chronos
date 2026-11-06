@@ -13,8 +13,10 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let t = &core.view().translations;
 
-    let export_btn = gtk4::Button::builder().label(&t.export_pdf).build();
-    export_btn.set_icon_name("document-save-symbolic");
+    let export_btn = gtk4::Button::builder()
+        .icon_name("media-floppy-symbolic")
+        .tooltip_text(&t.export_pdf)
+        .build();
 
     let settings_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -41,22 +43,41 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let flag_label = gtk4::Label::builder()
         .label(&t.flag_emoji)
         .use_markup(true)
+        .css_classes(["emoji-label"])
         .build();
     lang_box.append(&lang_icon);
     lang_box.append(&flag_label);
     let lang_btn = gtk4::Button::builder().child(&lang_box).build();
 
-    let edit_btn = gtk4::ToggleButton::builder()
-        .label(&t.tool_edit)
-        .icon_name("document-edit-symbolic")
-        .active(true)
+    // Edit Button (Icon + Text)
+    let edit_btn = gtk4::ToggleButton::builder().active(true).build();
+    let edit_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .halign(gtk4::Align::Center)
+        .valign(gtk4::Align::Center)
         .build();
+    let edit_icon = gtk4::Image::from_icon_name("document-edit-symbolic");
+    let edit_text_label = gtk4::Label::new(Some(&t.tool_edit));
+    edit_box.append(&edit_icon);
+    edit_box.append(&edit_text_label);
+    edit_btn.set_child(Some(&edit_box));
 
-    let create_btn = gtk4::ToggleButton::builder()
-        .label(&t.tool_create)
-        .icon_name("list-add-symbolic")
+    // Create Button (Icon + Text)
+    let create_btn = gtk4::ToggleButton::new();
+    let create_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .halign(gtk4::Align::Center)
+        .valign(gtk4::Align::Center)
         .build();
+    let create_icon = gtk4::Image::from_icon_name("list-add-symbolic");
+    let create_text_label = gtk4::Label::new(Some(&t.tool_create));
+    create_box.append(&create_icon);
+    create_box.append(&create_text_label);
+    create_btn.set_child(Some(&create_box));
 
+    // Delete Button (Icon + Text)
     let delete_btn = gtk4::ToggleButton::new();
     let delete_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -230,8 +251,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         export_btn: export_btn.clone(),
         lang_label: flag_label.clone(),
         settings_label: settings_label.clone(),
-        edit_btn: edit_btn.clone(),
-        create_btn: create_btn.clone(),
+        edit_text_label: edit_text_label.clone(),
+        create_text_label: create_text_label.clone(),
         delete_text_label: delete_text_label.clone(),
         scrolled_window: scrolled_window.clone(),
     };
@@ -362,6 +383,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let window = gtk4::ApplicationWindow::builder()
         .application(app)
         .title("Conservation Editor")
+        .icon_name("chronos")
         .default_width(1100)
         .default_height(600)
         .child(&container)

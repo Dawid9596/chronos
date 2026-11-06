@@ -13,14 +13,14 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 let t = &view.translations;
 
                 ctx.export_btn.set_sensitive(!view.is_exporting);
-                ctx.export_btn.set_label(if view.is_exporting {
+                ctx.export_btn.set_tooltip_text(Some(if view.is_exporting {
                     &t.exporting_pdf
                 } else {
                     &t.export_pdf
-                });
+                }));
 
                 if let Some(msg) = &view.last_error {
-                    let color = if msg.starts_with("Error") {
+                    let color = if msg.starts_with("Error") || msg.starts_with("Błąd") {
                         "red"
                     } else {
                         "green"
@@ -28,14 +28,16 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ctx.status
                         .set_markup(&format!("<span foreground='{}'>{}</span>", color, msg));
                 } else {
-                    ctx.status
-                        .set_text(&format!("Project: {}", view.document.project_name));
+                    ctx.status.set_text(&format!(
+                        "{}{}",
+                        t.project_prefix, view.document.project_name
+                    ));
                 }
 
                 ctx.lang_label.set_markup(&t.flag_emoji);
                 ctx.settings_label.set_markup(&t.settings_tooltip);
-                ctx.edit_btn.set_label(&t.tool_edit);
-                ctx.create_btn.set_label(&t.tool_create);
+                ctx.edit_text_label.set_text(&t.tool_edit);
+                ctx.create_text_label.set_text(&t.tool_create);
                 ctx.delete_text_label.set_text(&t.tool_delete);
 
                 let new_table = crate::ui::table::build_document_table(&view, ctx);
