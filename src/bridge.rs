@@ -139,6 +139,12 @@ pub enum Event {
     PdfExportFinished(ExportPdfResponse),
     DeleteLayer(u32),
     InsertLayerAfter(Option<u32>),
+    MoveLayer {
+        id: u32,
+        target_index: usize,
+        adopt_group_from_id: Option<u32>,
+    },
+    UpdateProjectName(String),
     UpdateText {
         id: u32,
         field: EditableField,
@@ -265,6 +271,37 @@ impl App for ConservationApp {
                     None => {
                         model.document.entries.insert(0, new_entry);
                     }
+                }
+                caps.render.render();
+            }
+            Event::MoveLayer {
+                id,
+                target_index,
+                adopt_group_from_id,
+            } => {
+                if let Some(pos) = model.document.entries.iter().position(|e| e.id == id) {
+                    let adopted = adopt_group_from_id.and_then(|target_id| {
+                        model
+                            .document
+                            .entries
+                            .iter()
+                            .find(|e| e.id == target_id)
+                            .map(|e| (e.chronological_phase.clone(), e.dating_period.clone()))
+                    });
+                    let mut entry = model.document.entries.remove(pos);
+                    if let Some((phase, dating)) = adopted {
+                        entry.chronological_phase = phase;
+                        entry.dating_period = dating;
+                    }
+                    let clamped_index = target_index.min(model.document.entries.len());
+                    model.document.entries.insert(clamped_index, entry);
+                    caps.render.render();
+                }
+            }
+            Event::UpdateProjectName(new_name) => {
+                let trimmed = new_name.trim();
+                if !trimmed.is_empty() {
+                    model.document.project_name = trimmed.to_string();
                 }
                 caps.render.render();
             }
@@ -446,6 +483,8 @@ impl App for ConservationApp {
                     FilePickerResponse::Opened { path, content } => {
                         match serde_json::from_str::<ConservationDocument>(&content) {
                             Ok(doc) => {
+                                model.next_id =
+                                    doc.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
                                 model.document = doc;
                                 model.current_file_path = Some(path.clone());
                                 model.last_error =

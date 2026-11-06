@@ -60,11 +60,82 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
         let mut col_idx = 0;
 
         if current_vis.flags[0] {
+            let grab_cursor = gtk4::gdk::Cursor::from_name("grab", None);
+            let grabbing_cursor = gtk4::gdk::Cursor::from_name("grabbing", None);
+
+            let handle_box = gtk4::Box::builder()
+                .orientation(gtk4::Orientation::Horizontal)
+                .halign(gtk4::Align::Center)
+                .valign(gtk4::Align::Center)
+                .margin_top(4)
+                .margin_bottom(4)
+                .tooltip_text("Double-click and drag to reorder")
+                .build();
+
+            handle_box.set_cursor(grab_cursor.as_ref());
+
             let row_num_label = gtk4::Label::new(Some(&row.row_number.to_string()));
-            row_num_label.set_margin_top(4);
-            row_num_label.set_margin_bottom(4);
-            row_num_label.set_valign(gtk4::Align::Center);
-            grid.attach(&row_num_label, col_idx, grid_row, 1, 1);
+            handle_box.append(&row_num_label);
+
+            let is_armed = std::rc::Rc::new(std::cell::Cell::new(false));
+
+            let click_gesture = gtk4::GestureClick::new();
+            click_gesture.set_button(1);
+            let is_armed_click = is_armed.clone();
+            let handle_box_click = handle_box.clone();
+            click_gesture.connect_pressed(move |_gesture, n_press, _x, _y| {
+                if n_press == 2 {
+                    is_armed_click.set(true);
+                    handle_box_click.set_cursor(grabbing_cursor.as_ref());
+                    handle_box_click.set_opacity(0.6);
+                }
+            });
+            handle_box.add_controller(click_gesture);
+
+            let drag_gesture = gtk4::GestureDrag::new();
+            let is_armed_drag = is_armed.clone();
+            let handle_box_drag = handle_box.clone();
+            let row_id = row.id;
+            let current_idx = i;
+            let total_rows = doc_rows.len();
+            let doc_rows_snapshot = doc_rows.clone();
+            let ctx_drag = ctx.clone();
+
+            drag_gesture.connect_drag_end(move |_gesture, _offset_x, offset_y| {
+                if !is_armed_drag.get() {
+                    return;
+                }
+                is_armed_drag.set(false);
+                handle_box_drag.set_cursor(grab_cursor.as_ref());
+                handle_box_drag.set_opacity(1.0);
+
+                let estimated_row_height = 36.0;
+                let delta = (offset_y / estimated_row_height).round() as isize;
+                if delta == 0 || total_rows <= 1 {
+                    return;
+                }
+
+                let target_idx =
+                    (current_idx as isize + delta).clamp(0, (total_rows as isize) - 1) as usize;
+                if target_idx == current_idx {
+                    return;
+                }
+
+                let adopt_group_from_id = doc_rows_snapshot.get(target_idx).map(|r| r.id);
+
+                let ctx_idle = ctx_drag.clone();
+                glib::idle_add_local_once(move || {
+                    let effects = ctx_idle.core.process_event(Event::MoveLayer {
+                        id: row_id,
+                        target_index: target_idx,
+                        adopt_group_from_id,
+                    });
+                    crate::effects::process_effects(&ctx_idle, effects);
+                });
+            });
+            handle_box.add_controller(drag_gesture);
+
+            grid.attach(&handle_box, col_idx, grid_row, 1, 1);
             col_idx += 1;
         }
 
@@ -180,12 +251,15 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
         }
 
         let delete_btn = gtk4::Button::builder()
-            .label("×")
+            .icon_name("user-trash-symbolic")
             .has_frame(false)
+            .focusable(false)
+            .can_focus(false)
             .halign(gtk4::Align::Center)
             .valign(gtk4::Align::Center)
             .margin_top(4)
             .margin_bottom(4)
+            .tooltip_text(&t.delete_label)
             .build();
         delete_btn.add_css_class("flat");
         delete_btn.add_css_class("destructive-action");
@@ -215,6 +289,7 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
             current_grid_row += 1;
         }
     }
+
     grid
 }
 
@@ -222,6 +297,8 @@ pub fn build_insert_row(after_id: Option<u32>, ctx: &AppContext) -> gtk4::Widget
     let btn = gtk4::Button::builder()
         .has_frame(false)
         .hexpand(true)
+        .focusable(false)
+        .can_focus(false)
         .margin_top(1)
         .margin_bottom(1)
         .build();

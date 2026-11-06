@@ -9,6 +9,7 @@ pub fn create_editable_widget(
     on_commit: impl Fn(String) -> Event + 'static,
 ) -> gtk4::Widget {
     let on_commit = std::rc::Rc::new(on_commit);
+
     let stack = gtk4::Stack::new();
     stack.set_transition_type(gtk4::StackTransitionType::None);
     stack.set_margin_top(4);
@@ -57,33 +58,42 @@ pub fn create_editable_widget(
 
         move || {
             if stack.visible_child_name().as_deref() == Some("entry") {
+                if let Some(root) = entry.root() {
+                    root.set_focus(None::<&gtk4::Widget>);
+                }
                 let new_text = entry.text().to_string();
                 stack.set_visible_child_name("label");
                 label.set_text(&new_text);
                 let event = on_commit(new_text);
-
-                let cdx_idle = ctx.clone();
+                let ctx_idle = ctx.clone();
                 let event_idle = event.clone();
                 glib::idle_add_local_once(move || {
-                    let effects = cdx_idle.core.process_event(event_idle);
-                    crate::effects::process_effects(&cdx_idle, effects);
+                    let effects = ctx_idle.core.process_event(event_idle);
+                    crate::effects::process_effects(&ctx_idle, effects);
                 });
             }
         }
     };
 
     let commit_and_switch_connect = commit_and_switch.clone();
-    entry.connect_activate(move |_| {
+    entry.connect_activate(move |entry| {
+        if let Some(root) = entry.root() {
+            root.set_focus(None::<&gtk4::Widget>);
+        }
         commit_and_switch_connect();
     });
 
     let key_controller = gtk4::EventControllerKey::new();
     let entry_connect = entry.clone();
     let stack_connect = stack.clone();
+    let label_connect = label.clone();
     key_controller.connect_key_pressed(move |_controller, key, _keycode, _state| {
         if key == gtk4::gdk::Key::Escape {
-            stack.set_visible_child_name("label");
-            entry_connect.set_text(label.text().as_str());
+            if let Some(root) = entry_connect.root() {
+                root.set_focus(None::<&gtk4::Widget>);
+            }
+            stack_connect.set_visible_child_name("label");
+            entry_connect.set_text(label_connect.text().as_str());
             glib::Propagation::Stop
         } else {
             glib::Propagation::Proceed
@@ -97,5 +107,5 @@ pub fn create_editable_widget(
     });
     entry.add_controller(focus_controller);
 
-    stack_connect.upcast()
+    stack.upcast()
 }
