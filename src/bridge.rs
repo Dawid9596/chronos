@@ -182,6 +182,7 @@ pub enum Event {
     RequestSaveAs,
     FileOpenResponse(FilePickerResponse),
     FileSaveResponse(FilePickerResponse),
+    ClearStatus,
 }
 
 #[derive(Default)]
@@ -520,6 +521,10 @@ impl App for ConservationApp {
                         model.last_error = Some(format!("{}{}", t.error_save_prefix, e));
                     }
                 }
+                caps.render.render();
+            }
+            Event::ClearStatus => {
+                model.last_error = None;
                 caps.render.render();
             }
         }

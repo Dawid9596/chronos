@@ -1,9 +1,27 @@
 use crate::context::AppContext;
-use chronos::bridge::{Effect, ExportPdfResponse};
+use chronos::bridge::{Effect, Event, ExportPdfResponse};
 use chronos::bridge::{FilePickerRequest, FilePickerResponse};
+use glib::source::timeout_add_local_once;
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::path::PathBuf;
+
+fn cancel_status_timer(ctx: &AppContext) {
+    if let Some(id) = ctx.status_timer.borrow_mut().take() {
+        id.remove();
+    }
+}
+
+fn schedule_status_restore(ctx: &AppContext) {
+    cancel_status_timer(ctx);
+    let ctx_idle = ctx.clone();
+    let restore_id = timeout_add_local_once(std::time::Duration::from_secs(3), move || {
+        ctx_idle.status_timer.borrow_mut().take(); // Clear ID without .remove() since it is firing
+        let effects = ctx_idle.core.process_event(Event::ClearStatus);
+        process_effects(&ctx_idle, effects);
+    });
+    *ctx.status_timer.borrow_mut() = Some(restore_id);
+}
 
 pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
     for effect in effects {
@@ -20,14 +38,27 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 }));
 
                 if let Some(msg) = &view.last_error {
-                    let color = if msg.starts_with("Error") || msg.starts_with("Błąd") {
-                        "red"
-                    } else {
-                        "green"
-                    };
-                    ctx.status
-                        .set_markup(&format!("<span foreground='{}'>{}</span>", color, msg));
+                    let is_new = ctx.last_message.borrow().as_deref() != Some(msg.as_str());
+                    if is_new {
+                        *ctx.last_message.borrow_mut() = Some(msg.clone());
+                        cancel_status_timer(ctx);
+                        let color = if msg.starts_with("Error") || msg.starts_with("B d") {
+                            "red"
+                        } else {
+                            "green"
+                        };
+                        let escaped = glib::markup_escape_text(msg);
+                        ctx.status.set_markup(&format!(
+                            "<span foreground='{}'>{}</span>",
+                            color, escaped
+                        ));
+                        if color == "green" {
+                            schedule_status_restore(ctx);
+                        }
+                    }
                 } else {
+                    cancel_status_timer(ctx);
+                    *ctx.last_message.borrow_mut() = None;
                     ctx.status.set_text(&format!(
                         "{}{}",
                         t.project_prefix, view.document.project_name

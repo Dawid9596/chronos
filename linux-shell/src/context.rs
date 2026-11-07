@@ -1,5 +1,6 @@
 use chronos::bridge::{ConservationApp, SlotEdge};
 use crux_core::Core;
+use gtk4::glib;
 use gtk4::{Button, Label, ScrolledWindow};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -42,4 +43,8 @@ pub struct AppContext {
     pub create_text_label: Label,
     pub delete_text_label: Label,
     pub scrolled_window: ScrolledWindow,
+    /// Tracks the last displayed message to avoid re-triggering identical renders.
+    pub last_message: Rc<RefCell<Option<String>>>,
+    /// Pending fade-out timer; canceled whenever a new message appears.
+    pub status_timer: Rc<RefCell<Option<glib::SourceId>>>,
 }

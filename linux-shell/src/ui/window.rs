@@ -141,7 +141,11 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     status_stack.set_halign(gtk4::Align::Center);
 
     let status_label = gtk4::Label::builder()
-        .label("Ready")
+        .label(format!(
+            "{}{}",
+            t.project_prefix,
+            core.view().document.project_name
+        ))
         .halign(gtk4::Align::Center)
         .tooltip_text("Double-click project name to edit")
         .build();
@@ -255,6 +259,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         create_text_label: create_text_label.clone(),
         delete_text_label: delete_text_label.clone(),
         scrolled_window: scrolled_window.clone(),
+        last_message: Rc::new(RefCell::new(None)),
+        status_timer: Rc::new(RefCell::new(None)),
     };
 
     *ctx_holder.borrow_mut() = Some(ctx.clone());
