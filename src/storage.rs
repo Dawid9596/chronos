@@ -19,6 +19,10 @@ pub struct ConditionBar {
 pub enum BarPattern {
     VerticalHatch,
     DenseGrid,
+    Bolus,
+    Brick,
+    Ceramics,
+    Wood,
 }
 
 #[derive(Clone, Debug)]

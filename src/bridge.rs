@@ -349,7 +349,11 @@ impl App for ConservationApp {
                     };
                     *pattern = match pattern {
                         BarPattern::VerticalHatch => BarPattern::DenseGrid,
-                        BarPattern::DenseGrid => BarPattern::VerticalHatch,
+                        BarPattern::DenseGrid => BarPattern::Bolus,
+                        BarPattern::Bolus => BarPattern::Brick,
+                        BarPattern::Brick => BarPattern::Ceramics,
+                        BarPattern::Ceramics => BarPattern::Wood,
+                        BarPattern::Wood => BarPattern::VerticalHatch,
                     };
                 }
                 caps.render.render();

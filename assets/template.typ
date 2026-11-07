@@ -10,6 +10,23 @@
   #line(start: (0pt, 5pt), end: (5pt, 0pt), stroke: 0.5pt + black)
   #line(start: (0pt, 0pt), end: (5pt, 5pt), stroke: 0.5pt + black)
 ]
+// Bolus: rings pattern, embedded from patterns/bolus.svg (viewBox 3108x343).
+// Tile height 12pt keeps the aspect ratio of the source SVG: 12pt * 3108/343 ~= 108.5pt.
+#let bolus-hatch = pattern(size: (108.5pt, 12pt))[
+  #image("bolus.svg", width: 108.5pt, height: 12pt)
+]
+// Brick: embedded from patterns/cegla.svg (viewBox 3108x299); 12pt height keeps the aspect.
+#let brick = pattern(size: (12pt * 3108 / 299, 12pt))[
+  #image("cegla.svg", width: 12pt * 3108 / 299, height: 12pt)
+]
+// Ceramics: embedded from patterns/ceramika.svg (viewBox 2845x321); 12pt height keeps the aspect.
+#let ceramics = pattern(size: (12pt * 2845 / 321, 12pt))[
+  #image("ceramika.svg", width: 12pt * 2845 / 321, height: 12pt)
+]
+// Wood: embedded from patterns/drewno.svg (viewBox 9436x1039); 12pt height keeps the aspect.
+#let wood = pattern(size: (12pt * 9436 / 1039, 12pt))[
+  #image("drewno.svg", width: 12pt * 9436 / 1039, height: 12pt)
+]
 // #let hatch-pattern = pattern(size: (8pt, 8pt))[
 //   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
 // ]
@@ -42,6 +59,14 @@
     vertical-hatch 
   } else if condition.pattern == "denseGrid" {
     dense-grid
+  } else if condition.pattern == "bolus" {
+    bolus-hatch
+  } else if condition.pattern == "brick" {
+    brick
+  } else if condition.pattern == "ceramics" {
+    ceramics
+  } else if condition.pattern == "wood" {
+    wood
   } else { 
     none 
   }

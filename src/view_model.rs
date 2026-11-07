@@ -10,6 +10,7 @@ pub struct ConservationWorld {
     book: LazyHash<typst::text::FontBook>,
     fonts: Vec<typst::text::Font>,
     files: HashMap<FileId, Source>,
+    assets: HashMap<&'static str, Bytes>,
     main_id: FileId,
 }
 
@@ -29,11 +30,17 @@ impl ConservationWorld {
         let mut inputs = Dict::new();
         inputs.insert("json_data".into(), Value::Str(json_view_model.into()));
 
+        let mut assets = HashMap::new();
+        for &(name, bytes) in &crate::patterns::TILES {
+            assets.insert(name, Bytes::from_static(bytes));
+        }
+
         Self {
             library: LazyHash::new(typst::Library::builder().with_inputs(inputs).build()),
             book: LazyHash::new(book),
             fonts: vec![font],
             files,
+            assets,
             main_id,
         }
     }
