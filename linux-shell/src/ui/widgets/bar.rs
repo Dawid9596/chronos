@@ -1,7 +1,7 @@
 use crate::context::{AppContext, BarTool, DragTarget};
-use chronos::bridge::{BarType, Event, SlotEdge};
+use chronos::bridge::{BarType, CycleDirection, Event, SlotEdge};
 use chronos::storage::{BarPattern, ConditionBar};
-use gtk4::{glib, prelude::*};
+use gtk4::{gdk, glib, prelude::*};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -23,8 +23,7 @@ thread_local! {
         RefCell::new(HashMap::new());
 }
 
-static SVG_TREES: std::sync::OnceLock<Vec<Option<resvg::usvg::Tree>>> =
-    std::sync::OnceLock::new();
+static SVG_TREES: std::sync::OnceLock<Vec<Option<resvg::usvg::Tree>>> = std::sync::OnceLock::new();
 
 /// Parses all tile SVGs once, lazily. Parse failures become None entries so
 /// the matching tile is skipped (never a panic inside a draw handler).
@@ -125,7 +124,6 @@ fn fill_svg_tile(cr: &gtk4::cairo::Context, idx: usize, x0: f64, seg_w: f64, h: 
     });
 }
 
-
 pub fn build_interactive_condition_bar(
     id: u32,
     bar_type: BarType,
@@ -220,46 +218,7 @@ pub fn build_interactive_condition_bar(
                             x2 += step;
                         }
                         cr.stroke().expect("stroke dense grid");
-                    } // BarPattern::Solid => {
-                      //     cr.rectangle(x0, 0.0, seg_w, h);
-                      //     cr.fill().expect("fill solid");
-                      // }
-                      // BarPattern::DiagonalHatch => {
-                      //     let step = 8.0;
-                      //     let mut x = x0 - h;
-                      //     while x < x0 + seg_w {
-                      //         cr.move_to(x, h);
-                      //         cr.line_to(x + h, 0.0);
-                      //         x += step;
-                      //     }
-                      //     cr.stroke().expect("stroke hatch");
-                      // }
-                      // BarPattern::CrossedOut => {
-                      //     let step = 12.0;
-                      //     let mut x = x0;
-                      //     while x < x0 + seg_w {
-                      //         cr.move_to(x, 0.0);
-                      //         cr.line_to(x + step, h);
-                      //         cr.move_to(x, h);
-                      //         cr.line_to(x + step, 0.0);
-                      //         x += step;
-                      //     }
-                      //     cr.stroke().expect("stroke cross");
-                      // }
-                      // BarPattern::Wavy => {
-                      //     let step = 16.0;
-                      //     let mut x = x0;
-                      //     let mid_y = h / 2.0;
-                      //     let amp = (h / 2.0) - 4.0;
-                      //     cr.move_to(x0, mid_y);
-                      //     while x < x0 + seg_w {
-                      //         cr.line_to(x + (step * 0.25), mid_y - amp);
-                      //         cr.line_to(x + (step * 0.75), mid_y + amp);
-                      //         cr.line_to(x + step, mid_y);
-                      //         x += step;
-                      //     }
-                      //     cr.stroke().expect("stroke wavy");
-                      // }
+                    }
                     BarPattern::Bolus
                     | BarPattern::Brick
                     | BarPattern::Ceramics
@@ -464,6 +423,7 @@ pub fn build_interactive_condition_bar(
     let is_ambiguous_end = is_ambiguous.clone();
     let ctx_end = ctx.clone();
     let drawing_area_end = drawing_area.clone();
+    let bar_type_right = bar_type.clone();
 
     drag.connect_drag_end(move |gesture, offset_x, _offset_y| {
         let widget = gesture.widget().unwrap();
@@ -476,6 +436,7 @@ pub fn build_interactive_condition_bar(
             (BarTool::Edit, DragTarget::None) => Event::CyclePattern {
                 id,
                 bar_type: bar_type.clone(),
+                direction: CycleDirection::Forward,
             },
             (BarTool::Create, _) => {
                 let click_x = gesture.start_point().map(|(x, _)| x).unwrap_or(0.0);
@@ -495,6 +456,7 @@ pub fn build_interactive_condition_bar(
                     Event::CyclePattern {
                         id,
                         bar_type: bar_type.clone(),
+                        direction: CycleDirection::Forward,
                     }
                 } else {
                     let start_x = gesture.start_point().map(|(x, _)| x).unwrap_or(0.0);
@@ -517,13 +479,41 @@ pub fn build_interactive_condition_bar(
         *target = DragTarget::None;
         drawing_area_end.queue_draw();
 
-        let ctx_idle = ctx_end.clone();
-        glib::idle_add_local_once(move || {
-            let effects = ctx_idle.core.process_event(event);
-            crate::effects::process_effects(&ctx_idle, effects);
-        });
+        dispatch_event(&ctx_end, event);
     });
 
     drawing_area.add_controller(drag);
+
+    // --- Right-click: cycle pattern backwards ---
+    // GestureDrag only listens to the primary button, so secondary clicks
+    // need their own gesture.
+    let ctx_right = ctx.clone();
+    let right_click = gtk4::GestureClick::builder()
+        .button(gdk::BUTTON_SECONDARY)
+        .build();
+    right_click.connect_released(move |_gesture, _n_press, _x, _y| {
+        if ctx_right.tool.get() == BarTool::Edit {
+            dispatch_event(
+                &ctx_right,
+                Event::CyclePattern {
+                    id,
+                    bar_type: bar_type_right.clone(),
+                    direction: CycleDirection::Backward,
+                },
+            );
+        }
+    });
+    drawing_area.add_controller(right_click);
+
     drawing_area
+}
+
+/// Defers `event` to the next idle tick so the core isn't re-entered from
+/// inside a GTK signal handler, then runs the resulting effects.
+fn dispatch_event(ctx: &AppContext, event: Event) {
+    let ctx = ctx.clone();
+    glib::idle_add_local_once(move || {
+        let effects = ctx.core.process_event(event);
+        crate::effects::process_effects(&ctx, effects);
+    });
 }

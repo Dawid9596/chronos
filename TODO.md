@@ -1,12 +1,12 @@
-Save / loaded green messages ought to fade away after 3s.
+fix: Moving a row inside merges with the group rather than separate them.
 
-Right click to cycle back (left click currently cycles patterns forward).
+Add a new abstraction at the linux-shell leve: a Tool, including what is displayed at the toolbar, enum on what the Tools is, so that click / hover / drag actions can be handled in the context of that Tool.
 
-"Paint" tool – allows hand picking the pattern to paint onto a cell (rather thab using the cycle).
+    "Paint" tool – allows hand picking the pattern to paint onto a cell (rather thab using the cycle).
 
-"Split" tool – allows splitting merged cells. This must be able to be saved, however any saved change to the text removes the 'split' status.
+    "Split" tool – allows splitting merged cells. This must be able to be saved, however any saved change to the text removes the 'split' status.
 
-"Duplicate" tool – allows duplicating rows. By default cells are merged.
+    "Duplicate" tool – allows duplicating rows. By default cells are merged.
 
 "File" menu.
 

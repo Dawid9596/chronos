@@ -78,6 +78,35 @@ pub enum SlotEdge {
     End,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CycleDirection {
+    Forward,
+    Backward,
+}
+
+const PATTERN_ORDER: [BarPattern; 6] = [
+    BarPattern::VerticalHatch,
+    BarPattern::DenseGrid,
+    BarPattern::Bolus,
+    BarPattern::Brick,
+    BarPattern::Ceramics,
+    BarPattern::Wood,
+];
+
+/// The pattern one step from `current` in `direction`, wrapping at both ends.
+fn cycled_pattern(current: &BarPattern, direction: CycleDirection) -> BarPattern {
+    let len = PATTERN_ORDER.len();
+    let idx = PATTERN_ORDER
+        .iter()
+        .position(|p| std::mem::discriminant(p) == std::mem::discriminant(current))
+        .unwrap_or(0);
+    let next = match direction {
+        CycleDirection::Forward => (idx + 1) % len,
+        CycleDirection::Backward => (idx + len - 1) % len,
+    };
+    PATTERN_ORDER[next].clone()
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum FilePickerRequest {
     OpenFile {
@@ -158,6 +187,7 @@ pub enum Event {
     CyclePattern {
         id: u32,
         bar_type: BarType,
+        direction: CycleDirection,
     },
     AddSlot {
         id: u32,
@@ -340,7 +370,11 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::CyclePattern { id, bar_type } => {
+            Event::CyclePattern {
+                id,
+                bar_type,
+                direction,
+            } => {
                 if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
                     let pattern = match bar_type {
                         BarType::GraphicalRepresentation => {
@@ -348,14 +382,7 @@ impl App for ConservationApp {
                         }
                         BarType::WovenTrim => &mut entry.woven_trim.pattern,
                     };
-                    *pattern = match pattern {
-                        BarPattern::VerticalHatch => BarPattern::DenseGrid,
-                        BarPattern::DenseGrid => BarPattern::Bolus,
-                        BarPattern::Bolus => BarPattern::Brick,
-                        BarPattern::Brick => BarPattern::Ceramics,
-                        BarPattern::Ceramics => BarPattern::Wood,
-                        BarPattern::Wood => BarPattern::VerticalHatch,
-                    };
+                    *pattern = cycled_pattern(pattern, direction);
                 }
                 caps.render.render();
             }
