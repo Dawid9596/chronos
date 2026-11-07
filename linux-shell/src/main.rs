@@ -2,6 +2,7 @@
 
 mod context;
 mod effects;
+mod fonts;
 mod ui;
 
 use gtk4::prelude::*;
@@ -9,6 +10,10 @@ use gtk4::prelude::*;
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() -> gtk4::glib::ExitCode {
+    // Must happen before GTK initializes Pango's font map, so the bundled
+    // emoji font is available for the first text layout.
+    fonts::register_bundled_fonts();
+
     let app = gtk4::Application::builder().application_id(APP_ID).build();
 
     app.connect_startup(|_| {
@@ -27,7 +32,7 @@ fn main() -> gtk4::glib::ExitCode {
         let css_provider = gtk4::CssProvider::new();
         css_provider.load_from_string(
             "label.emoji-label { \
-                font-family: 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; \
+                font-family: 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif; \
             } \
             button.insert-gap { \
                 min-height: 6px; \
