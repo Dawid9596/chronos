@@ -1,6 +1,4 @@
-"File" menu.
-
-"About" menu.
+Embed data in PDF.
 
 "Flag, settings, export pdf should have margin right"
 
