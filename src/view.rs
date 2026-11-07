@@ -33,7 +33,11 @@ pub struct GroupSpan {
 }
 
 impl ConservationDocument {
-    pub fn to_view_model(&self, translations: Translations, visible_columns: [bool; 7]) -> DocumentViewModel {
+    pub fn to_view_model(
+        &self,
+        translations: Translations,
+        visible_columns: [bool; 7],
+    ) -> DocumentViewModel {
         let len = self.entries.len();
         let mut rows = Vec::with_capacity(len);
         if len == 0 {
@@ -41,7 +45,7 @@ impl ConservationDocument {
                 project_name: self.project_name.clone(),
                 rows,
                 translations,
-                visible_columns
+                visible_columns,
             };
         }
 
@@ -94,7 +98,7 @@ impl ConservationDocument {
                 let next = &self.entries[i + 1];
                 (entry.chronological_phase != next.chronological_phase
                     || entry.chrono_group != next.chrono_group)
-                    || (entry.dating_period != next.dating_period
+                    && (entry.dating_period != next.dating_period
                         || entry.dating_group != next.dating_group)
             } else {
                 true
@@ -117,7 +121,7 @@ impl ConservationDocument {
             project_name: self.project_name.clone(),
             rows,
             translations,
-            visible_columns
+            visible_columns,
         }
     }
 }
