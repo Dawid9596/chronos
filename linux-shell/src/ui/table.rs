@@ -98,7 +98,6 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
             let row_id = row.id;
             let current_idx = i;
             let total_rows = doc_rows.len();
-            let doc_rows_snapshot = doc_rows.clone();
             let ctx_drag = ctx.clone();
 
             drag_gesture.connect_drag_end(move |_gesture, _offset_x, offset_y| {
@@ -121,14 +120,11 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
                     return;
                 }
 
-                let adopt_group_from_id = doc_rows_snapshot.get(target_idx).map(|r| r.id);
-
                 let ctx_idle = ctx_drag.clone();
                 glib::idle_add_local_once(move || {
                     let effects = ctx_idle.core.process_event(Event::MoveLayer {
                         id: row_id,
                         target_index: target_idx,
-                        adopt_group_from_id,
                     });
                     crate::effects::process_effects(&ctx_idle, effects);
                 });

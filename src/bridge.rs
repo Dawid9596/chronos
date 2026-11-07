@@ -171,7 +171,6 @@ pub enum Event {
     MoveLayer {
         id: u32,
         target_index: usize,
-        adopt_group_from_id: Option<u32>,
     },
     UpdateProjectName(String),
     UpdateText {
@@ -305,25 +304,9 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
-            Event::MoveLayer {
-                id,
-                target_index,
-                adopt_group_from_id,
-            } => {
+            Event::MoveLayer { id, target_index } => {
                 if let Some(pos) = model.document.entries.iter().position(|e| e.id == id) {
-                    let adopted = adopt_group_from_id.and_then(|target_id| {
-                        model
-                            .document
-                            .entries
-                            .iter()
-                            .find(|e| e.id == target_id)
-                            .map(|e| (e.chronological_phase.clone(), e.dating_period.clone()))
-                    });
-                    let mut entry = model.document.entries.remove(pos);
-                    if let Some((phase, dating)) = adopted {
-                        entry.chronological_phase = phase;
-                        entry.dating_period = dating;
-                    }
+                    let entry = model.document.entries.remove(pos);
                     let clamped_index = target_index.min(model.document.entries.len());
                     model.document.entries.insert(clamped_index, entry);
                     caps.render.render();
