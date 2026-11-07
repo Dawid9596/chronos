@@ -28,6 +28,7 @@ pub struct Translations {
     pub tool_delete: String,
     pub tool_paint: String,
     pub tool_split: String,
+    pub tool_duplicate: String,
     pub status_ready: String,
     pub project_prefix: String,
 
@@ -67,6 +68,7 @@ impl Translations {
                 tool_delete: "Delete".into(),
                 tool_paint: "Paint".into(),
                 tool_split: "Split".into(),
+                tool_duplicate: "Duplicate".into(),
                 status_ready: "Ready".into(),
                 project_prefix: "Project: ".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
@@ -96,6 +98,7 @@ impl Translations {
                 tool_delete: "Usuń".into(),
                 tool_paint: "Maluj".into(),
                 tool_split: "Rozdziel".into(),
+                tool_duplicate: "Duplikuj".into(),
                 status_ready: "Gotowy".into(),
                 project_prefix: "Projekt: ".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),

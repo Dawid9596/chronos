@@ -191,7 +191,19 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
             click_gesture.set_button(1);
             let is_armed_click = is_armed.clone();
             let handle_box_click = handle_box.clone();
+            let row_id = row.id;
+            let ctx_click = ctx.clone();
             click_gesture.connect_pressed(move |_gesture, n_press, _x, _y| {
+                if let Some(ev) = ctx_click.tool.get().on_row_click(row_id) {
+                    if n_press == 1 {
+                        let ctx_idle = ctx_click.clone();
+                        glib::idle_add_local_once(move || {
+                            let effects = ctx_idle.core.process_event(ev);
+                            crate::effects::process_effects(&ctx_idle, effects);
+                        });
+                    }
+                    return;
+                }
                 if n_press == 2 {
                     is_armed_click.set(true);
                     handle_box_click.set_cursor(grabbing_cursor.as_ref());

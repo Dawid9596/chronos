@@ -2,6 +2,7 @@ use chronos::bridge::{BarType, CycleDirection, Event, SlotEdge};
 use chronos::i18n::Translations;
 use chronos::storage::{BarPattern, Slot};
 use gtk4::cairo;
+use gtk4::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tool {
@@ -10,6 +11,7 @@ pub enum Tool {
     Delete,
     Paint(BarPattern),
     Split,
+    Duplicate,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,13 +37,51 @@ pub struct BarInteractionState {
 }
 
 impl Tool {
-    pub const TOOLBAR_DEFAULTS: [Tool; 5] = [
+    pub const TOOLBAR_DEFAULTS: [Tool; 6] = [
         Tool::Edit,
         Tool::Create,
         Tool::Delete,
         Tool::Paint(BarPattern::VerticalHatch),
         Tool::Split,
+        Tool::Duplicate,
     ];
+
+    pub const PAINT_VARIANTS: [Tool; 6] = [
+        Tool::Paint(BarPattern::VerticalHatch),
+        Tool::Paint(BarPattern::DenseGrid),
+        Tool::Paint(BarPattern::Bolus),
+        Tool::Paint(BarPattern::Brick),
+        Tool::Paint(BarPattern::Ceramics),
+        Tool::Paint(BarPattern::Wood),
+    ];
+
+    /// Returns the selectable variants for this tool family, or `&[]` if the tool has none.
+    pub fn variants(self) -> &'static [Tool] {
+        match self {
+            Tool::Paint(_) => &Self::PAINT_VARIANTS,
+            Tool::Edit
+            | Tool::Create
+            | Tool::Delete
+            | Tool::Split
+            | Tool::Duplicate => &[],
+        }
+    }
+
+    /// True if `self` and `other` belong to the same top-level toolbar button.
+    pub fn same_kind(self, other: Tool) -> bool {
+        std::mem::discriminant(&self) == std::mem::discriminant(&other)
+    }
+
+    /// Builds the child widget displayed inside a variant selector button.
+    pub fn build_variant_widget(self) -> gtk4::Widget {
+        match self {
+            Tool::Paint(pattern) => {
+                crate::ui::widgets::bar::build_pattern_swatch(pattern, 36, 20).upcast()
+            }
+            // Future tools with variants can return a Label, Image, or custom widget here:
+            other => gtk4::Image::from_icon_name(other.icon_name()).upcast(),
+        }
+    }
 
     pub fn icon_name(self) -> &'static str {
         match self {
@@ -50,6 +90,7 @@ impl Tool {
             Tool::Delete => "user-trash-symbolic",
             Tool::Paint(_) => "applications-graphics-symbolic",
             Tool::Split => "edit-cut-symbolic",
+            Tool::Duplicate => "edit-copy-symbolic",
         }
     }
 
@@ -60,6 +101,7 @@ impl Tool {
             Tool::Delete => &t.tool_delete,
             Tool::Paint(_) => &t.tool_paint,
             Tool::Split => &t.tool_split,
+            Tool::Duplicate => &t.tool_duplicate,
         }
     }
 
@@ -154,7 +196,7 @@ impl Tool {
                     return true;
                 }
             }
-            Tool::Delete | Tool::Split => {}
+            Tool::Delete | Tool::Split | Tool::Duplicate => {}
         }
         false
     }
@@ -164,7 +206,7 @@ impl Tool {
             Tool::Edit => state.hover_slot = None,
             Tool::Create => state.create_preview = None,
             Tool::Paint(_) => state.paint_hover = false,
-            Tool::Delete | Tool::Split => {}
+            Tool::Delete | Tool::Split | Tool::Duplicate => {}
         }
     }
 
@@ -221,7 +263,7 @@ impl Tool {
                 }
                 state.drag_target = target;
             }
-            Tool::Create | Tool::Paint(_) | Tool::Split => {
+            Tool::Create | Tool::Paint(_) | Tool::Split | Tool::Duplicate => {
                 state.drag_target = DragTarget::None;
             }
         }
@@ -325,6 +367,7 @@ impl Tool {
                     })
                 }
             }
+            (Tool::Duplicate, _) if offset_x.abs() <= 3.0 => Some(Event::DuplicateLayer(id)),
             _ => None,
         }
     }
@@ -336,7 +379,7 @@ impl Tool {
                 bar_type,
                 direction: CycleDirection::Backward,
             }),
-            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split => None,
+            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split | Tool::Duplicate => None,
         }
     }
 
@@ -350,6 +393,14 @@ impl Tool {
                 tail_member_ids,
                 field,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn on_row_click(self, row_id: u32) -> Option<Event> {
+        if self == Tool::Duplicate {
+            Some(Event::DuplicateLayer(row_id))
         } else {
             None
         }

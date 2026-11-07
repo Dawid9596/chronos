@@ -50,27 +50,43 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     lang_box.append(&flag_label);
     let lang_btn = gtk4::Button::builder().child(&lang_box).build();
 
-    let selected_paint_pattern = Rc::new(Cell::new(chronos::storage::BarPattern::VerticalHatch));
+    let tool_section = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(6)
+        .halign(gtk4::Align::Center)
+        .build();
 
-    let tool_bar = gtk4::Box::builder()
+    let tool_bar_row = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
         .spacing(4)
+        .halign(gtk4::Align::Center)
+        .build();
+
+    let bottom_stack = gtk4::Stack::builder()
+        .transition_type(gtk4::StackTransitionType::Crossfade)
+        .halign(gtk4::Align::Center)
+        .build();
+
+    let bottom_revealer = gtk4::Revealer::builder()
+        .transition_type(gtk4::RevealerTransitionType::SlideDown)
+        .reveal_child(false)
+        .halign(gtk4::Align::Center)
+        .child(&bottom_stack)
         .build();
 
     let mut tool_labels = Vec::with_capacity(Tool::TOOLBAR_DEFAULTS.len());
     let mut first_btn: Option<gtk4::ToggleButton> = None;
-    let mut paint_toggle_btn: Option<gtk4::ToggleButton> = None;
 
-    // Revealer holding the pattern swatches so they appear when Paint is active
-    // (or can be clicked directly).
-    let pattern_revealer = gtk4::Revealer::builder()
-        .transition_type(gtk4::RevealerTransitionType::SlideRight)
-        .reveal_child(false)
-        .build();
+    // Keep track of inline revealers so they close when another tool is chosen
+    let inline_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
+        Rc::new(RefCell::new(Vec::new()));
 
-    for t_variant in Tool::TOOLBAR_DEFAULTS {
+    for (tool_idx, default_tool) in Tool::TOOLBAR_DEFAULTS.into_iter().enumerate() {
+        let remembered_variant = Rc::new(Cell::new(default_tool));
+        let variants = default_tool.variants();
+
         let btn = gtk4::ToggleButton::builder()
-            .active(t_variant == Tool::Edit)
+            .active(default_tool == Tool::Edit)
             .build();
 
         let btn_box = gtk4::Box::builder()
@@ -80,8 +96,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             .valign(gtk4::Align::Center)
             .build();
 
-        let icon = gtk4::Image::from_icon_name(t_variant.icon_name());
-        let text_label = gtk4::Label::new(Some(t_variant.label(t)));
+        let icon = gtk4::Image::from_icon_name(default_tool.icon_name());
+        let text_label = gtk4::Label::new(Some(default_tool.label(t)));
         btn_box.append(&icon);
         btn_box.append(&text_label);
         btn.set_child(Some(&btn_box));
@@ -93,73 +109,96 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             first_btn = Some(btn.clone());
         }
 
-        if matches!(t_variant, Tool::Paint(_)) {
-            paint_toggle_btn = Some(btn.clone());
+        tool_bar_row.append(&btn);
+        tool_labels.push((default_tool, text_label));
+
+        // Build variant selector box if this tool has variants
+        let stack_page_name = format!("tool-variants-{tool_idx}");
+        if !variants.is_empty() {
+            let selector_box = gtk4::Box::builder()
+                .orientation(gtk4::Orientation::Horizontal)
+                .spacing(2)
+                .build();
+
+            let mut first_var_btn: Option<gtk4::ToggleButton> = None;
+            for &variant in variants {
+                let var_widget = variant.build_variant_widget();
+                let var_btn = gtk4::ToggleButton::builder()
+                    .child(&var_widget)
+                    .active(variant == default_tool)
+                    .build();
+
+                if let Some(ref leader) = first_var_btn {
+                    var_btn.set_group(Some(leader));
+                } else {
+                    first_var_btn = Some(var_btn.clone());
+                }
+
+                let tool_cell = tool.clone();
+                let remembered = remembered_variant.clone();
+                let parent_btn = btn.clone();
+                var_btn.connect_toggled(move |b| {
+                    if b.is_active() {
+                        remembered.set(variant);
+                        if !parent_btn.is_active() {
+                            parent_btn.set_active(true);
+                        }
+                        tool_cell.set(variant);
+                    }
+                });
+
+                selector_box.append(&var_btn);
+            }
+
+            if variants.len() <= 3 {
+                // Case 1: <= 3 variants -> inline immediately to the right of this tool button
+                selector_box.set_margin_start(2);
+                selector_box.set_margin_end(4);
+                let inline_rev = gtk4::Revealer::builder()
+                    .transition_type(gtk4::RevealerTransitionType::SlideRight)
+                    .reveal_child(default_tool == Tool::Edit)
+                    .child(&selector_box)
+                    .build();
+                tool_bar_row.append(&inline_rev);
+                inline_revealers
+                    .borrow_mut()
+                    .push((default_tool, inline_rev));
+            } else {
+                // Case 2: > 3 variants -> placed in the bottom revealer stack
+                bottom_stack.add_named(&selector_box, Some(&stack_page_name));
+            }
         }
 
         let tool_cell = tool.clone();
-        let paint_pat = selected_paint_pattern.clone();
-        let revealer_clone = pattern_revealer.clone();
+        let remembered = remembered_variant.clone();
+        let inline_revs = inline_revealers.clone();
+        let bottom_rev = bottom_revealer.clone();
+        let b_stack = bottom_stack.clone();
+        let variant_count = variants.len();
+
         btn.connect_toggled(move |b| {
             if b.is_active() {
-                match t_variant {
-                    Tool::Paint(_) => {
-                        tool_cell.set(Tool::Paint(paint_pat.get()));
-                        revealer_clone.set_reveal_child(true);
-                    }
-                    other => {
-                        tool_cell.set(other);
-                        revealer_clone.set_reveal_child(false);
-                    }
+                let active_tool = remembered.get();
+                tool_cell.set(active_tool);
+
+                // Update inline revealers (<= 3 variants)
+                for (kind, rev) in inline_revs.borrow().iter() {
+                    rev.set_reveal_child(kind.same_kind(active_tool));
+                }
+
+                // Update bottom revealer (> 3 variants)
+                if variant_count > 3 {
+                    b_stack.set_visible_child_name(&stack_page_name);
+                    bottom_rev.set_reveal_child(true);
+                } else {
+                    bottom_rev.set_reveal_child(false);
                 }
             }
         });
-
-        tool_bar.append(&btn);
-        tool_labels.push((t_variant, text_label));
     }
 
-    // Build the pattern swatch selector buttons inside the revealer
-    let palette_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .spacing(2)
-        .margin_start(6)
-        .build();
-
-    let mut first_swatch_btn: Option<gtk4::ToggleButton> = None;
-    for &pat in &chronos::bridge::PATTERN_ORDER {
-        let swatch = crate::ui::widgets::bar::build_pattern_swatch(pat, 36, 20);
-        let pat_btn = gtk4::ToggleButton::builder()
-            .child(&swatch)
-            .active(pat == chronos::storage::BarPattern::VerticalHatch)
-            .build();
-
-        if let Some(ref leader) = first_swatch_btn {
-            pat_btn.set_group(Some(leader));
-        } else {
-            first_swatch_btn = Some(pat_btn.clone());
-        }
-
-        let tool_cell = tool.clone();
-        let paint_pat = selected_paint_pattern.clone();
-        let paint_btn_ref = paint_toggle_btn.clone();
-        pat_btn.connect_toggled(move |b| {
-            if b.is_active() {
-                paint_pat.set(pat);
-                if let Some(ref p_btn) = paint_btn_ref {
-                    if !p_btn.is_active() {
-                        p_btn.set_active(true);
-                    }
-                }
-                tool_cell.set(Tool::Paint(pat));
-            }
-        });
-
-        palette_box.append(&pat_btn);
-    }
-
-    pattern_revealer.set_child(Some(&palette_box));
-    tool_bar.append(&pattern_revealer);
+    tool_section.append(&tool_bar_row);
+    tool_section.append(&bottom_revealer);
 
     let left_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -171,7 +210,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let top_bar = gtk4::CenterBox::new();
     top_bar.set_start_widget(Some(&left_box));
-    top_bar.set_center_widget(Some(&tool_bar));
+    top_bar.set_center_widget(Some(&tool_section));
 
     let status_stack = gtk4::Stack::new();
     status_stack.set_transition_type(gtk4::StackTransitionType::None);

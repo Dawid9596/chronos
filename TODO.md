@@ -1,9 +1,11 @@
-"Split" tool – allows splitting merged cells. This must be able to be saved, however any saved change to the text removes the 'split' status.
-
-"Duplicate" tool – allows duplicating rows. By default cells are merged.
+"Merge" tool (selector down / up) – allows merging a cell into neigh cell
 
 "File" menu.
 
 "About" menu.
 
 "Flag, settings, export pdf should have margin right"
+
+A column of size zero should be rendered as a vertical line, not the actual pattern
+
+.chr.json extension support

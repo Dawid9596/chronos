@@ -167,6 +167,7 @@ pub enum Event {
     RequestPdfExport([bool; 7]),
     PdfExportFinished(ExportPdfResponse),
     DeleteLayer(u32),
+    DuplicateLayer(u32),
     InsertLayerAfter(Option<u32>),
     MoveLayer {
         id: u32,
@@ -280,6 +281,18 @@ impl App for ConservationApp {
             Event::DeleteLayer(id) => {
                 model.document.entries.retain(|e| e.id != id);
                 caps.render.render();
+            }
+            Event::DuplicateLayer(id) => {
+                if let Some(idx) = model.document.entries.iter().position(|e| e.id == id) {
+                    let new_id = model.next_id;
+                    model.next_id += 1;
+
+                    let mut duplicated = model.document.entries[idx].clone();
+                    duplicated.id = new_id;
+
+                    model.document.entries.insert(idx + 1, duplicated);
+                    caps.render.render();
+                }
             }
             Event::InsertLayerAfter(after_id) => {
                 let new_id = model.next_id;
