@@ -1,4 +1,5 @@
 #let data = json.decode(sys.inputs.json_data)
+#let params = data.canvas_params
 
 // ---------------------------------------------------------
 // Define Patterns for the Condition Bars
@@ -82,7 +83,7 @@
           line(
             start: (0pt, 0%),
             end: (0pt, 100%),
-            stroke: 1.5pt + luma(77),
+            stroke: (params.zero_width_line_pt * 1pt) + luma(77),
           ),
         )
       } else {
@@ -97,7 +98,15 @@
 // Document Layout & Table Generation
 // ---------------------------------------------------------
 #let conservation-report(data) = {
-  set page("a4", margin: (x: 1.5cm, y: 2cm))
+  let page-margin-val = params.page_margin_mm * 1mm
+  set page(
+    lower(params.paper_size),
+    margin: (x: page-margin-val, y: page-margin-val),
+    flipped: params.landscape
+  )
+
+  // Cell padding
+  let cell-inset-val = params.cell_padding_mm * 1mm
   set text(font: "Linux Libertine", size: 10pt)
   align(center)[
     #text(size: 16pt, weight: "bold")[#data.project_name] \
@@ -106,7 +115,7 @@
   ]
   v(2em)
 
-  let base-ratios = (5, 35, 10, 20, 10, 10, 10)
+  let base-ratios = params.column_ratios
   let base-aligns = (center, center, center, left, center, center, center)
 
   let active-ratios = ()
@@ -118,8 +127,8 @@
     }
   }
 
-  let total-ratio = active-ratios.sum()
-  let active-columns = active-ratios.map(r => (r / total-ratio) * 100%)
+  let total-ratio = if active-ratios.len() == 0 { 1 } else { active-ratios.sum() }
+  let active-columns = if active-ratios.len() == 0 { () } else { active-ratios.map(r => (r / total-ratio) * 100%) }
 
   let all-headers = (
     rotated-header(data.translations.col_no),
@@ -158,13 +167,16 @@
     }
   }
 
-  table(
-    columns: active-columns,
-    align: active-aligns,
-    stroke: (x, y) => if y == 0 { 1pt + black } else { 0.5pt + luma(200) },
-    fill: (x, y) => if y == 0 { luma(240) } else { none },
-    ..cells
-  )
+  if active-ratios.len() > 0 {
+    table(
+      inset: cell-inset-val,
+      columns: active-columns,
+      align: active-aligns,
+      stroke: (x, y) => if y == 0 { 1pt + black } else { 0.5pt + luma(200) },
+      fill: (x, y) => if y == 0 { luma(240) } else { none },
+      ..cells
+    )
+  }
 }
 
 #conservation-report(data)

@@ -1,4 +1,6 @@
+use crate::context::CanvasParams;
 use crate::i18n::Translations;
+use crate::storage::StatusMessage;
 use crate::storage::{
     AppState, BarPattern, ConditionBar, ConservationDocument, ConservationEntry, Slot,
 };
@@ -9,10 +11,10 @@ use crux_core::{App, macros::Effect, render::Render};
 use crux_macros::Capability;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ExportPdfRequest {
     pub file_name: String,
-    pub pdf_bytes: Vec<u8>,
+    pub view_model: crate::view::DocumentViewModel,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -41,12 +43,12 @@ where
     pub fn export(
         &self,
         file_name: String,
-        pdf_bytes: Vec<u8>,
+        view_model: crate::view::DocumentViewModel,
         on_complete: impl Fn(ExportPdfResponse) -> Ev + Send + Sync + 'static,
     ) {
         let request = ExportPdfRequest {
             file_name,
-            pdf_bytes,
+            view_model,
         };
         self.context.spawn({
             let context = self.context.clone();
@@ -110,7 +112,7 @@ fn cycled_pattern(current: &BarPattern, direction: CycleDirection) -> BarPattern
         CycleDirection::Forward => (idx + 1) % len,
         CycleDirection::Backward => (idx + len - 1) % len,
     };
-    PATTERN_ORDER[next].clone()
+    PATTERN_ORDER[next]
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -170,7 +172,7 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
-    RequestPdfExport([bool; 7]),
+    RequestPdfExport([bool; 7], CanvasParams),
     PdfExportFinished(ExportPdfResponse),
     DeleteLayer(u32),
     DuplicateLayer(u32),
@@ -262,30 +264,42 @@ impl App for ConservationApp {
             Event::Init => {
                 caps.render.render();
             }
-            Event::RequestPdfExport(visible_columns) => {
+            Event::RequestPdfExport(visible_columns, canvas_params) => {
                 model.is_exporting = true;
                 model.last_error = None;
-                let t = Translations::get(model.language);
-                let view_model = model.document.to_view_model(t, visible_columns);
+                // Trigger an immediate UI render so the export button disables and shows "Exporting..."
+                caps.render.render();
 
-                match crate::generate_pdf::typst_compile_to_bytes(&view_model) {
-                    Ok(pdf_bytes) => {
-                        let file_name = format!("{}.pdf", model.document.project_name);
-                        caps.export_pdf
-                            .export(file_name, pdf_bytes, Event::PdfExportFinished);
-                    }
-                    Err(err_msg) => {
-                        model.is_exporting = false;
-                        model.last_error = Some(err_msg);
-                        caps.render.render();
-                    }
-                }
+                let t = Translations::get(model.language);
+                let view_model = model
+                    .document
+                    .to_view_model(t, visible_columns, canvas_params);
+                let safe_stem: String = model
+                    .document
+                    .project_name
+                    .chars()
+                    .map(|c| {
+                        if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
+                    .collect();
+                let file_name = format!("{}.pdf", safe_stem.trim());
+
+                caps.export_pdf
+                    .export(file_name, view_model, Event::PdfExportFinished);
             }
             Event::PdfExportFinished(response) => {
                 model.is_exporting = false;
                 match response {
-                    ExportPdfResponse::Success(path) => model.last_error = Some(path),
-                    ExportPdfResponse::Error(err) => model.last_error = Some(err),
+                    ExportPdfResponse::Success(path) => {
+                        model.last_error = Some(StatusMessage::Info(path))
+                    }
+                    ExportPdfResponse::Error(err) => {
+                        model.last_error = Some(StatusMessage::Error(err))
+                    }
                 }
                 caps.render.render();
             }
@@ -379,16 +393,12 @@ impl App for ConservationApp {
                     if member_ids.contains(&entry.id) {
                         match field {
                             EditableField::ChronologicalPhase => {
-                                if entry.chronological_phase != new_value {
-                                    entry.chronological_phase = new_value.clone();
-                                    entry.chrono_group = 0;
-                                }
+                                // Keep existing chrono_group so explicit splits are preserved
+                                entry.chronological_phase = new_value.clone();
                             }
                             EditableField::DatingPeriod => {
-                                if entry.dating_period != new_value {
-                                    entry.dating_period = new_value.clone();
-                                    entry.dating_group = 0;
-                                }
+                                // Keep existing dating_group so explicit splits are preserved
+                                entry.dating_period = new_value.clone();
                             }
                             _ => {}
                         }
@@ -451,57 +461,111 @@ impl App for ConservationApp {
                     _ => None,
                 };
 
-                if let Some(n_idx) = neighbor_idx {
-                    let neighbor = &model.document.entries[n_idx];
+                if let (Some(first), Some(last), Some(n_idx)) = (first_pos, last_pos, neighbor_idx)
+                {
+                    // Allocate a fresh group ID so the merged span cannot accidentally
+                    // coalesce with an adjacent group that happens to share the same text.
+                    let new_group_id = model
+                        .document
+                        .entries
+                        .iter()
+                        .map(|e| match field {
+                            EditableField::ChronologicalPhase => e.chrono_group,
+                            EditableField::DatingPeriod => e.dating_group,
+                            _ => 0,
+                        })
+                        .max()
+                        .unwrap_or(0)
+                        + 1;
+
                     match field {
                         EditableField::ChronologicalPhase => {
-                            let target_val = neighbor.chronological_phase.clone();
-                            let target_group = neighbor.chrono_group;
-                            let target_id = neighbor.id;
+                            let target_val =
+                                model.document.entries[n_idx].chronological_phase.clone();
+                            let target_group = model.document.entries[n_idx].chrono_group;
 
-                            let clicked_val = first_pos
-                                .map(|i| model.document.entries[i].chronological_phase.clone())
-                                .unwrap_or_default();
+                            // Find only the contiguous slice of the neighbor group
+                            let (mut range_start, mut range_end) = (n_idx, n_idx);
+                            if n_idx < first {
+                                while range_start > 0 {
+                                    let prev = &model.document.entries[range_start - 1];
+                                    if prev.chronological_phase == target_val
+                                        && prev.chrono_group == target_group
+                                    {
+                                        range_start -= 1;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                range_end = last;
+                            } else {
+                                while range_end + 1 < len {
+                                    let next = &model.document.entries[range_end + 1];
+                                    if next.chronological_phase == target_val
+                                        && next.chrono_group == target_group
+                                    {
+                                        range_end += 1;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                range_start = first;
+                            }
+
+                            let clicked_val =
+                                model.document.entries[first].chronological_phase.clone();
                             let final_val = if !clicked_val.is_empty() {
                                 clicked_val
                             } else {
-                                target_val.clone()
+                                target_val
                             };
 
-                            for entry in model.document.entries.iter_mut() {
-                                if member_ids.contains(&entry.id)
-                                    || (entry.id == target_id)
-                                    || (entry.chronological_phase == target_val
-                                        && entry.chrono_group == target_group)
-                                {
-                                    entry.chronological_phase = final_val.clone();
-                                    entry.chrono_group = target_group;
-                                }
+                            for entry in &mut model.document.entries[range_start..=range_end] {
+                                entry.chronological_phase = final_val.clone();
+                                entry.chrono_group = new_group_id;
                             }
                         }
                         EditableField::DatingPeriod => {
-                            let target_val = neighbor.dating_period.clone();
-                            let target_group = neighbor.dating_group;
-                            let target_id = neighbor.id;
+                            let target_val = model.document.entries[n_idx].dating_period.clone();
+                            let target_group = model.document.entries[n_idx].dating_group;
 
-                            let clicked_val = first_pos
-                                .map(|i| model.document.entries[i].dating_period.clone())
-                                .unwrap_or_default();
+                            let (mut range_start, mut range_end) = (n_idx, n_idx);
+                            if n_idx < first {
+                                while range_start > 0 {
+                                    let prev = &model.document.entries[range_start - 1];
+                                    if prev.dating_period == target_val
+                                        && prev.dating_group == target_group
+                                    {
+                                        range_start -= 1;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                range_end = last;
+                            } else {
+                                while range_end + 1 < len {
+                                    let next = &model.document.entries[range_end + 1];
+                                    if next.dating_period == target_val
+                                        && next.dating_group == target_group
+                                    {
+                                        range_end += 1;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                range_start = first;
+                            }
+
+                            let clicked_val = model.document.entries[first].dating_period.clone();
                             let final_val = if !clicked_val.is_empty() {
                                 clicked_val
                             } else {
-                                target_val.clone()
+                                target_val
                             };
 
-                            for entry in model.document.entries.iter_mut() {
-                                if member_ids.contains(&entry.id)
-                                    || (entry.id == target_id)
-                                    || (entry.dating_period == target_val
-                                        && entry.dating_group == target_group)
-                                {
-                                    entry.dating_period = final_val.clone();
-                                    entry.dating_group = target_group;
-                                }
+                            for entry in &mut model.document.entries[range_start..=range_end] {
+                                entry.dating_period = final_val.clone();
+                                entry.dating_group = new_group_id;
                             }
                         }
                         _ => {}
@@ -561,7 +625,7 @@ impl App for ConservationApp {
                             end_pct: at_pct,
                         });
                         bar.slots
-                            .sort_by(|a, b| a.start_pct.partial_cmp(&b.start_pct).unwrap());
+                            .sort_by(|a, b| a.start_pct.total_cmp(&b.start_pct));
                     }
                 }
                 caps.render.render();
@@ -674,18 +738,26 @@ impl App for ConservationApp {
                                     doc.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
                                 model.document = doc;
                                 model.current_file_path = Some(path.clone());
-                                model.last_error =
-                                    Some(format!("{}{}", t.status_loaded_prefix, path));
+                                model.last_error = Some(StatusMessage::Info(format!(
+                                    "{}{}",
+                                    t.status_loaded_prefix, path
+                                )));
                             }
                             Err(e) => {
-                                model.last_error = Some(format!("{}{}", t.error_parse_prefix, e));
+                                model.last_error = Some(StatusMessage::Error(format!(
+                                    "{}{}",
+                                    t.error_parse_prefix, e
+                                )));
                             }
                         }
                     }
                     FilePickerResponse::Saved { .. } => {}
                     FilePickerResponse::Cancelled => {}
                     FilePickerResponse::Error(e) => {
-                        model.last_error = Some(format!("{}{}", t.error_open_prefix, e));
+                        model.last_error = Some(StatusMessage::Error(format!(
+                            "{}{}",
+                            t.error_open_prefix, e
+                        )));
                     }
                 }
                 caps.render.render();
@@ -695,12 +767,18 @@ impl App for ConservationApp {
                 match response {
                     FilePickerResponse::Saved { path } => {
                         model.current_file_path = Some(path.clone());
-                        model.last_error = Some(format!("{}{}", t.status_saved_prefix, path));
+                        model.last_error = Some(StatusMessage::Info(format!(
+                            "{}{}",
+                            t.status_saved_prefix, path
+                        )));
                     }
                     FilePickerResponse::Opened { .. } => {}
                     FilePickerResponse::Cancelled => {}
                     FilePickerResponse::Error(e) => {
-                        model.last_error = Some(format!("{}{}", t.error_save_prefix, e));
+                        model.last_error = Some(StatusMessage::Error(format!(
+                            "{}{}",
+                            t.error_save_prefix, e
+                        )));
                     }
                 }
                 caps.render.render();
@@ -716,10 +794,132 @@ impl App for ConservationApp {
     fn view(&self, model: &Self::Model) -> Self::ViewModel {
         let t = Translations::get(model.language);
         AppViewModel {
-            document: model.document.to_view_model(t.clone(), [true; 7]),
+            document: model
+                .document
+                .to_view_model(t.clone(), [true; 7], CanvasParams::default()),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
             translations: t,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n::{Language, Translations};
+    use crux_core::Core;
+
+    #[test]
+    fn split_and_edit_group_preserves_boundary() {
+        let core = Core::<ConservationApp>::default();
+        // Default state has rows 1 and 2 merged under "Iron Age" (chrono_group = 0)
+        let vm = core.view();
+        assert_eq!(
+            vm.document.rows[0]
+                .chronological_phase
+                .as_ref()
+                .unwrap()
+                .span,
+            2
+        );
+
+        // 1. Split row 2 from row 1
+        let _ = core.process_event(Event::SplitGroupCell {
+            tail_member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+        });
+        let vm = core.view();
+        assert_eq!(
+            vm.document.rows[0]
+                .chronological_phase
+                .as_ref()
+                .unwrap()
+                .span,
+            1
+        );
+        assert_eq!(
+            vm.document.rows[1]
+                .chronological_phase
+                .as_ref()
+                .unwrap()
+                .span,
+            1
+        );
+
+        // 2. Rename row 2 to "Bronze Age", then back to "Iron Age"
+        let _ = core.process_event(Event::UpdateGroupText {
+            member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+            new_value: "Bronze Age".into(),
+        });
+        let _ = core.process_event(Event::UpdateGroupText {
+            member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+            new_value: "Iron Age".into(),
+        });
+
+        // Rows 1 and 2 must remain separate (span = 1 each) despite having identical text
+        let vm = core.view();
+        assert_eq!(
+            vm.document.rows[0]
+                .chronological_phase
+                .as_ref()
+                .unwrap()
+                .span,
+            1
+        );
+        assert_eq!(
+            vm.document.rows[1]
+                .chronological_phase
+                .as_ref()
+                .unwrap()
+                .span,
+            1
+        );
+    }
+
+    #[test]
+    fn merge_only_affects_contiguous_neighbor() {
+        let core = Core::<ConservationApp>::default();
+        // Insert a 3rd row at the bottom and set its phase to "Iron Age" (chrono_group = 0)
+        let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
+        let _ = core.process_event(Event::UpdateGroupText {
+            member_ids: vec![3],
+            field: EditableField::ChronologicalPhase,
+            new_value: "Iron Age".into(),
+        });
+        // Split row 2 and set it to "Middle Ages" so row 1 ("Iron Age") and row 3 ("Iron Age") are separated
+        let _ = core.process_event(Event::SplitGroupCell {
+            tail_member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+        });
+        let _ = core.process_event(Event::UpdateGroupText {
+            member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+            new_value: "Middle Ages".into(),
+        });
+
+        // Merge row 2 ("Middle Ages") UP into row 1 ("Iron Age")
+        let _ = core.process_event(Event::MergeGroupCell {
+            member_ids: vec![2],
+            field: EditableField::ChronologicalPhase,
+            direction: MergeDirection::Up,
+        });
+
+        let _t = Translations::get(Language::English);
+        let vm = core.view().document;
+        // Rows 1 & 2 should now be merged as "Middle Ages" (span = 2)
+        assert_eq!(
+            vm.rows[0].chronological_phase.as_ref().unwrap().value,
+            "Middle Ages"
+        );
+        assert_eq!(vm.rows[0].chronological_phase.as_ref().unwrap().span, 2);
+        // Row 3 (non-adjacent) must still be "Iron Age" (span = 1), untouched by the merge!
+        assert_eq!(
+            vm.rows[2].chronological_phase.as_ref().unwrap().value,
+            "Iron Age"
+        );
+        assert_eq!(vm.rows[2].chronological_phase.as_ref().unwrap().span, 1);
     }
 }

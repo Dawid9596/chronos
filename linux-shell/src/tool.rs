@@ -16,17 +16,14 @@ pub enum Tool {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Default)]
 pub enum DragTarget {
+    #[default]
     None,
     Edge { slot_index: usize, edge: SlotEdge },
     Slot(usize),
 }
 
-impl Default for DragTarget {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 #[derive(Default)]
 pub struct BarInteractionState {
@@ -67,11 +64,7 @@ impl Tool {
         match self {
             Tool::Paint(_) => &Self::PAINT_VARIANTS,
             Tool::Merge(_) => &Self::MERGE_VARIANTS,
-            Tool::Edit
-            | Tool::Create
-            | Tool::Delete
-            | Tool::Split
-            | Tool::Duplicate => &[],
+            Tool::Edit | Tool::Create | Tool::Delete | Tool::Split | Tool::Duplicate => &[],
         }
     }
 
@@ -161,14 +154,13 @@ impl Tool {
                     cr.stroke().expect("stroke preview");
                 }
             }
-            Tool::Paint(_) => {
-                if state.paint_hover {
+            Tool::Paint(_)
+                if state.paint_hover => {
                     cr.set_source_rgba(0.2, 0.5, 0.9, 0.8);
                     cr.set_line_width(2.0);
                     cr.rectangle(1.0, 1.0, (w - 2.0).max(0.0), (h - 2.0).max(0.0));
                     cr.stroke().expect("stroke paint hover border");
                 }
-            }
             _ => {}
         }
     }
@@ -395,7 +387,12 @@ impl Tool {
                 bar_type,
                 direction: CycleDirection::Backward,
             }),
-            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split | Tool::Duplicate | Tool::Merge(_) => None,
+            Tool::Create
+            | Tool::Delete
+            | Tool::Paint(_)
+            | Tool::Split
+            | Tool::Duplicate
+            | Tool::Merge(_) => None,
         }
     }
 
@@ -422,20 +419,15 @@ impl Tool {
         }
     }
 
-    pub fn on_group_merge_click(
-        self,
-        member_ids: Vec<u32>,
-        field: EditableField,
-    ) -> Option<Event> {
-        if let Tool::Merge(direction) = self {
-            if !member_ids.is_empty() {
+    pub fn on_group_merge_click(self, member_ids: Vec<u32>, field: EditableField) -> Option<Event> {
+        if let Tool::Merge(direction) = self
+            && !member_ids.is_empty() {
                 return Some(Event::MergeGroupCell {
                     member_ids,
                     field,
                     direction,
                 });
             }
-        }
         None
     }
 }

@@ -2,6 +2,8 @@
 
 mod context;
 mod effects;
+mod settings;
+mod shortcuts;
 mod tool;
 mod ui;
 
@@ -26,11 +28,10 @@ fn main() -> gtk4::glib::ExitCode {
         let display = gtk4::gdk::Display::default().expect("Could not connect to a display.");
 
         let icon_theme = gtk4::IconTheme::for_display(&display);
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
+        if let Ok(exe_path) = std::env::current_exe()
+            && let Some(exe_dir) = exe_path.parent() {
                 icon_theme.add_search_path(exe_dir.join("share/icons"));
             }
-        }
         let settings = gtk4::Settings::for_display(&display);
         settings.set_gtk_icon_theme_name(Some("Adwaita"));
         gtk4::Window::set_default_icon_name("chronos");
@@ -65,6 +66,42 @@ fn main() -> gtk4::glib::ExitCode {
             button.split-gap:hover { \
                 background-color: alpha(@theme_selected_bg_color, 0.55); \
                 min-height: 10px; \
+            } \
+            .menu-bar { \
+                border-bottom: 1px solid alpha(@theme_fg_color, 0.12); \
+                padding-bottom: 6px; \
+            } \
+            button.menu-item-btn { \
+                padding: 6px 10px; \
+                border-radius: 5px; \
+            } \
+            label.shortcut-hint { \
+                color: alpha(@theme_fg_color, 0.45); \
+                font-size: 0.88em; \
+                margin-left: 24px; \
+            } \
+            .md-h1 { \
+                font-size: 1.6em; \
+                font-weight: bold; \
+                margin-top: 8px; \
+                margin-bottom: 4px; \
+            } \
+            .md-h2 { \
+                font-size: 1.3em; \
+                font-weight: bold; \
+                margin-top: 10px; \
+                margin-bottom: 2px; \
+            } \
+            .md-h3 { \
+                font-size: 1.1em; \
+                font-weight: bold; \
+                margin-top: 6px; \
+            } \
+            .md-code { \
+                font-family: monospace; \
+                background-color: alpha(@theme_fg_color, 0.06); \
+                padding: 8px; \
+                border-radius: 4px; \
             }",
         );
 

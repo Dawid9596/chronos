@@ -8,7 +8,7 @@ pub struct Slot {
     pub end_pct: f32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ConditionBar {
     pub pattern: BarPattern,
     pub slots: Vec<Slot>,
@@ -25,11 +25,17 @@ pub enum BarPattern {
     Wood,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum StatusMessage {
+    Info(String),
+    Error(String),
+}
+
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub document: ConservationDocument,
     pub next_id: u32,
-    pub last_error: Option<String>,
+    pub last_error: Option<StatusMessage>,
     pub is_exporting: bool,
     pub language: Language,
     pub current_file_path: Option<String>,

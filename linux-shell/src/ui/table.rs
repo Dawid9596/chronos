@@ -12,8 +12,12 @@ fn build_group_cell_widget(
     ctx: &AppContext,
 ) -> (gtk4::Widget, i32) {
     let mut gtk_span = group.span;
-    for k in start_row_idx..(start_row_idx + group.span - 1) {
-        if doc_rows[k].is_last_in_group {
+    for row in doc_rows
+        .iter()
+        .take(start_row_idx + group.span - 1)
+        .skip(start_row_idx)
+    {
+        if row.is_last_in_group {
             gtk_span += 1;
         }
     }
@@ -35,19 +39,18 @@ fn build_group_cell_widget(
     let field_merge = field.clone();
     let ctx_merge = ctx.clone();
     merge_click.connect_pressed(move |gesture, n_press, _x, _y| {
-        if n_press == 1 {
-            if let Some(ev) = ctx_merge
+        if n_press == 1
+            && let Some(ev) = ctx_merge
                 .tool
                 .get()
                 .on_group_merge_click(member_ids_merge.clone(), field_merge.clone())
-            {
-                gesture.set_state(gtk4::EventSequenceState::Claimed);
-                let ctx_idle = ctx_merge.clone();
-                glib::idle_add_local_once(move || {
-                    let effects = ctx_idle.core.process_event(ev);
-                    crate::effects::process_effects(&ctx_idle, effects);
-                });
-            }
+        {
+            gesture.set_state(gtk4::EventSequenceState::Claimed);
+            let ctx_idle = ctx_merge.clone();
+            glib::idle_add_local_once(move || {
+                let effects = ctx_idle.core.process_event(ev);
+                crate::effects::process_effects(&ctx_idle, effects);
+            });
         }
     });
     base_widget.add_controller(merge_click);
@@ -168,7 +171,7 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
         if is_visible {
             let label = gtk4::Label::builder()
                 .use_markup(true)
-                .label(&format!("<b>{}</b>", title))
+                .label(format!("<b>{}</b>", title))
                 .build();
             grid.attach(&label, col_idx, 0, 1, 1);
             col_idx += 1;
@@ -288,24 +291,25 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
             col_idx += 1;
         }
 
+        let graph_w = 150;
+        let woven_w = 60;
         if current_vis.flags[1] {
             let graph_bar = crate::ui::widgets::bar::build_interactive_condition_bar(
                 row.id,
                 BarType::GraphicalRepresentation,
                 row.graphical_representation.clone(),
-                150,
+                graph_w,
                 ctx,
             );
             grid.attach(&graph_bar, col_idx, grid_row, 1, 1);
             col_idx += 1;
         }
-
         if current_vis.flags[2] {
             let woven_bar = crate::ui::widgets::bar::build_interactive_condition_bar(
                 row.id,
                 BarType::WovenTrim,
                 row.woven_trim.clone(),
-                60,
+                woven_w,
                 ctx,
             );
             grid.attach(&woven_bar, col_idx, grid_row, 1, 1);
@@ -359,13 +363,8 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
 
         if current_vis.flags[6] {
             if let Some(dating) = &row.dating_period {
-                let (widget, gtk_span) = build_group_cell_widget(
-                    dating,
-                    EditableField::DatingPeriod,
-                    i,
-                    doc_rows,
-                    ctx,
-                );
+                let (widget, gtk_span) =
+                    build_group_cell_widget(dating, EditableField::DatingPeriod, i, doc_rows, ctx);
                 grid.attach(&widget, col_idx, grid_row, 1, gtk_span);
             }
             col_idx += 1;

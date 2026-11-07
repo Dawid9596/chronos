@@ -33,8 +33,10 @@ fn tree_for(idx: usize) -> Option<&'static resvg::usvg::Tree> {
         (0..chronos::patterns::TILES.len())
             .map(|i| match chronos::patterns::TILES.get(i) {
                 Some((_, data)) => {
-                    let mut options = resvg::usvg::Options::default();
-                    options.fontdb = std::sync::Arc::new(resvg::usvg::fontdb::Database::new());
+                    let options = resvg::usvg::Options {
+                        fontdb: std::sync::Arc::new(resvg::usvg::fontdb::Database::new()),
+                        ..resvg::usvg::Options::default()
+                    };
                     resvg::usvg::Tree::from_data(data, &options).ok()
                 }
                 None => None,
@@ -75,7 +77,7 @@ fn svg_surface_for(idx: usize, h: f64) -> Option<gtk4::cairo::ImageSurface> {
     // B, G, R, A in memory); the pixel buffer is kept alive inside the
     // surface's data.
     let mut argb = Vec::with_capacity(pixmap.data().len());
-    for chunk in pixmap.data().chunks_exact(4) {
+    for chunk in pixmap.data().as_chunks::<4>().0 {
         argb.extend_from_slice(&[chunk[2], chunk[1], chunk[0], chunk[3]]);
     }
 
@@ -165,8 +167,8 @@ pub fn draw_pattern_rect(
             cr.stroke().expect("stroke dense grid");
         }
         BarPattern::Bolus | BarPattern::Brick | BarPattern::Ceramics | BarPattern::Wood => {
-            let idx = chronos::patterns::tile_index(pattern)
-                .expect("arm covers all SVG-backed variants");
+            let idx =
+                chronos::patterns::tile_index(pattern).expect("arm covers all SVG-backed variants");
             fill_svg_tile(cr, idx, x0, seg_w, h);
         }
     }
@@ -213,7 +215,7 @@ pub fn build_interactive_condition_bar(
         .build();
 
     let draw_slots = Rc::new(RefCell::new(condition.slots.clone()));
-    let draw_pattern = Rc::new(RefCell::new(condition.pattern.clone()));
+    let draw_pattern = Rc::new(RefCell::new(condition.pattern));
     let interaction = Rc::new(RefCell::new(BarInteractionState::default()));
 
     // --- Draw Function ---
@@ -256,14 +258,14 @@ pub fn build_interactive_condition_bar(
             } else {
                 cr.rectangle(x0, 0.0, seg_w, h);
                 cr.clip();
-                draw_pattern_rect(&cr, &pattern, x0, seg_w, h);
+                draw_pattern_rect(cr, &pattern, x0, seg_w, h);
                 cr.reset_clip();
             }
 
-            current_tool.draw_slot_overlay(&cr, &state, idx, x0, x1, h);
+            current_tool.draw_slot_overlay(cr, &state, idx, x0, x1, h);
         }
 
-        current_tool.draw_bar_overlay(&cr, &state, w, h);
+        current_tool.draw_bar_overlay(cr, &state, w, h);
     });
 
     // --- Motion Controller ---
@@ -305,7 +307,10 @@ pub fn build_interactive_condition_bar(
         let w = gesture.widget().unwrap().width() as f64;
         let slots = draw_slots_begin.borrow();
         let mut state = interaction_begin.borrow_mut();
-        ctx_begin.tool.get().on_drag_begin(&mut state, &slots, w, start_x);
+        ctx_begin
+            .tool
+            .get()
+            .on_drag_begin(&mut state, &slots, w, start_x);
     });
 
     let interaction_update = interaction.clone();
@@ -336,14 +341,11 @@ pub fn build_interactive_condition_bar(
         let w = gesture.widget().unwrap().width() as f64;
         let start_x = gesture.start_point().map(|(x, _)| x).unwrap_or(0.0);
         let mut state = interaction_end.borrow_mut();
-        let event = ctx_end.tool.get().on_drag_end(
-            &mut state,
-            id,
-            bar_type.clone(),
-            w,
-            start_x,
-            offset_x,
-        );
+        let event =
+            ctx_end
+                .tool
+                .get()
+                .on_drag_end(&mut state, id, bar_type.clone(), w, start_x, offset_x);
         drawing_area_end.queue_draw();
         if let Some(ev) = event {
             dispatch_event(&ctx_end, ev);
@@ -357,7 +359,11 @@ pub fn build_interactive_condition_bar(
         .button(gdk::BUTTON_SECONDARY)
         .build();
     right_click.connect_released(move |_gesture, _n_press, _x, _y| {
-        if let Some(ev) = ctx_right.tool.get().on_secondary_click(id, bar_type_right.clone()) {
+        if let Some(ev) = ctx_right
+            .tool
+            .get()
+            .on_secondary_click(id, bar_type_right.clone())
+        {
             dispatch_event(&ctx_right, ev);
         }
     });

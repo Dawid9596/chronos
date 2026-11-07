@@ -1,0 +1,462 @@
+//! Rebindable keyboard shortcuts.
+//!
+//! * [`Action`] is everything that can be bound and its default key.
+//! * [`ShortcutRegistry`] owns the *current* bindings, validates changes.
+//!
+//! Bindings are stored as GTK accelerator names such as `<Control>o` or `e`
+//! (see `gtk::accelerator_parse`)
+
+use crate::tool::Tool;
+use chronos::i18n::Translations;
+use gtk4::prelude::*;
+use gtk4::{gdk, glib};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Action {
+    Open,
+    Save,
+    SaveAs,
+    Export,
+    ToolEdit,
+    ToolCreate,
+    ToolDelete,
+    ToolPaint,
+    ToolSplit,
+    ToolDuplicate,
+    ToolMerge,
+}
+
+impl Action {
+    pub const FILE: [Action; 4] = [Action::Open, Action::Save, Action::SaveAs, Action::Export];
+
+    /// Must stay in the same order as `Tool::TOOLBAR_DEFAULTS`.
+    pub const TOOLS: [Action; 7] = [
+        Action::ToolEdit,
+        Action::ToolCreate,
+        Action::ToolDelete,
+        Action::ToolPaint,
+        Action::ToolSplit,
+        Action::ToolDuplicate,
+        Action::ToolMerge,
+    ];
+
+    pub const ALL: [Action; 11] = [
+        Action::Open,
+        Action::Save,
+        Action::SaveAs,
+        Action::Export,
+        Action::ToolEdit,
+        Action::ToolCreate,
+        Action::ToolDelete,
+        Action::ToolPaint,
+        Action::ToolSplit,
+        Action::ToolDuplicate,
+        Action::ToolMerge,
+    ];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Action::Open => "open",
+            Action::Save => "save",
+            Action::SaveAs => "save_as",
+            Action::Export => "export",
+            Action::ToolEdit => "tool_edit",
+            Action::ToolCreate => "tool_create",
+            Action::ToolDelete => "tool_delete",
+            Action::ToolPaint => "tool_paint",
+            Action::ToolSplit => "tool_split",
+            Action::ToolDuplicate => "tool_duplicate",
+            Action::ToolMerge => "tool_merge",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Action> {
+        Self::ALL.into_iter().find(|a| a.id() == id)
+    }
+
+    fn default_accel(self) -> &'static str {
+        match self {
+            Action::Open => "<Control>o",
+            Action::Save => "<Control>s",
+            Action::SaveAs => "<Control><Shift>s",
+            Action::Export => "<Control>e",
+            Action::ToolEdit => "e",
+            Action::ToolCreate => "c",
+            Action::ToolDelete => "d",
+            Action::ToolPaint => "p",
+            Action::ToolSplit => "s",
+            Action::ToolDuplicate => "r",
+            Action::ToolMerge => "m",
+        }
+    }
+
+    /// Ensures a shorcut needs a modifier as bare keys
+    /// are too easy to press accidentally.
+    pub fn needs_modifier(self) -> bool {
+        Self::FILE.contains(&self)
+    }
+
+    pub fn tool(self) -> Option<Tool> {
+        Self::TOOLS
+            .iter()
+            .position(|a| *a == self)
+            .map(|i| Tool::TOOLBAR_DEFAULTS[i])
+    }
+
+    pub fn for_tool(tool: Tool) -> Action {
+        let idx = Tool::TOOLBAR_DEFAULTS
+            .iter()
+            .position(|t| t.same_kind(tool))
+            .unwrap_or(0);
+        Self::TOOLS[idx]
+    }
+
+    pub fn display_name(self, t: &Translations) -> String {
+        match self {
+            Action::Open => t.menu_open.to_string(),
+            Action::Save => t.menu_save.to_string(),
+            Action::SaveAs => t.menu_save_as.to_string(),
+            Action::Export => t.menu_export.to_string(),
+            _ => self
+                .tool()
+                .map(|tool| tool.label(t).to_string())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssignError {
+    Invalid,
+    /// File actions must include Ctrl or Alt.
+    NeedsModifier,
+    Conflict(Action),
+}
+
+fn command_mods() -> gdk::ModifierType {
+    gdk::ModifierType::CONTROL_MASK
+        | gdk::ModifierType::ALT_MASK
+        | gdk::ModifierType::SUPER_MASK
+        | gdk::ModifierType::META_MASK
+}
+
+pub fn has_command_modifier(accel: &str) -> bool {
+    gtk4::accelerator_parse(accel)
+        .map(|(_, mods)| mods.intersects(command_mods()))
+        .unwrap_or(false)
+}
+
+/// Re-expresses an accelerator in GTK's canonical spelling.
+pub fn normalize(accel: &str) -> Option<String> {
+    let (key, mods) = gtk4::accelerator_parse(accel)?;
+    Some(gtk4::accelerator_name(key.to_lower(), mods).to_string())
+}
+
+/// Human-readable form, e.g. `Ctrl+Shift+S`.
+pub fn accel_label(accel: &str) -> String {
+    gtk4::accelerator_parse(accel)
+        .map(|(key, mods)| gtk4::accelerator_get_label(key, mods).to_string())
+        .unwrap_or_else(|| accel.to_string())
+}
+
+/// Matches both the lower- and upper-case keyval.
+fn build_trigger(accel: &str) -> Option<gtk4::ShortcutTrigger> {
+    let (key, mods) = gtk4::accelerator_parse(accel)?;
+    let (lower, upper) = (key.to_lower(), key.to_upper());
+    let first = gtk4::KeyvalTrigger::new(lower, mods);
+    if lower == upper {
+        return Some(first.upcast());
+    }
+    let second = gtk4::KeyvalTrigger::new(upper, mods);
+    Some(gtk4::AlternativeTrigger::new(first, second).upcast())
+}
+
+fn text_input_has_focus(window: &glib::WeakRef<gtk4::ApplicationWindow>) -> bool {
+    window
+        .upgrade()
+        .and_then(|w| gtk4::prelude::GtkWindowExt::focus(&w))
+        .is_some_and(|focused| focused.is::<gtk4::Editable>())
+}
+
+pub struct ShortcutRegistry {
+    defaults: HashMap<Action, String>,
+    /// Shared with the GTK callbacks so they always see the current binding.
+    bindings: Rc<RefCell<HashMap<Action, String>>>,
+    shortcuts: RefCell<Vec<(Action, gtk4::Shortcut)>>,
+    hint_labels: RefCell<Vec<(Action, gtk4::Label)>>,
+    tooltips: RefCell<Vec<(Action, gtk4::Widget)>>,
+    shortcut_prefix: RefCell<String>,
+}
+
+impl ShortcutRegistry {
+    pub fn new(overrides: &BTreeMap<String, String>) -> Self {
+        let defaults: HashMap<Action, String> = Action::ALL
+            .iter()
+            .map(|&a| {
+                let accel =
+                    normalize(a.default_accel()).unwrap_or_else(|| a.default_accel().into());
+                (a, accel)
+            })
+            .collect();
+
+        let mut bindings = defaults.clone();
+        for (id, accel) in overrides {
+            let (Some(action), Some(accel)) = (Action::from_id(id), normalize(accel)) else {
+                continue;
+            };
+            if action.needs_modifier() && !has_command_modifier(&accel) {
+                continue;
+            }
+            bindings.insert(action, accel);
+        }
+
+        // Verify for and remove and clashes in shortcuts.
+        loop {
+            let mut seen: HashMap<String, Action> = HashMap::new();
+            let mut clashing: Vec<Action> = Vec::new();
+            for &action in &Action::ALL {
+                if let Some(prev) = seen.insert(bindings[&action].clone(), action) {
+                    clashing.push(prev);
+                    clashing.push(action);
+                }
+            }
+            let mut changed = false;
+            for action in clashing {
+                if bindings[&action] != defaults[&action] {
+                    bindings.insert(action, defaults[&action].clone());
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        Self {
+            defaults,
+            bindings: Rc::new(RefCell::new(bindings)),
+            shortcuts: RefCell::new(Vec::new()),
+            hint_labels: RefCell::new(Vec::new()),
+            tooltips: RefCell::new(Vec::new()),
+            shortcut_prefix: RefCell::new("Shortcut: ".to_string()),
+        }
+    }
+
+    pub fn accel(&self, action: Action) -> String {
+        self.bindings.borrow()[&action].clone()
+    }
+
+    pub fn label(&self, action: Action) -> String {
+        accel_label(&self.accel(action))
+    }
+
+    pub fn is_default(&self, action: Action) -> bool {
+        self.bindings.borrow()[&action] == self.defaults[&action]
+    }
+
+    /// Shortcuts that differ from the defaults.
+    pub fn overrides(&self) -> BTreeMap<String, String> {
+        let bindings = self.bindings.borrow();
+        Action::ALL
+            .iter()
+            .filter(|a| bindings[*a] != self.defaults[*a])
+            .map(|a| (a.id().to_string(), bindings[a].clone()))
+            .collect()
+    }
+
+    pub fn try_set(&self, action: Action, accel: &str) -> Result<(), AssignError> {
+        let accel = normalize(accel).ok_or(AssignError::Invalid)?;
+        if action.needs_modifier() && !has_command_modifier(&accel) {
+            return Err(AssignError::NeedsModifier);
+        }
+        if let Some(other) = Action::ALL
+            .into_iter()
+            .find(|&other| other != action && self.accel(other) == accel)
+        {
+            return Err(AssignError::Conflict(other));
+        }
+        self.bindings.borrow_mut().insert(action, accel);
+        self.apply(action);
+        Ok(())
+    }
+
+    /// Restore default.
+    pub fn reset(&self, action: Action) -> Result<(), AssignError> {
+        let default = self.defaults[&action].clone();
+        self.try_set(action, &default)
+    }
+    
+    /// Restore default for all.
+    pub fn reset_all(&self) {
+        *self.bindings.borrow_mut() = self.defaults.clone();
+        for action in Action::ALL {
+            self.apply(action);
+        }
+    }
+
+    /// Shows this action's shortcut in `label` and keeps it up to date.
+    pub fn bind_hint_label(&self, action: Action, label: &gtk4::Label) {
+        label.set_text(&self.label(action));
+        self.hint_labels.borrow_mut().push((action, label.clone()));
+    }
+
+    /// Adds "Shortcut: X" as `widget`'s tooltip and keeps it up to date.
+    pub fn bind_tooltip(&self, action: Action, widget: &impl IsA<gtk4::Widget>, t: &Translations) {
+        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
+        let widget = widget.upcast_ref::<gtk4::Widget>().clone();
+        let prefix = self.shortcut_prefix.borrow();
+        widget.set_tooltip_text(Some(&tooltip_text(&prefix, &self.label(action))));
+        self.tooltips.borrow_mut().push((action, widget));
+    }
+
+    pub fn update_translations(&self, t: &Translations) {
+        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
+        let prefix = self.shortcut_prefix.borrow();
+        for (a, widget) in self.tooltips.borrow().iter() {
+            let label = self.label(*a);
+            widget.set_tooltip_text(Some(&tooltip_text(&prefix, &label)));
+        }
+    }
+
+    pub fn install(&self, window: &gtk4::ApplicationWindow, dispatch: Rc<dyn Fn(Action)>) {
+        let controller = gtk4::ShortcutController::new();
+        controller.set_scope(gtk4::ShortcutScope::Managed);
+
+        let win_weak = window.downgrade();
+        let mut installed = self.shortcuts.borrow_mut();
+        installed.clear();
+
+        for action in Action::ALL {
+            let bindings = self.bindings.clone();
+            let dispatch = dispatch.clone();
+            let win_weak = win_weak.clone();
+
+            let callback = gtk4::CallbackAction::new(move |_, _| {
+                let is_tool = action.tool().is_some();
+                let is_plain_key = bindings
+                    .borrow()
+                    .get(&action)
+                    .map(|accel| !has_command_modifier(accel))
+                    .unwrap_or(true);
+                if (is_tool || is_plain_key) && text_input_has_focus(&win_weak) {
+                    return glib::Propagation::Proceed;
+                }
+                dispatch(action);
+                glib::Propagation::Stop
+            });
+
+            let shortcut = gtk4::Shortcut::new(build_trigger(&self.accel(action)), Some(callback));
+            controller.add_shortcut(shortcut.clone());
+            installed.push((action, shortcut));
+        }
+
+        window.add_controller(controller);
+    }
+
+    fn apply(&self, action: Action) {
+        let accel = self.accel(action);
+        let label = accel_label(&accel);
+
+        for (a, shortcut) in self.shortcuts.borrow().iter() {
+            if *a == action {
+                shortcut.set_trigger(build_trigger(&accel));
+            }
+        }
+        for (a, hint) in self.hint_labels.borrow().iter() {
+            if *a == action {
+                hint.set_text(&label);
+            }
+        }
+        for (a, widget) in self.tooltips.borrow().iter() {
+            if *a == action {
+                let prefix = self.shortcut_prefix.borrow();
+                widget.set_tooltip_text(Some(&tooltip_text(&prefix, &label)));
+            }
+        }
+    }
+}
+
+fn tooltip_text(prefix: &str, label: &str) -> String {
+    format!("{prefix}{label}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // One thread due to gtk.
+    #[test]
+    fn registry_behaviour() {
+        if gtk4::init().is_err() {
+            eprintln!("no display; skipping shortcut registry test");
+            return;
+        }
+
+        // Defaults: every action bound, all distinct.
+        let reg = ShortcutRegistry::new(&BTreeMap::new());
+        let mut all: Vec<String> = Action::ALL.iter().map(|a| reg.accel(*a)).collect();
+        all.sort();
+        all.dedup();
+        assert_eq!(all.len(), Action::ALL.len());
+        assert!(reg.overrides().is_empty());
+        assert_eq!(reg.label(Action::Save), "Ctrl+S");
+        let save_as = reg.label(Action::SaveAs); // GTK decides modifier order/wording
+        assert!(save_as.contains("Shift") && save_as.contains("Ctrl") && save_as.ends_with('S'));
+        assert_eq!(reg.label(Action::ToolEdit), "E");
+
+        // Letter case and spelling are normalised.
+        assert_eq!(normalize("<Control>O"), normalize("<ctrl>o"));
+
+        // Validation.
+        assert_eq!(
+            reg.try_set(Action::Open, "j"),
+            Err(AssignError::NeedsModifier)
+        );
+        assert_eq!(
+            reg.try_set(Action::Open, "<Control>s"),
+            Err(AssignError::Conflict(Action::Save))
+        );
+        assert_eq!(
+            reg.try_set(Action::ToolEdit, "s"),
+            Err(AssignError::Conflict(Action::ToolSplit))
+        );
+        assert_eq!(
+            reg.try_set(Action::Open, "not a key"),
+            Err(AssignError::Invalid)
+        );
+        assert!(reg.try_set(Action::Open, "<Control>o").is_ok()); // same key as itself is fine
+
+        // Rebinding, overrides, reset.
+        assert!(reg.try_set(Action::Open, "<Control>j").is_ok());
+        assert_eq!(reg.label(Action::Open), "Ctrl+J");
+        assert_eq!(reg.overrides().len(), 1);
+        assert!(!reg.is_default(Action::Open));
+        assert!(reg.try_set(Action::ToolDelete, "<Control>o").is_ok()); // freed key can be reused
+        assert_eq!(
+            reg.reset(Action::Open),
+            Err(AssignError::Conflict(Action::ToolDelete))
+        );
+        reg.reset_all();
+        assert!(reg.overrides().is_empty());
+
+        // A saved file that is a legitimate swap round-trips unchanged...
+        let mut swap = BTreeMap::new();
+        swap.insert("open".to_string(), normalize("<Control>s").unwrap());
+        swap.insert("save".to_string(), normalize("<Control>o").unwrap());
+        let reg = ShortcutRegistry::new(&swap);
+        assert_eq!(reg.label(Action::Open), "Ctrl+S");
+        assert_eq!(reg.label(Action::Save), "Ctrl+O");
+
+        // ...while a hand-edited clash, junk keys and unknown actions are dropped.
+        let mut bad = BTreeMap::new();
+        bad.insert("open".to_string(), "<Control>s".to_string()); // clashes with Save's default
+        bad.insert("tool_paint".to_string(), "garbage!!".to_string());
+        bad.insert("no_such_action".to_string(), "x".to_string());
+        bad.insert("export".to_string(), "x".to_string()); // file action without modifier
+        let reg = ShortcutRegistry::new(&bad);
+        assert!(reg.overrides().is_empty());
+    }
+}

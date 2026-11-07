@@ -10,7 +10,7 @@ use crate::storage::BarPattern;
 
 /// Tile art, indexed by the tile index used by the renderers (see
 /// [`tile_index`]): `(file name as served by the typst world, bytes)`.
-pub const TILES: [(&'static str, &'static [u8]); 4] = [
+pub const TILES: [(&str, &[u8]); 4] = [
     // 0 = BarPattern::Bolus
     ("bolus.svg", include_bytes!("../patterns/bolus.svg")),
     // 1 = BarPattern::Brick

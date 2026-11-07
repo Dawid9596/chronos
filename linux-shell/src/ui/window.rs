@@ -1,4 +1,6 @@
-use crate::context::{AppContext, ColumnVisibility};
+use crate::context::{AppContext, MenuLabels};
+use crate::settings::Settings;
+use crate::shortcuts::{Action, ShortcutRegistry};
 use crate::tool::Tool;
 use chronos::bridge::{ConservationApp, Event};
 use chronos::i18n::Language;
@@ -8,13 +10,275 @@ use gtk4::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+fn build_menu_row(
+    text: &str,
+    shortcut: Option<(&ShortcutRegistry, Action)>,
+    popover: &gtk4::Popover,
+    on_click: impl Fn() + 'static,
+) -> (gtk4::Button, gtk4::Label) {
+    let row_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(16)
+        .hexpand(true)
+        .build();
+
+    let title_label = gtk4::Label::builder()
+        .label(text)
+        .halign(gtk4::Align::Start)
+        .hexpand(true)
+        .xalign(0.0)
+        .build();
+    row_box.append(&title_label);
+
+    if let Some((registry, action)) = shortcut {
+        let sc_label = gtk4::Label::builder().halign(gtk4::Align::End).build();
+        registry.bind_hint_label(action, &sc_label);
+        sc_label.add_css_class("shortcut-hint");
+        row_box.append(&sc_label);
+    }
+
+    let btn = gtk4::Button::builder()
+        .child(&row_box)
+        .has_frame(false)
+        .hexpand(true)
+        .build();
+    btn.add_css_class("flat");
+    btn.add_css_class("menu-item-btn");
+
+    let pop = popover.clone();
+    btn.connect_clicked(move |_| {
+        pop.popdown();
+        on_click();
+    });
+
+    (btn, title_label)
+}
+
 pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, AppContext) {
     let core = Rc::new(Core::<ConservationApp>::default());
-    let vis = Rc::new(RefCell::new(ColumnVisibility::default()));
+    let settings = Settings::load();
+    let vis = Rc::new(RefCell::new(settings.columns.clone()));
+    let canvas_params = Rc::new(RefCell::new(settings.canvas.clone()));
+    let shortcuts = Rc::new(ShortcutRegistry::new(&settings.shortcuts));
     let tool = Rc::new(Cell::new(Tool::Edit));
-
     let t = &core.view().translations;
 
+    let ctx_holder: Rc<RefCell<Option<AppContext>>> = Rc::new(RefCell::new(None));
+
+    // --- Menu Bar (File, Edit, About, Help) ---
+    let menu_bar = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+    menu_bar.add_css_class("menu-bar");
+
+    // File Menu
+    let file_popover = gtk4::Popover::builder().has_arrow(false).build();
+    let file_vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(2)
+        .margin_top(4)
+        .margin_bottom(4)
+        .margin_start(4)
+        .margin_end(4)
+        .build();
+
+    let (open_item, file_open_lbl) = build_menu_row(
+        &t.menu_open,
+        Some((&*shortcuts, Action::Open)),
+        &file_popover,
+        {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    let ctx_idle = ctx.clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle.core.process_event(Event::RequestOpen);
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
+            }
+        },
+    );
+
+    let (save_item, file_save_lbl) = build_menu_row(
+        &t.menu_save,
+        Some((&*shortcuts, Action::Save)),
+        &file_popover,
+        {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    let ctx_idle = ctx.clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle.core.process_event(Event::RequestSave);
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
+            }
+        },
+    );
+
+    let (save_as_item, file_save_as_lbl) = build_menu_row(
+        &t.menu_save_as,
+        Some((&*shortcuts, Action::SaveAs)),
+        &file_popover,
+        {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    let ctx_idle = ctx.clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle.core.process_event(Event::RequestSaveAs);
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
+            }
+        },
+    );
+
+    let (export_item, file_export_lbl) = build_menu_row(
+        &t.menu_export,
+        Some((&*shortcuts, Action::Export)),
+        &file_popover,
+        {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    let ctx_idle = ctx.clone();
+                    let flags = ctx_idle.vis.borrow().flags;
+                    let canvas_params = ctx_idle.canvas_params.borrow().clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle
+                            .core
+                            .process_event(Event::RequestPdfExport(flags, canvas_params));
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
+            }
+        },
+    );
+
+    file_vbox.append(&open_item);
+    file_vbox.append(&save_item);
+    file_vbox.append(&save_as_item);
+    file_vbox.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
+    file_vbox.append(&export_item);
+    file_popover.set_child(Some(&file_vbox));
+
+    let file_btn_label = gtk4::Label::new(Some(&t.menu_file));
+    let file_menu_btn = gtk4::MenuButton::builder()
+        .child(&file_btn_label)
+        .popover(&file_popover)
+        .has_frame(false)
+        .build();
+    file_menu_btn.add_css_class("flat");
+
+    // Edit Menu
+    let edit_popover = gtk4::Popover::builder().has_arrow(false).build();
+    let edit_vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(2)
+        .margin_top(4)
+        .margin_bottom(4)
+        .margin_start(4)
+        .margin_end(4)
+        .build();
+
+    let (canvas_item, edit_canvas_lbl) =
+        build_menu_row(&t.menu_canvas_params, None, &edit_popover, {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    crate::ui::dialogs::show_canvas_params_dialog(ctx);
+                }
+            }
+        });
+
+    let (prefs_item, edit_prefs_lbl) = build_menu_row(&t.menu_preferences, None, &edit_popover, {
+        let holder = ctx_holder.clone();
+        move || {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                crate::ui::dialogs::show_preferences_dialog(ctx);
+            }
+        }
+    });
+
+    let (shortcuts_item, edit_shortcuts_lbl) =
+        build_menu_row(&t.menu_shortcuts, None, &edit_popover, {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    crate::ui::dialogs::show_shortcuts_dialog(ctx);
+                }
+            }
+        });
+
+    edit_vbox.append(&canvas_item);
+    edit_vbox.append(&prefs_item);
+    edit_vbox.append(&shortcuts_item);
+    edit_popover.set_child(Some(&edit_vbox));
+
+    let edit_btn_label = gtk4::Label::new(Some(&t.menu_edit));
+    let edit_menu_btn = gtk4::MenuButton::builder()
+        .child(&edit_btn_label)
+        .popover(&edit_popover)
+        .has_frame(false)
+        .build();
+    edit_menu_btn.add_css_class("flat");
+
+    // About Menu Button
+    let about_menu_btn = gtk4::Button::builder()
+        .label(&t.menu_about)
+        .has_frame(false)
+        .build();
+    about_menu_btn.add_css_class("flat");
+    {
+        let holder = ctx_holder.clone();
+        about_menu_btn.connect_clicked(move |_| {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                let title = ctx.core.view().translations.menu_about;
+                crate::ui::markdown::show_markdown_window(&ctx.window, &title, "about");
+            }
+        });
+    }
+
+    // Help Menu Button
+    let help_menu_btn = gtk4::Button::builder()
+        .label(&t.menu_help)
+        .has_frame(false)
+        .build();
+    help_menu_btn.add_css_class("flat");
+    {
+        let holder = ctx_holder.clone();
+        help_menu_btn.connect_clicked(move |_| {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                let title = ctx.core.view().translations.menu_help;
+                crate::ui::markdown::show_markdown_window(&ctx.window, &title, "help");
+            }
+        });
+    }
+
+    menu_bar.append(&file_menu_btn);
+    menu_bar.append(&edit_menu_btn);
+    menu_bar.append(&about_menu_btn);
+    menu_bar.append(&help_menu_btn);
+
+    let menu_labels = Rc::new(MenuLabels {
+        file_btn: file_btn_label,
+        edit_btn: edit_btn_label,
+        about_btn: about_menu_btn,
+        help_btn: help_menu_btn,
+        file_open: file_open_lbl,
+        file_save: file_save_lbl,
+        file_save_as: file_save_as_lbl,
+        file_export: file_export_lbl,
+        edit_canvas: edit_canvas_lbl,
+        edit_prefs: edit_prefs_lbl,
+        edit_shortcuts: edit_shortcuts_lbl,
+    });
+
+    // --- Existing Toolbar & Controls ---
     let export_btn = gtk4::Button::builder()
         .icon_name("media-floppy-symbolic")
         .tooltip_text(&t.export_pdf)
@@ -74,9 +338,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
 
     let mut tool_labels = Vec::with_capacity(Tool::TOOLBAR_DEFAULTS.len());
+    let mut tool_buttons = Vec::with_capacity(Tool::TOOLBAR_DEFAULTS.len());
     let mut first_btn: Option<gtk4::ToggleButton> = None;
-
-    // Keep track of inline revealers so they close when another tool is chosen
     let inline_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
         Rc::new(RefCell::new(Vec::new()));
 
@@ -110,8 +373,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
         tool_bar_row.append(&btn);
         tool_labels.push((default_tool, text_label));
+        shortcuts.bind_tooltip(Action::for_tool(default_tool), &btn, t);
+        tool_buttons.push((default_tool, btn.clone()));
 
-        // Build variant selector box if this tool has variants
         let stack_page_name = format!("tool-variants-{tool_idx}");
         if !variants.is_empty() {
             let selector_box = gtk4::Box::builder()
@@ -150,7 +414,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             }
 
             if variants.len() <= 3 {
-                // Case 1: <= 3 variants -> inline immediately to the right of this tool button
                 selector_box.set_margin_start(2);
                 selector_box.set_margin_end(4);
                 let inline_rev = gtk4::Revealer::builder()
@@ -163,7 +426,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     .borrow_mut()
                     .push((default_tool, inline_rev));
             } else {
-                // Case 2: > 3 variants -> placed in the bottom revealer stack
                 bottom_stack.add_named(&selector_box, Some(&stack_page_name));
             }
         }
@@ -179,13 +441,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             if b.is_active() {
                 let active_tool = remembered.get();
                 tool_cell.set(active_tool);
-
-                // Update inline revealers (<= 3 variants)
                 for (kind, rev) in inline_revs.borrow().iter() {
                     rev.set_reveal_child(kind.same_kind(active_tool));
                 }
-
-                // Update bottom revealer (> 3 variants)
                 if variant_count > 3 {
                     b_stack.set_visible_child_name(&stack_page_name);
                     bottom_rev.set_reveal_child(true);
@@ -253,8 +511,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     });
     status_label.add_controller(click_gesture);
 
-    let ctx_holder: Rc<RefCell<Option<AppContext>>> = Rc::new(RefCell::new(None));
-
     let commit_project_name = {
         let status_stack = status_stack.clone();
         let status_entry = status_entry.clone();
@@ -266,8 +522,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 }
                 let new_name = status_entry.text().to_string();
                 status_stack.set_visible_child_name("label");
-                if !new_name.trim().is_empty() {
-                    if let Some(ctx) = ctx_holder.borrow().as_ref() {
+                if !new_name.trim().is_empty()
+                    && let Some(ctx) = ctx_holder.borrow().as_ref() {
                         let ctx_idle = ctx.clone();
                         glib::idle_add_local_once(move || {
                             let effects = ctx_idle
@@ -276,7 +532,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                             crate::effects::process_effects(&ctx_idle, effects);
                         });
                     }
-                }
             }
         }
     };
@@ -307,7 +562,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let container = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Vertical)
-        .margin_top(20)
+        .margin_top(10)
         .margin_bottom(20)
         .margin_start(20)
         .margin_end(20)
@@ -335,6 +590,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         window: window.clone(),
         core: core.clone(),
         vis: vis.clone(),
+        canvas_params,
         tool: tool.clone(),
         status: status_label.clone(),
         export_btn: export_btn.clone(),
@@ -342,9 +598,13 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         current_lang,
         flag_area,
         tool_labels: Rc::new(tool_labels),
+        tool_buttons: Rc::new(tool_buttons),
+        shortcuts: shortcuts.clone(),
+        menu_labels,
         scrolled_window: scrolled_window.clone(),
         last_message: Rc::new(RefCell::new(None)),
         status_timer: Rc::new(RefCell::new(None)),
+        settings_timer: Rc::new(RefCell::new(None)),
     };
 
     *ctx_holder.borrow_mut() = Some(ctx.clone());
@@ -363,9 +623,12 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     scrolled_window.set_child(Some(&initial_table));
     container.append(&scrolled_window);
 
+    let settings_popover = gtk4::Popover::builder().has_arrow(false).build();
+    settings_popover.set_parent(&settings_btn);
+
     let ctx_settings = ctx.clone();
-    settings_btn.connect_clicked(move |btn| {
-        let settings_popover = gtk4::Popover::new();
+    settings_btn.connect_clicked(move |_btn| {
+        let settings_popover = settings_popover.clone();
         let popover_vbox = gtk4::Box::builder()
             .orientation(gtk4::Orientation::Vertical)
             .spacing(8)
@@ -398,80 +661,73 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 let view = ctx_cb.core.view();
                 let new_table = crate::ui::table::build_document_table(&view, &ctx_cb);
                 ctx_cb.scrolled_window.set_child(Some(&new_table));
+                ctx_cb.persist_settings();
             });
             popover_vbox.append(&cb);
         }
 
         settings_popover.set_child(Some(&popover_vbox));
-        settings_popover.set_parent(btn);
         settings_popover.popup();
     });
 
     let ctx_export = ctx.clone();
     export_btn.connect_clicked(move |_| {
         let current_vis = ctx_export.vis.borrow().flags;
+        let canvas_params = ctx_export.canvas_params.borrow().clone();
         let effects = ctx_export
             .core
-            .process_event(Event::RequestPdfExport(current_vis));
+            .process_event(Event::RequestPdfExport(current_vis, canvas_params));
         crate::effects::process_effects(&ctx_export, effects);
     });
 
-    let shortcut_controller = gtk4::ShortcutController::new();
-    shortcut_controller.set_scope(gtk4::ShortcutScope::Managed);
-
-    fn add_shortcut(
-        controller: &gtk4::ShortcutController,
-        keys: &[gtk4::gdk::Key],
-        mods: gtk4::gdk::ModifierType,
-        ctx: &AppContext,
-        event: chronos::bridge::Event,
-    ) {
-        for &key in keys {
-            let ctx_clone = ctx.clone();
-            let event_clone = event.clone();
-            let trigger = gtk4::KeyvalTrigger::new(key, mods);
-            let action = gtk4::CallbackAction::new(move |_, _| {
-                let ctx_idle = ctx_clone.clone();
-                let event_idle = event_clone.clone();
-                glib::idle_add_local_once(move || {
-                    let effects = ctx_idle.core.process_event(event_idle);
-                    crate::effects::process_effects(&ctx_idle, effects);
-                });
-                glib::Propagation::Stop
-            });
-            controller.add_shortcut(gtk4::Shortcut::new(Some(trigger), Some(action)));
-        }
+    {
+        let ctx_sc = ctx.clone();
+        shortcuts.install(&window, Rc::new(move |action| run_action(&ctx_sc, action)));
     }
 
-    // Ctrl+O (Open)
-    add_shortcut(
-        &shortcut_controller,
-        &[gtk4::gdk::Key::o, gtk4::gdk::Key::O],
-        gtk4::gdk::ModifierType::CONTROL_MASK,
-        &ctx,
-        Event::RequestOpen,
-    );
+    if let Some(saved) = settings.saved_language()
+        && saved != ctx.current_lang.get() {
+            defer_event(&ctx, Event::ToggleLanguage);
+        }
 
-    // Ctrl+S (Save)
-    add_shortcut(
-        &shortcut_controller,
-        &[gtk4::gdk::Key::s, gtk4::gdk::Key::S],
-        gtk4::gdk::ModifierType::CONTROL_MASK,
-        &ctx,
-        Event::RequestSave,
-    );
-
-    // Ctrl+Shift+S (Save As)
-    add_shortcut(
-        &shortcut_controller,
-        &[gtk4::gdk::Key::s, gtk4::gdk::Key::S],
-        gtk4::gdk::ModifierType::CONTROL_MASK | gtk4::gdk::ModifierType::SHIFT_MASK,
-        &ctx,
-        Event::RequestSaveAs,
-    );
-
-    window.add_controller(shortcut_controller);
+    let ctx_close = ctx.clone();
+    window.connect_close_request(move |_| {
+        ctx_close.flush_pending_settings();
+        glib::Propagation::Proceed
+    });
     (window, ctx)
+}
+
+fn defer_event(ctx: &AppContext, event: Event) {
+    let ctx = ctx.clone();
+    glib::idle_add_local_once(move || {
+        let effects = ctx.core.process_event(event);
+        crate::effects::process_effects(&ctx, effects);
+    });
+}
+
+fn select_tool(ctx: &AppContext, tool: Tool) {
+    if let Some((_, btn)) = ctx.tool_buttons.iter().find(|(t, _)| t.same_kind(tool)) {
+        btn.set_active(true);
+    }
+}
+
+fn run_action(ctx: &AppContext, action: Action) {
+    match action {
+        Action::Open => defer_event(ctx, Event::RequestOpen),
+        Action::Save => defer_event(ctx, Event::RequestSave),
+        Action::SaveAs => defer_event(ctx, Event::RequestSaveAs),
+        Action::Export => {
+            let flags = ctx.vis.borrow().flags;
+            let canvas_params = ctx.canvas_params.borrow().clone();
+            defer_event(ctx, Event::RequestPdfExport(flags, canvas_params));
+        }
+        tool_action => {
+            if let Some(tool) = tool_action.tool() {
+                select_tool(ctx, tool);
+            }
+        }
+    }
 }
 
 pub fn build_flag_widget(lang: Rc<Cell<Language>>) -> gtk4::DrawingArea {

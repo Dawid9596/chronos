@@ -1,18 +1,20 @@
 use crate::{
+    context::CanvasParams,
     i18n::Translations,
-    storage::{ConditionBar, ConservationDocument},
+    storage::{ConditionBar, ConservationDocument, StatusMessage},
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct DocumentViewModel {
     pub project_name: String,
     pub rows: Vec<RowViewModel>,
     pub translations: Translations,
     pub visible_columns: [bool; 7],
+    pub canvas_params: CanvasParams,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RowViewModel {
     pub id: u32,
     pub row_number: usize,
@@ -25,7 +27,7 @@ pub struct RowViewModel {
     pub is_last_in_group: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct GroupSpan {
     pub value: String,
     pub span: usize,
@@ -37,6 +39,7 @@ impl ConservationDocument {
         &self,
         translations: Translations,
         visible_columns: [bool; 7],
+        canvas_params: CanvasParams,
     ) -> DocumentViewModel {
         let len = self.entries.len();
         let mut rows = Vec::with_capacity(len);
@@ -46,6 +49,7 @@ impl ConservationDocument {
                 rows,
                 translations,
                 visible_columns,
+                canvas_params,
             };
         }
 
@@ -122,6 +126,7 @@ impl ConservationDocument {
             rows,
             translations,
             visible_columns,
+            canvas_params,
         }
     }
 }
@@ -129,7 +134,7 @@ impl ConservationDocument {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppViewModel {
     pub document: DocumentViewModel,
-    pub last_error: Option<String>,
+    pub last_error: Option<StatusMessage>,
     pub is_exporting: bool,
     pub translations: Translations,
 }

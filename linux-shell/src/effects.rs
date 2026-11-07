@@ -1,6 +1,7 @@
 use crate::context::AppContext;
 use chronos::bridge::{Effect, Event, ExportPdfResponse};
 use chronos::bridge::{FilePickerRequest, FilePickerResponse};
+use chronos::storage::StatusMessage;
 use glib::source::timeout_add_local_once;
 use gtk4::glib;
 use gtk4::prelude::*;
@@ -38,16 +39,17 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 }));
 
                 if let Some(msg) = &view.last_error {
-                    let is_new = ctx.last_message.borrow().as_deref() != Some(msg.as_str());
+                    let text = match msg {
+                        StatusMessage::Info(s) => s.as_str(),
+                        StatusMessage::Error(s) => s.as_str(),
+                    };
+                    let is_error = matches!(msg, StatusMessage::Error(_));
+                    let is_new = ctx.last_message.borrow().as_deref() != Some(text);
                     if is_new {
-                        *ctx.last_message.borrow_mut() = Some(msg.clone());
+                        *ctx.last_message.borrow_mut() = Some(text.to_string());
                         cancel_status_timer(ctx);
-                        let color = if msg.starts_with("Error") || msg.starts_with("B d") {
-                            "red"
-                        } else {
-                            "green"
-                        };
-                        let escaped = glib::markup_escape_text(msg);
+                        let color = if is_error { "red" } else { "green" };
+                        let escaped = glib::markup_escape_text(text);
                         ctx.status.set_markup(&format!(
                             "<span foreground='{}'>{}</span>",
                             color, escaped
@@ -65,35 +67,61 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ));
                 }
 
-                ctx.current_lang.set(t.language);
+                if ctx.current_lang.get() != t.language {
+                    ctx.current_lang.set(t.language);
+                    ctx.persist_settings();
+                }
                 ctx.flag_area.queue_draw();
                 ctx.settings_label.set_markup(&t.settings_tooltip);
+                ctx.menu_labels.update(t);
+                ctx.shortcuts.update_translations(t);
                 for (tool_variant, label) in ctx.tool_labels.iter() {
                     label.set_text(tool_variant.label(t));
                 }
 
                 let new_table = crate::ui::table::build_document_table(&view, ctx);
+
+                // 1. Capture the current vertical scroll position
+                let vadj = ctx.scrolled_window.vadjustment();
+                let saved_y = vadj.value();
+
+                // 2. Swap the grid
                 ctx.scrolled_window.set_child(Some(&new_table));
+
+                // 3. Restore the position after GTK computes the new widget's layout allocation
+                glib::idle_add_local_once(move || {
+                    vadj.set_value(saved_y);
+                });
             }
             Effect::ExportPdf(mut request) => {
                 let ctx = ctx.clone();
                 glib::spawn_future_local(async move {
                     let file_name = request.operation.file_name.clone();
-                    let pdf_bytes = request.operation.pdf_bytes.clone();
-                    let save_dir = dirs::document_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let file_path = save_dir.join(file_name);
+                    let view_model = request.operation.view_model.clone();
 
-                    let response = match std::fs::write(&file_path, pdf_bytes) {
-                        Ok(_) => {
-                            let _ = open::that(&file_path);
-                            ExportPdfResponse::Success(format!("Saved to {}", file_path.display()))
-                        }
-                        Err(e) => ExportPdfResponse::Error(format!("Error: {}", e)),
+                    let response = gtk4::gio::spawn_blocking(move || {
+                        let pdf_bytes = chronos::generate_pdf::typst_compile_to_bytes(&view_model)
+                            .map_err(|e| format!("Error: {e}"))?;
+
+                        let save_dir = dirs::document_dir().unwrap_or_else(|| PathBuf::from("."));
+                        let file_path = save_dir.join(file_name);
+
+                        std::fs::write(&file_path, pdf_bytes).map_err(|e| format!("Error: {e}"))?;
+
+                        let _ = open::that(&file_path);
+                        Ok::<String, String>(format!("Saved to {}", file_path.display()))
+                    })
+                    .await
+                    .unwrap_or_else(|_| Err("Error: PDF export worker panicked".to_string()));
+
+                    let export_response = match response {
+                        Ok(msg) => ExportPdfResponse::Success(msg),
+                        Err(err) => ExportPdfResponse::Error(err),
                     };
 
                     let next_effects = ctx
                         .core
-                        .resolve(&mut request, response)
+                        .resolve(&mut request, export_response)
                         .expect("Failed to resolve effect");
                     process_effects(&ctx, next_effects);
                 });
