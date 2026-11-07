@@ -14,7 +14,7 @@ pub struct ConditionBar {
     pub slots: Vec<Slot>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum BarPattern {
     VerticalHatch,
@@ -62,6 +62,8 @@ impl Default for AppState {
                         layer_thickness: "12 cm".to_string(),
                         chronological_phase: "Iron Age".to_string(),
                         dating_period: "500 BC".to_string(),
+                        chrono_group: 0,
+                        dating_group: 0,
                     },
                     ConservationEntry {
                         id: 2,
@@ -83,6 +85,8 @@ impl Default for AppState {
                         layer_thickness: "5 cm".to_string(),
                         chronological_phase: "Iron Age".to_string(),
                         dating_period: "400 BC".to_string(),
+                        chrono_group: 0,
+                        dating_group: 0,
                     },
                 ],
             },
@@ -111,4 +115,8 @@ pub struct ConservationEntry {
     pub layer_thickness: String,
     pub chronological_phase: String,
     pub dating_period: String,
+    #[serde(default)]
+    pub chrono_group: u32,
+    #[serde(default)]
+    pub dating_group: u32,
 }

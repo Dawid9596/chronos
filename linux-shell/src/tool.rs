@@ -1,6 +1,6 @@
 use chronos::bridge::{BarType, CycleDirection, Event, SlotEdge};
 use chronos::i18n::Translations;
-use chronos::storage::Slot;
+use chronos::storage::{BarPattern, Slot};
 use gtk4::cairo;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,6 +8,8 @@ pub enum Tool {
     Edit,
     Create,
     Delete,
+    Paint(BarPattern),
+    Split,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,29 +19,37 @@ pub enum DragTarget {
     Slot(usize),
 }
 
-/// Per-bar interactive state manipulated by the active `Tool`.
-#[derive(Default)]
-pub struct BarInteractionState {
-    pub hover_slot: Option<usize>,
-    pub create_preview: Option<f64>,
-    pub drag_target: DragTarget,
-    pub is_ambiguous: bool,
-}
-
 impl Default for DragTarget {
     fn default() -> Self {
         Self::None
     }
 }
 
+#[derive(Default)]
+pub struct BarInteractionState {
+    pub hover_slot: Option<usize>,
+    pub create_preview: Option<f64>,
+    pub drag_target: DragTarget,
+    pub is_ambiguous: bool,
+    pub paint_hover: bool,
+}
+
 impl Tool {
-    pub const ALL: [Tool; 3] = [Tool::Edit, Tool::Create, Tool::Delete];
+    pub const TOOLBAR_DEFAULTS: [Tool; 5] = [
+        Tool::Edit,
+        Tool::Create,
+        Tool::Delete,
+        Tool::Paint(BarPattern::VerticalHatch),
+        Tool::Split,
+    ];
 
     pub fn icon_name(self) -> &'static str {
         match self {
             Tool::Edit => "document-edit-symbolic",
             Tool::Create => "list-add-symbolic",
             Tool::Delete => "user-trash-symbolic",
+            Tool::Paint(_) => "applications-graphics-symbolic",
+            Tool::Split => "edit-cut-symbolic",
         }
     }
 
@@ -48,6 +58,8 @@ impl Tool {
             Tool::Edit => &t.tool_edit,
             Tool::Create => &t.tool_create,
             Tool::Delete => &t.tool_delete,
+            Tool::Paint(_) => &t.tool_paint,
+            Tool::Split => &t.tool_split,
         }
     }
 
@@ -78,22 +90,33 @@ impl Tool {
         self,
         cr: &cairo::Context,
         state: &BarInteractionState,
+        w: f64,
         h: f64,
     ) {
-        if self == Tool::Create {
-            if let Some(preview_x) = state.create_preview {
-                cr.set_source_rgba(0.2, 0.5, 0.9, 0.5);
-                cr.set_line_width(2.0);
-                cr.move_to(preview_x, 0.0);
-                cr.line_to(preview_x, h);
-                cr.stroke().expect("stroke preview");
+        match self {
+            Tool::Create => {
+                if let Some(preview_x) = state.create_preview {
+                    cr.set_source_rgba(0.2, 0.5, 0.9, 0.5);
+                    cr.set_line_width(2.0);
+                    cr.move_to(preview_x, 0.0);
+                    cr.line_to(preview_x, h);
+                    cr.stroke().expect("stroke preview");
+                }
             }
+            Tool::Paint(_) => {
+                if state.paint_hover {
+                    cr.set_source_rgba(0.2, 0.5, 0.9, 0.8);
+                    cr.set_line_width(2.0);
+                    cr.rectangle(1.0, 1.0, (w - 2.0).max(0.0), (h - 2.0).max(0.0));
+                    cr.stroke().expect("stroke paint hover border");
+                }
+            }
+            _ => {}
         }
     }
 
     // --- Pointer / Gesture Handlers ---
 
-    /// Returns `true` if the visual state changed and the widget needs a redraw.
     pub fn on_motion(
         self,
         state: &mut BarInteractionState,
@@ -125,7 +148,13 @@ impl Tool {
                     return true;
                 }
             }
-            Tool::Delete => {}
+            Tool::Paint(_) => {
+                if !state.paint_hover {
+                    state.paint_hover = true;
+                    return true;
+                }
+            }
+            Tool::Delete | Tool::Split => {}
         }
         false
     }
@@ -134,7 +163,8 @@ impl Tool {
         match self {
             Tool::Edit => state.hover_slot = None,
             Tool::Create => state.create_preview = None,
-            Tool::Delete => {}
+            Tool::Paint(_) => state.paint_hover = false,
+            Tool::Delete | Tool::Split => {}
         }
     }
 
@@ -191,13 +221,12 @@ impl Tool {
                 }
                 state.drag_target = target;
             }
-            Tool::Create => {
+            Tool::Create | Tool::Paint(_) | Tool::Split => {
                 state.drag_target = DragTarget::None;
             }
         }
     }
 
-    /// Returns `true` if a live drag preview updated `slots` and requires a redraw.
     pub fn on_drag_update(
         self,
         state: &mut BarInteractionState,
@@ -274,6 +303,11 @@ impl Tool {
                 bar_type,
                 slot_index,
             }),
+            (Tool::Paint(pattern), _) => Some(Event::SetPattern {
+                id,
+                bar_type,
+                pattern,
+            }),
             (Tool::Edit, DragTarget::Edge { slot_index, edge }) => {
                 if is_amb && offset_x.abs() <= 3.0 {
                     Some(Event::CyclePattern {
@@ -302,7 +336,22 @@ impl Tool {
                 bar_type,
                 direction: CycleDirection::Backward,
             }),
-            Tool::Create | Tool::Delete => None,
+            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split => None,
+        }
+    }
+
+    pub fn on_group_split_click(
+        self,
+        tail_member_ids: Vec<u32>,
+        field: chronos::bridge::EditableField,
+    ) -> Option<Event> {
+        if self == Tool::Split && !tail_member_ids.is_empty() {
+            Some(Event::SplitGroupCell {
+                tail_member_ids,
+                field,
+            })
+        } else {
+            None
         }
     }
 }

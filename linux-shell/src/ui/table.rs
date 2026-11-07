@@ -4,6 +4,114 @@ use chronos::view::AppViewModel;
 use gtk4::glib;
 use gtk4::prelude::*;
 
+fn build_group_cell_widget(
+    group: &chronos::view::GroupSpan,
+    field: EditableField,
+    start_row_idx: usize,
+    doc_rows: &[chronos::view::RowViewModel],
+    ctx: &AppContext,
+) -> (gtk4::Widget, i32) {
+    let mut gtk_span = group.span;
+    for k in start_row_idx..(start_row_idx + group.span - 1) {
+        if doc_rows[k].is_last_in_group {
+            gtk_span += 1;
+        }
+    }
+
+    let base_widget = crate::ui::widgets::editable::create_editable_widget(&group.value, ctx, {
+        let member_ids = group.member_ids.clone();
+        let field = field.clone();
+        move |new_val| Event::UpdateGroupText {
+            member_ids: member_ids.clone(),
+            field: field.clone(),
+            new_value: new_val,
+        }
+    });
+
+    if group.span <= 1 {
+        return (base_widget, gtk_span as i32);
+    }
+
+    base_widget.add_css_class("merged-cell");
+
+    let overlay = gtk4::Overlay::new();
+    overlay.set_child(Some(&base_widget));
+
+    // Build a vertical box with homogeneous row slots so each boundary aligns
+    // between row `offset - 1` and row `offset` inside the merged cell.
+    let split_vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .homogeneous(true)
+        .hexpand(true)
+        .vexpand(true)
+        .can_target(false)
+        .visible(ctx.tool.get() == crate::tool::Tool::Split)
+        .build();
+
+    for offset in 1..group.span {
+        let slot_box = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Vertical)
+            .valign(gtk4::Align::End)
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+
+        let split_btn = gtk4::Button::builder()
+            .has_frame(false)
+            .hexpand(true)
+            .focusable(false)
+            .can_focus(false)
+            .build();
+        split_btn.add_css_class("split-gap");
+
+        let tail_ids = group.member_ids[offset..].to_vec();
+        let field_clone = field.clone();
+        let ctx_btn = ctx.clone();
+
+        split_btn.connect_clicked(move |_| {
+            if let Some(ev) = ctx_btn
+                .tool
+                .get()
+                .on_group_split_click(tail_ids.clone(), field_clone.clone())
+            {
+                let ctx_idle = ctx_btn.clone();
+                glib::idle_add_local_once(move || {
+                    let effects = ctx_idle.core.process_event(ev);
+                    crate::effects::process_effects(&ctx_idle, effects);
+                });
+            }
+        });
+
+        slot_box.append(&split_btn);
+        split_vbox.append(&slot_box);
+    }
+
+    // Trailing spacer for the bottom row of the merged group
+    let bottom_spacer = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .hexpand(true)
+        .vexpand(true)
+        .can_target(false)
+        .build();
+    split_vbox.append(&bottom_spacer);
+
+    overlay.add_overlay(&split_vbox);
+    overlay.set_measure_overlay(&split_vbox, false);
+
+    // Enable hit-testing on the split overlay only when `Tool::Split` is active
+    let split_vbox_motion = split_vbox.clone();
+    let ctx_motion = ctx.clone();
+    let motion = gtk4::EventControllerMotion::new();
+    motion.connect_enter(move |_, _, _| {
+        let is_split = ctx_motion.tool.get() == crate::tool::Tool::Split;
+        split_vbox_motion.set_can_target(is_split);
+        split_vbox_motion.set_visible(is_split);
+    });
+    overlay.add_controller(motion);
+
+    (overlay.upcast(), gtk_span as i32)
+}
+
 pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::Grid {
     let grid = gtk4::Grid::builder()
         .column_spacing(16)
@@ -192,56 +300,28 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
 
         if current_vis.flags[5] {
             if let Some(chrono) = &row.chronological_phase {
-                let mut gtk_span = chrono.span;
-                for k in i..(i + chrono.span - 1) {
-                    if doc_rows[k].is_last_in_group {
-                        gtk_span += 1;
-                    }
-                }
-
-                let chrono_widget =
-                    crate::ui::widgets::editable::create_editable_widget(&chrono.value, ctx, {
-                        let member_ids = chrono.member_ids.clone();
-                        move |new_val| Event::UpdateGroupText {
-                            member_ids: member_ids.clone(),
-                            field: EditableField::ChronologicalPhase,
-                            new_value: new_val,
-                        }
-                    });
-
-                if chrono.span > 1 {
-                    chrono_widget.add_css_class("merged-cell");
-                }
-
-                grid.attach(&chrono_widget, col_idx, grid_row, 1, gtk_span as i32);
+                let (widget, gtk_span) = build_group_cell_widget(
+                    chrono,
+                    EditableField::ChronologicalPhase,
+                    i,
+                    doc_rows,
+                    ctx,
+                );
+                grid.attach(&widget, col_idx, grid_row, 1, gtk_span);
             }
             col_idx += 1;
         }
 
         if current_vis.flags[6] {
             if let Some(dating) = &row.dating_period {
-                let mut gtk_span = dating.span;
-                for k in i..(i + dating.span - 1) {
-                    if doc_rows[k].is_last_in_group {
-                        gtk_span += 1;
-                    }
-                }
-
-                let dating_widget =
-                    crate::ui::widgets::editable::create_editable_widget(&dating.value, ctx, {
-                        let member_ids = dating.member_ids.clone();
-                        move |new_val| Event::UpdateGroupText {
-                            member_ids: member_ids.clone(),
-                            field: EditableField::DatingPeriod,
-                            new_value: new_val,
-                        }
-                    });
-
-                if dating.span > 1 {
-                    dating_widget.add_css_class("merged-cell");
-                }
-
-                grid.attach(&dating_widget, col_idx, grid_row, 1, gtk_span as i32);
+                let (widget, gtk_span) = build_group_cell_widget(
+                    dating,
+                    EditableField::DatingPeriod,
+                    i,
+                    doc_rows,
+                    ctx,
+                );
+                grid.attach(&widget, col_idx, grid_row, 1, gtk_span);
             }
             col_idx += 1;
         }

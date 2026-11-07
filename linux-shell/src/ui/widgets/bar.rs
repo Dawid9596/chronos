@@ -125,6 +125,78 @@ fn fill_svg_tile(cr: &gtk4::cairo::Context, idx: usize, x0: f64, seg_w: f64, h: 
     });
 }
 
+/// Draws `pattern` inside the rectangle `(x0, 0.0, seg_w, h)`.
+pub fn draw_pattern_rect(
+    cr: &gtk4::cairo::Context,
+    pattern: &BarPattern,
+    x0: f64,
+    seg_w: f64,
+    h: f64,
+) {
+    cr.rectangle(x0, 0.0, seg_w, h);
+    cr.clip();
+    cr.set_source_rgb(0.3, 0.3, 0.3);
+    cr.set_line_width(1.5);
+    match pattern {
+        BarPattern::VerticalHatch => {
+            let step = 8.0;
+            let mut x = x0;
+            while x <= x0 + seg_w {
+                cr.move_to(x, 0.0);
+                cr.line_to(x, h);
+                x += step;
+            }
+            cr.stroke().expect("stroke vertical hatch");
+        }
+        BarPattern::DenseGrid => {
+            let step = 8.0;
+            let mut x = x0 - h;
+            while x <= x0 + seg_w {
+                cr.move_to(x, h);
+                cr.line_to(x + h, 0.0);
+                x += step;
+            }
+            let mut x2 = x0;
+            while x2 <= x0 + seg_w + h {
+                cr.move_to(x2, 0.0);
+                cr.line_to(x2 - h, h);
+                x2 += step;
+            }
+            cr.stroke().expect("stroke dense grid");
+        }
+        BarPattern::Bolus | BarPattern::Brick | BarPattern::Ceramics | BarPattern::Wood => {
+            let idx = chronos::patterns::tile_index(pattern)
+                .expect("arm covers all SVG-backed variants");
+            fill_svg_tile(cr, idx, x0, seg_w, h);
+        }
+    }
+    cr.reset_clip();
+}
+
+/// Builds a small non-interactive preview swatch of `pattern` for the toolbar.
+pub fn build_pattern_swatch(pattern: BarPattern, width: i32, height: i32) -> gtk4::DrawingArea {
+    let area = gtk4::DrawingArea::builder()
+        .width_request(width)
+        .height_request(height)
+        .build();
+    area.set_draw_func(move |_area, cr, w, h| {
+        let w = w as f64;
+        let h = h as f64;
+        if w == 0.0 || h == 0.0 {
+            return;
+        }
+        cr.set_source_rgb(0.95, 0.95, 0.95);
+        cr.rectangle(0.0, 0.0, w, h);
+        cr.fill().expect("fill swatch bg");
+        draw_pattern_rect(cr, &pattern, 0.0, w, h);
+        cr.set_source_rgb(0.6, 0.6, 0.6);
+        cr.set_line_width(1.0);
+        cr.rectangle(0.0, 0.0, w, h);
+        cr.stroke().expect("stroke swatch border");
+    });
+    area
+}
+
 pub fn build_interactive_condition_bar(
     id: u32,
     bar_type: BarType,
@@ -184,56 +256,14 @@ pub fn build_interactive_condition_bar(
             } else {
                 cr.rectangle(x0, 0.0, seg_w, h);
                 cr.clip();
-                cr.set_source_rgb(0.3, 0.3, 0.3);
-                cr.set_line_width(1.5);
-                match &*pattern {
-                    BarPattern::VerticalHatch => {
-                        let step = 8.0;
-                        let mut x = x0;
-                        while x <= x0 + seg_w {
-                            cr.move_to(x, 0.0);
-                            cr.line_to(x, h);
-                            x += step;
-                        }
-                        cr.stroke().expect("stroke vertical hatch");
-                    }
-                    BarPattern::DenseGrid => {
-                        let step = 8.0;
-
-                        // Bottom-left to top-right
-                        let mut x = x0 - h;
-                        while x <= x0 + seg_w {
-                            cr.move_to(x, h);
-                            cr.line_to(x + h, 0.0);
-                            x += step;
-                        }
-
-                        // Top-left to bottom-right
-                        let mut x2 = x0;
-                        while x2 <= x0 + seg_w + h {
-                            cr.move_to(x2, 0.0);
-                            cr.line_to(x2 - h, h);
-                            x2 += step;
-                        }
-                        cr.stroke().expect("stroke dense grid");
-                    }
-                    BarPattern::Bolus
-                    | BarPattern::Brick
-                    | BarPattern::Ceramics
-                    | BarPattern::Wood => {
-                        // Arm exactly covers the SVG-backed variants.
-                        let idx = chronos::patterns::tile_index(&pattern)
-                            .expect("arm covers all SVG-backed variants");
-                        fill_svg_tile(&cr, idx, x0, seg_w, h);
-                    }
-                }
+                draw_pattern_rect(&cr, &pattern, x0, seg_w, h);
                 cr.reset_clip();
             }
 
             current_tool.draw_slot_overlay(&cr, &state, idx, x0, x1, h);
         }
 
-        current_tool.draw_bar_overlay(&cr, &state, h);
+        current_tool.draw_bar_overlay(&cr, &state, w, h);
     });
 
     // --- Motion Controller ---

@@ -49,6 +49,17 @@ fn main() -> gtk4::glib::ExitCode {
                 border: 1px dashed alpha(@theme_fg_color, 0.3); \
                 border-radius: 3px; \
                 background-color: alpha(@theme_fg_color, 0.03); \
+            } \
+            button.split-gap { \
+                min-height: 6px; \
+                padding: 0; \
+                background-color: transparent; \
+                border: none; \
+                transition: all 0.15s ease-out; \
+            } \
+            button.split-gap:hover { \
+                background-color: alpha(@theme_selected_bg_color, 0.55); \
+                min-height: 10px; \
             }",
         );
 

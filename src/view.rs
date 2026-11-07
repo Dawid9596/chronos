@@ -51,11 +51,15 @@ impl ConservationDocument {
         for i in (1..len).rev() {
             let current = &self.entries[i];
             let previous = &self.entries[i - 1];
-            if current.chronological_phase == previous.chronological_phase {
+            if current.chronological_phase == previous.chronological_phase
+                && current.chrono_group == previous.chrono_group
+            {
                 chrono_spans[i - 1] = chrono_spans[i] + 1;
                 chrono_spans[i] = 0;
             }
-            if current.dating_period == previous.dating_period {
+            if current.dating_period == previous.dating_period
+                && current.dating_group == previous.dating_group
+            {
                 dating_spans[i - 1] = dating_spans[i] + 1;
                 dating_spans[i] = 0;
             }
@@ -88,8 +92,10 @@ impl ConservationDocument {
 
             let is_last_in_group = if i + 1 < len {
                 let next = &self.entries[i + 1];
-                entry.chronological_phase != next.chronological_phase
-                    || entry.dating_period != next.dating_period
+                (entry.chronological_phase != next.chronological_phase
+                    || entry.chrono_group != next.chrono_group)
+                    || (entry.dating_period != next.dating_period
+                        || entry.dating_group != next.dating_group)
             } else {
                 true
             };

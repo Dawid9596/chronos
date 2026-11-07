@@ -84,7 +84,7 @@ pub enum CycleDirection {
     Backward,
 }
 
-const PATTERN_ORDER: [BarPattern; 6] = [
+pub const PATTERN_ORDER: [BarPattern; 6] = [
     BarPattern::VerticalHatch,
     BarPattern::DenseGrid,
     BarPattern::Bolus,
@@ -188,6 +188,15 @@ pub enum Event {
         bar_type: BarType,
         direction: CycleDirection,
     },
+    SetPattern {
+        id: u32,
+        bar_type: BarType,
+        pattern: BarPattern,
+    },
+    SplitGroupCell {
+        tail_member_ids: Vec<u32>,
+        field: EditableField,
+    },
     AddSlot {
         id: u32,
         bar_type: BarType,
@@ -289,6 +298,8 @@ impl App for ConservationApp {
                     layer_thickness: String::new(),
                     chronological_phase: String::new(),
                     dating_period: String::new(),
+                    chrono_group: 0,
+                    dating_group: 0,
                 };
                 match after_id {
                     Some(id) => {
@@ -344,9 +355,49 @@ impl App for ConservationApp {
                     if member_ids.contains(&entry.id) {
                         match field {
                             EditableField::ChronologicalPhase => {
-                                entry.chronological_phase = new_value.clone()
+                                if entry.chronological_phase != new_value {
+                                    entry.chronological_phase = new_value.clone();
+                                    entry.chrono_group = 0;
+                                }
                             }
-                            EditableField::DatingPeriod => entry.dating_period = new_value.clone(),
+                            EditableField::DatingPeriod => {
+                                if entry.dating_period != new_value {
+                                    entry.dating_period = new_value.clone();
+                                    entry.dating_group = 0;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                caps.render.render();
+            }
+            Event::SplitGroupCell {
+                tail_member_ids,
+                field,
+            } => {
+                let new_group_id = model
+                    .document
+                    .entries
+                    .iter()
+                    .map(|e| match field {
+                        EditableField::ChronologicalPhase => e.chrono_group,
+                        EditableField::DatingPeriod => e.dating_group,
+                        _ => 0,
+                    })
+                    .max()
+                    .unwrap_or(0)
+                    + 1;
+
+                for entry in model.document.entries.iter_mut() {
+                    if tail_member_ids.contains(&entry.id) {
+                        match field {
+                            EditableField::ChronologicalPhase => {
+                                entry.chrono_group = new_group_id;
+                            }
+                            EditableField::DatingPeriod => {
+                                entry.dating_group = new_group_id;
+                            }
                             _ => {}
                         }
                     }
@@ -366,6 +417,22 @@ impl App for ConservationApp {
                         BarType::WovenTrim => &mut entry.woven_trim.pattern,
                     };
                     *pattern = cycled_pattern(pattern, direction);
+                }
+                caps.render.render();
+            }
+            Event::SetPattern {
+                id,
+                bar_type,
+                pattern,
+            } => {
+                if let Some(entry) = model.document.entries.iter_mut().find(|e| e.id == id) {
+                    let target = match bar_type {
+                        BarType::GraphicalRepresentation => {
+                            &mut entry.graphical_representation.pattern
+                        }
+                        BarType::WovenTrim => &mut entry.woven_trim.pattern,
+                    };
+                    *target = pattern;
                 }
                 caps.render.render();
             }
