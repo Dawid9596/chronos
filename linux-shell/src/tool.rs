@@ -1,4 +1,4 @@
-use chronos::bridge::{BarType, CycleDirection, Event, SlotEdge};
+use chronos::bridge::{BarType, CycleDirection, EditableField, Event, MergeDirection, SlotEdge};
 use chronos::i18n::Translations;
 use chronos::storage::{BarPattern, Slot};
 use gtk4::cairo;
@@ -12,6 +12,7 @@ pub enum Tool {
     Paint(BarPattern),
     Split,
     Duplicate,
+    Merge(MergeDirection),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,13 +38,14 @@ pub struct BarInteractionState {
 }
 
 impl Tool {
-    pub const TOOLBAR_DEFAULTS: [Tool; 6] = [
+    pub const TOOLBAR_DEFAULTS: [Tool; 7] = [
         Tool::Edit,
         Tool::Create,
         Tool::Delete,
         Tool::Paint(BarPattern::VerticalHatch),
         Tool::Split,
         Tool::Duplicate,
+        Tool::Merge(MergeDirection::Down),
     ];
 
     pub const PAINT_VARIANTS: [Tool; 6] = [
@@ -55,10 +57,16 @@ impl Tool {
         Tool::Paint(BarPattern::Wood),
     ];
 
+    pub const MERGE_VARIANTS: [Tool; 2] = [
+        Tool::Merge(MergeDirection::Down),
+        Tool::Merge(MergeDirection::Up),
+    ];
+
     /// Returns the selectable variants for this tool family, or `&[]` if the tool has none.
     pub fn variants(self) -> &'static [Tool] {
         match self {
             Tool::Paint(_) => &Self::PAINT_VARIANTS,
+            Tool::Merge(_) => &Self::MERGE_VARIANTS,
             Tool::Edit
             | Tool::Create
             | Tool::Delete
@@ -78,6 +86,12 @@ impl Tool {
             Tool::Paint(pattern) => {
                 crate::ui::widgets::bar::build_pattern_swatch(pattern, 36, 20).upcast()
             }
+            Tool::Merge(MergeDirection::Down) => {
+                gtk4::Image::from_icon_name("go-down-symbolic").upcast()
+            }
+            Tool::Merge(MergeDirection::Up) => {
+                gtk4::Image::from_icon_name("go-up-symbolic").upcast()
+            }
             // Future tools with variants can return a Label, Image, or custom widget here:
             other => gtk4::Image::from_icon_name(other.icon_name()).upcast(),
         }
@@ -91,6 +105,7 @@ impl Tool {
             Tool::Paint(_) => "applications-graphics-symbolic",
             Tool::Split => "edit-cut-symbolic",
             Tool::Duplicate => "edit-copy-symbolic",
+            Tool::Merge(_) => "object-flip-vertical-symbolic",
         }
     }
 
@@ -102,6 +117,7 @@ impl Tool {
             Tool::Paint(_) => &t.tool_paint,
             Tool::Split => &t.tool_split,
             Tool::Duplicate => &t.tool_duplicate,
+            Tool::Merge(_) => &t.tool_merge,
         }
     }
 
@@ -196,7 +212,7 @@ impl Tool {
                     return true;
                 }
             }
-            Tool::Delete | Tool::Split | Tool::Duplicate => {}
+            Tool::Delete | Tool::Split | Tool::Duplicate | Tool::Merge(_) => {}
         }
         false
     }
@@ -206,7 +222,7 @@ impl Tool {
             Tool::Edit => state.hover_slot = None,
             Tool::Create => state.create_preview = None,
             Tool::Paint(_) => state.paint_hover = false,
-            Tool::Delete | Tool::Split | Tool::Duplicate => {}
+            Tool::Delete | Tool::Split | Tool::Duplicate | Tool::Merge(_) => {}
         }
     }
 
@@ -263,7 +279,7 @@ impl Tool {
                 }
                 state.drag_target = target;
             }
-            Tool::Create | Tool::Paint(_) | Tool::Split | Tool::Duplicate => {
+            Tool::Create | Tool::Paint(_) | Tool::Split | Tool::Duplicate | Tool::Merge(_) => {
                 state.drag_target = DragTarget::None;
             }
         }
@@ -379,7 +395,7 @@ impl Tool {
                 bar_type,
                 direction: CycleDirection::Backward,
             }),
-            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split | Tool::Duplicate => None,
+            Tool::Create | Tool::Delete | Tool::Paint(_) | Tool::Split | Tool::Duplicate | Tool::Merge(_) => None,
         }
     }
 
@@ -404,5 +420,22 @@ impl Tool {
         } else {
             None
         }
+    }
+
+    pub fn on_group_merge_click(
+        self,
+        member_ids: Vec<u32>,
+        field: EditableField,
+    ) -> Option<Event> {
+        if let Tool::Merge(direction) = self {
+            if !member_ids.is_empty() {
+                return Some(Event::MergeGroupCell {
+                    member_ids,
+                    field,
+                    direction,
+                });
+            }
+        }
+        None
     }
 }

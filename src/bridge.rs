@@ -84,6 +84,12 @@ pub enum CycleDirection {
     Backward,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MergeDirection {
+    Down,
+    Up,
+}
+
 pub const PATTERN_ORDER: [BarPattern; 6] = [
     BarPattern::VerticalHatch,
     BarPattern::DenseGrid,
@@ -197,6 +203,11 @@ pub enum Event {
     SplitGroupCell {
         tail_member_ids: Vec<u32>,
         field: EditableField,
+    },
+    MergeGroupCell {
+        member_ids: Vec<u32>,
+        field: EditableField,
+        direction: MergeDirection,
     },
     AddSlot {
         id: u32,
@@ -416,6 +427,87 @@ impl App for ConservationApp {
                     }
                 }
                 caps.render.render();
+            }
+            Event::MergeGroupCell {
+                member_ids,
+                field,
+                direction,
+            } => {
+                let len = model.document.entries.len();
+                let first_pos = model
+                    .document
+                    .entries
+                    .iter()
+                    .position(|e| member_ids.contains(&e.id));
+                let last_pos = model
+                    .document
+                    .entries
+                    .iter()
+                    .rposition(|e| member_ids.contains(&e.id));
+
+                let neighbor_idx = match (direction, first_pos, last_pos) {
+                    (MergeDirection::Up, Some(first), _) if first > 0 => Some(first - 1),
+                    (MergeDirection::Down, _, Some(last)) if last + 1 < len => Some(last + 1),
+                    _ => None,
+                };
+
+                if let Some(n_idx) = neighbor_idx {
+                    let neighbor = &model.document.entries[n_idx];
+                    match field {
+                        EditableField::ChronologicalPhase => {
+                            let target_val = neighbor.chronological_phase.clone();
+                            let target_group = neighbor.chrono_group;
+                            let target_id = neighbor.id;
+
+                            let clicked_val = first_pos
+                                .map(|i| model.document.entries[i].chronological_phase.clone())
+                                .unwrap_or_default();
+                            let final_val = if !clicked_val.is_empty() {
+                                clicked_val
+                            } else {
+                                target_val.clone()
+                            };
+
+                            for entry in model.document.entries.iter_mut() {
+                                if member_ids.contains(&entry.id)
+                                    || (entry.id == target_id)
+                                    || (entry.chronological_phase == target_val
+                                        && entry.chrono_group == target_group)
+                                {
+                                    entry.chronological_phase = final_val.clone();
+                                    entry.chrono_group = target_group;
+                                }
+                            }
+                        }
+                        EditableField::DatingPeriod => {
+                            let target_val = neighbor.dating_period.clone();
+                            let target_group = neighbor.dating_group;
+                            let target_id = neighbor.id;
+
+                            let clicked_val = first_pos
+                                .map(|i| model.document.entries[i].dating_period.clone())
+                                .unwrap_or_default();
+                            let final_val = if !clicked_val.is_empty() {
+                                clicked_val
+                            } else {
+                                target_val.clone()
+                            };
+
+                            for entry in model.document.entries.iter_mut() {
+                                if member_ids.contains(&entry.id)
+                                    || (entry.id == target_id)
+                                    || (entry.dating_period == target_val
+                                        && entry.dating_group == target_group)
+                                {
+                                    entry.dating_period = final_val.clone();
+                                    entry.dating_group = target_group;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    caps.render.render();
+                }
             }
             Event::CyclePattern {
                 id,

@@ -1,5 +1,3 @@
-"Merge" tool (selector down / up) – allows merging a cell into neigh cell
-
 "File" menu.
 
 "About" menu.

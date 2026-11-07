@@ -28,6 +28,30 @@ fn build_group_cell_widget(
         }
     });
 
+    // Trigger Merge on single click when Tool::Merge(_) is active
+    let merge_click = gtk4::GestureClick::new();
+    merge_click.set_button(1);
+    let member_ids_merge = group.member_ids.clone();
+    let field_merge = field.clone();
+    let ctx_merge = ctx.clone();
+    merge_click.connect_pressed(move |gesture, n_press, _x, _y| {
+        if n_press == 1 {
+            if let Some(ev) = ctx_merge
+                .tool
+                .get()
+                .on_group_merge_click(member_ids_merge.clone(), field_merge.clone())
+            {
+                gesture.set_state(gtk4::EventSequenceState::Claimed);
+                let ctx_idle = ctx_merge.clone();
+                glib::idle_add_local_once(move || {
+                    let effects = ctx_idle.core.process_event(ev);
+                    crate::effects::process_effects(&ctx_idle, effects);
+                });
+            }
+        }
+    });
+    base_widget.add_controller(merge_click);
+
     if group.span <= 1 {
         return (base_widget, gtk_span as i32);
     }
