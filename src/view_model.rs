@@ -60,7 +60,10 @@ impl typst::World for ConservationWorld {
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+        self.assets
+            .get(id.vpath().as_rootless_path().to_str().unwrap_or(""))
+            .cloned()
+            .ok_or(FileError::NotFound(id.vpath().as_rootless_path().into()))
     }
 
     fn font(&self, index: usize) -> Option<Font> {
