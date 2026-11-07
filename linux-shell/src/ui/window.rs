@@ -61,6 +61,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let canvas_params = Rc::new(RefCell::new(settings.canvas.clone()));
     let shortcuts = Rc::new(ShortcutRegistry::new(&settings.shortcuts));
     let tool = Rc::new(Cell::new(Tool::Edit));
+    let split_overlays: crate::ui::table::SplitOverlays = Rc::new(RefCell::new(Vec::new()));
     let t = &core.view().translations;
 
     let ctx_holder: Rc<RefCell<Option<AppContext>>> = Rc::new(RefCell::new(None));
@@ -398,6 +399,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 }
 
                 let tool_cell = tool.clone();
+                let overlays = split_overlays.clone();
                 let remembered = remembered_variant.clone();
                 let parent_btn = btn.clone();
                 var_btn.connect_toggled(move |b| {
@@ -407,6 +409,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                             parent_btn.set_active(true);
                         }
                         tool_cell.set(variant);
+                        crate::ui::table::update_split_overlays(&overlays, variant);
                     }
                 });
 
@@ -431,6 +434,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         }
 
         let tool_cell = tool.clone();
+        let overlays = split_overlays.clone();
         let remembered = remembered_variant.clone();
         let inline_revs = inline_revealers.clone();
         let bottom_rev = bottom_revealer.clone();
@@ -441,6 +445,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             if b.is_active() {
                 let active_tool = remembered.get();
                 tool_cell.set(active_tool);
+                crate::ui::table::update_split_overlays(&overlays, active_tool);
                 for (kind, rev) in inline_revs.borrow().iter() {
                     rev.set_reveal_child(kind.same_kind(active_tool));
                 }
@@ -523,15 +528,16 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 let new_name = status_entry.text().to_string();
                 status_stack.set_visible_child_name("label");
                 if !new_name.trim().is_empty()
-                    && let Some(ctx) = ctx_holder.borrow().as_ref() {
-                        let ctx_idle = ctx.clone();
-                        glib::idle_add_local_once(move || {
-                            let effects = ctx_idle
-                                .core
-                                .process_event(Event::UpdateProjectName(new_name));
-                            crate::effects::process_effects(&ctx_idle, effects);
-                        });
-                    }
+                    && let Some(ctx) = ctx_holder.borrow().as_ref()
+                {
+                    let ctx_idle = ctx.clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle
+                            .core
+                            .process_event(Event::UpdateProjectName(new_name));
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
             }
         }
     };
@@ -568,7 +574,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .margin_end(20)
         .spacing(12)
         .build();
-
+    container.append(&menu_bar);
     container.append(&top_bar);
     container.append(&status_stack);
 
@@ -602,6 +608,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         shortcuts: shortcuts.clone(),
         menu_labels,
         scrolled_window: scrolled_window.clone(),
+        table: Rc::new(RefCell::new(None)),
+        split_overlays: split_overlays.clone(),
         last_message: Rc::new(RefCell::new(None)),
         status_timer: Rc::new(RefCell::new(None)),
         settings_timer: Rc::new(RefCell::new(None)),
@@ -619,8 +627,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     });
 
     let initial_view = core.view();
-    let initial_table = crate::ui::table::build_document_table(&initial_view, &ctx);
-    scrolled_window.set_child(Some(&initial_table));
+    crate::ui::table::sync_document_table(&initial_view, &ctx);
     container.append(&scrolled_window);
 
     let settings_popover = gtk4::Popover::builder().has_arrow(false).build();
@@ -659,8 +666,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             cb.connect_toggled(move |check_btn| {
                 ctx_cb.vis.borrow_mut().flags[i] = check_btn.is_active();
                 let view = ctx_cb.core.view();
-                let new_table = crate::ui::table::build_document_table(&view, &ctx_cb);
-                ctx_cb.scrolled_window.set_child(Some(&new_table));
+                crate::ui::table::sync_document_table(&view, &ctx_cb);
                 ctx_cb.persist_settings();
             });
             popover_vbox.append(&cb);
@@ -686,9 +692,10 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     }
 
     if let Some(saved) = settings.saved_language()
-        && saved != ctx.current_lang.get() {
-            defer_event(&ctx, Event::ToggleLanguage);
-        }
+        && saved != ctx.current_lang.get()
+    {
+        defer_event(&ctx, Event::ToggleLanguage);
+    }
 
     let ctx_close = ctx.clone();
     window.connect_close_request(move |_| {

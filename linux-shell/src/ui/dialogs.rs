@@ -152,8 +152,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         check.connect_toggled(move |c| {
             ctx_chk.vis.borrow_mut().flags[i] = c.is_active();
             let view = ctx_chk.core.view();
-            let new_table = crate::ui::table::build_document_table(&view, &ctx_chk);
-            ctx_chk.scrolled_window.set_child(Some(&new_table));
+            crate::ui::table::sync_document_table(&view, &ctx_chk);
             ctx_chk.persist_settings();
         });
 

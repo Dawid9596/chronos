@@ -3,11 +3,45 @@ use chronos::bridge::Event;
 use gtk4::glib;
 use gtk4::prelude::*;
 
-pub fn create_editable_widget(
+/// Handle to a live double-click-to-edit cell.
+///
+/// The table keeps one of these per text cell so that a state change which
+/// only alters text can be pushed into the existing widget instead of
+/// rebuilding the whole grid.
+#[derive(Clone)]
+pub struct EditableCell {
+    stack: gtk4::Stack,
+    label: gtk4::Label,
+    entry: gtk4::Entry,
+}
+
+impl EditableCell {
+    /// The widget to attach to the grid.
+    pub fn widget(&self) -> gtk4::Widget {
+        self.stack.clone().upcast()
+    }
+
+    /// Updates the displayed text from the model without disturbing the user.
+    ///
+    /// The label always follows the model. The entry is only touched while the
+    /// cell is *not* being edited, so a re-render triggered by something else
+    /// (e.g. the status-message timer) can never clobber what is being typed.
+    pub fn set_text(&self, text: &str) {
+        if self.label.text().as_str() != text {
+            self.label.set_text(text);
+        }
+        let editing = self.stack.visible_child_name().as_deref() == Some("entry");
+        if !editing && self.entry.text().as_str() != text {
+            self.entry.set_text(text);
+        }
+    }
+}
+
+pub fn create_editable_cell(
     initial_text: &str,
     ctx: &AppContext,
     on_commit: impl Fn(String) -> Event + 'static,
-) -> gtk4::Widget {
+) -> EditableCell {
     let on_commit = std::rc::Rc::new(on_commit);
 
     let stack = gtk4::Stack::new();
@@ -107,5 +141,9 @@ pub fn create_editable_widget(
     });
     entry.add_controller(focus_controller);
 
-    stack.upcast()
+    EditableCell {
+        stack,
+        label,
+        entry,
+    }
 }

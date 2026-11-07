@@ -75,6 +75,12 @@ pub struct AppContext {
     pub shortcuts: Rc<ShortcutRegistry>,
     pub menu_labels: Rc<MenuLabels>,
     pub scrolled_window: ScrolledWindow,
+    /// The grid currently shown in `scrolled_window` together with handles to
+    /// its cells. `None` until the first call to `ui::table::sync_document_table`.
+    pub table: Rc<RefCell<Option<crate::ui::table::DocumentTable>>>,
+    /// Split-line overlays of the merged cells in the current grid; toggled
+    /// by `ui::table::update_split_overlays` whenever `tool` changes.
+    pub split_overlays: crate::ui::table::SplitOverlays,
     /// Tracks the last displayed message to avoid re-triggering identical renders.
     pub last_message: Rc<RefCell<Option<String>>>,
     /// Pending fade-out timer; canceled whenever a new message appears.

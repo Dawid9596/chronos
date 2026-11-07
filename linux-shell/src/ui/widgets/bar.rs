@@ -1,7 +1,7 @@
 use crate::context::AppContext;
-use crate::tool::BarInteractionState;
+use crate::tool::{BarInteractionState, DragTarget};
 use chronos::bridge::{BarType, Event};
-use chronos::storage::{BarPattern, ConditionBar};
+use chronos::storage::{BarPattern, ConditionBar, Slot};
 use gtk4::{gdk, glib, prelude::*};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -199,13 +199,68 @@ pub fn build_pattern_swatch(pattern: BarPattern, width: i32, height: i32) -> gtk
     area
 }
 
+/// Handle to a live condition bar. It shares the draw handler's state, so the
+/// table can push new model values into an existing bar and just repaint it,
+/// instead of rebuilding the widget (and the whole grid around it).
+#[derive(Clone)]
+pub struct ConditionBarHandle {
+    area: gtk4::DrawingArea,
+    slots: Rc<RefCell<Vec<Slot>>>,
+    pattern: Rc<RefCell<BarPattern>>,
+    interaction: Rc<RefCell<BarInteractionState>>,
+}
+
+impl ConditionBarHandle {
+    /// The widget to attach to the grid.
+    pub fn widget(&self) -> gtk4::DrawingArea {
+        self.area.clone()
+    }
+
+    /// Brings the bar in line with the model and repaints only if something
+    /// that is actually drawn has changed.
+    ///
+    /// Ignored while an edge/slot drag is in progress: the drag mutates the
+    /// local slots live, and an unrelated re-render must not snap the bar
+    /// back under the user's pointer. The drag-end event produces its own
+    /// render, which syncs the final value.
+    pub fn sync(&self, condition: &ConditionBar) {
+        if self.interaction.borrow().drag_target != DragTarget::None {
+            return;
+        }
+
+        let mut dirty = false;
+        {
+            let mut slots = self.slots.borrow_mut();
+            let same = slots.len() == condition.slots.len()
+                && slots
+                    .iter()
+                    .zip(&condition.slots)
+                    .all(|(a, b)| a.start_pct == b.start_pct && a.end_pct == b.end_pct);
+            if !same {
+                *slots = condition.slots.clone();
+                dirty = true;
+            }
+        }
+        {
+            let mut pattern = self.pattern.borrow_mut();
+            if *pattern != condition.pattern {
+                *pattern = condition.pattern;
+                dirty = true;
+            }
+        }
+        if dirty {
+            self.area.queue_draw();
+        }
+    }
+}
+
 pub fn build_interactive_condition_bar(
     id: u32,
     bar_type: BarType,
     condition: ConditionBar,
     width_request: i32,
     ctx: &AppContext,
-) -> gtk4::DrawingArea {
+) -> ConditionBarHandle {
     let drawing_area = gtk4::DrawingArea::builder()
         .hexpand(true)
         .width_request(width_request)
@@ -369,7 +424,12 @@ pub fn build_interactive_condition_bar(
     });
     drawing_area.add_controller(right_click);
 
-    drawing_area
+    ConditionBarHandle {
+        area: drawing_area,
+        slots: draw_slots,
+        pattern: draw_pattern,
+        interaction,
+    }
 }
 
 /// Defers `event` to the next idle tick so the core isn't re-entered from

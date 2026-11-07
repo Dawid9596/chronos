@@ -79,19 +79,7 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     label.set_text(tool_variant.label(t));
                 }
 
-                let new_table = crate::ui::table::build_document_table(&view, ctx);
-
-                // 1. Capture the current vertical scroll position
-                let vadj = ctx.scrolled_window.vadjustment();
-                let saved_y = vadj.value();
-
-                // 2. Swap the grid
-                ctx.scrolled_window.set_child(Some(&new_table));
-
-                // 3. Restore the position after GTK computes the new widget's layout allocation
-                glib::idle_add_local_once(move || {
-                    vadj.set_value(saved_y);
-                });
+                crate::ui::table::sync_document_table(&view, ctx);
             }
             Effect::ExportPdf(mut request) => {
                 let ctx = ctx.clone();
