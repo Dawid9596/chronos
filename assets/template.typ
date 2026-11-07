@@ -73,9 +73,22 @@
 
   box(width: 100%, height: 1.2em, stroke: 0.5pt + luma(150), {
     for slot in condition.slots {
+      let span = slot.end_pct - slot.start_pct
       let x0 = slot.start_pct * 1%
-      let w = calc.max(slot.end_pct - slot.start_pct, 0.3) * 1%
-      place(left, dx: x0, box(width: w, height: 100%, fill: fill-style, stroke: none))
+      if calc.abs(span) < 0.5 {
+        place(
+          left,
+          dx: x0,
+          line(
+            start: (0pt, 0%),
+            end: (0pt, 100%),
+            stroke: 1.5pt + luma(77),
+          ),
+        )
+      } else {
+        let w = span * 1%
+        place(left, dx: x0, box(width: w, height: 100%, fill: fill-style, stroke: none))
+      }
     }
   })
 }
