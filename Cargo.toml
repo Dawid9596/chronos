@@ -44,7 +44,7 @@ binaries = [
 
 resources = [
   "dll_stage/*.dll",
-  { src = "dll_stage/schemas/gschemas.compiled", target = "share/glib-2.0/schemas/" },
+  { src = "dll_stage/schemas", target = "share/glib-2.0/schemas" },
   { src = "dll_stage/gdk-pixbuf-2.0", target = "lib/gdk-pixbuf-2.0" },
   { src = "dll_stage/hicolor", target = "share/icons/hicolor" },
   { src = "dll_stage/Adwaita", target = "share/icons/Adwaita" },

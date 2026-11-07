@@ -10,6 +10,16 @@ use gtk4::prelude::*;
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() -> gtk4::glib::ExitCode {
+    #[cfg(windows)]
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let schema_dir = exe_dir.join("share/glib-2.0/schemas");
+            unsafe {
+                std::env::set_var("GSETTINGS_SCHEMA_DIR", &schema_dir);
+            }
+        }
+    }
+
     let app = gtk4::Application::builder().application_id(APP_ID).build();
 
     app.connect_startup(|_| {
