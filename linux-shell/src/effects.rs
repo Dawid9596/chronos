@@ -65,7 +65,8 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ));
                 }
 
-                ctx.lang_label.set_markup(&t.flag_emoji);
+                ctx.current_lang.set(t.language);
+                ctx.flag_area.queue_draw();
                 ctx.settings_label.set_markup(&t.settings_tooltip);
                 for (tool_variant, label) in ctx.tool_labels.iter() {
                     label.set_text(tool_variant.label(t));
@@ -107,20 +108,25 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
 
                             let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
                             let filter = gtk4::FileFilter::new();
-                            filter.add_mime_type("application/json");
+                            filter.add_pattern("*.json");
                             filter.add_suffix("json");
                             filter.set_name(Some(filter_name));
                             filters.append(&filter);
                             dialog.set_filters(Some(&filters));
 
-                            match dialog.open_future(None::<&gtk4::Window>).await {
-                                Ok(file) => {
-                                    let path = file.path().unwrap().to_string_lossy().to_string();
-                                    match std::fs::read_to_string(&path) {
-                                        Ok(content) => FilePickerResponse::Opened { path, content },
-                                        Err(e) => FilePickerResponse::Error(e.to_string()),
+                            match dialog.open_future(Some(&ctx.window)).await {
+                                Ok(file) => match file.path() {
+                                    Some(path_buf) => {
+                                        let path = path_buf.to_string_lossy().to_string();
+                                        match std::fs::read_to_string(&path) {
+                                            Ok(content) => {
+                                                FilePickerResponse::Opened { path, content }
+                                            }
+                                            Err(e) => FilePickerResponse::Error(e.to_string()),
+                                        }
                                     }
-                                }
+                                    None => FilePickerResponse::Error("Invalid file path".into()),
+                                },
                                 Err(_) => FilePickerResponse::Cancelled,
                             }
                         }
@@ -135,18 +141,31 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                             } else {
                                 let dialog = gtk4::FileDialog::new();
                                 dialog.set_title(title);
+                                dialog.set_initial_name(Some("project.json"));
 
                                 let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
                                 let filter = gtk4::FileFilter::new();
-                                filter.add_mime_type("application/json");
+                                filter.add_pattern("*.json");
                                 filter.add_suffix("json");
                                 filter.set_name(Some(filter_name));
                                 filters.append(&filter);
                                 dialog.set_filters(Some(&filters));
 
-                                match dialog.save_future(None::<&gtk4::Window>).await {
-                                    // Return an owned String here
-                                    Ok(file) => file.path().unwrap().to_string_lossy().to_string(),
+                                match dialog.save_future(Some(&ctx.window)).await {
+                                    Ok(file) => match file.path() {
+                                        Some(p) => p.to_string_lossy().to_string(),
+                                        None => {
+                                            let next_effects = ctx
+                                                .core
+                                                .resolve(
+                                                    &mut request,
+                                                    FilePickerResponse::Cancelled,
+                                                )
+                                                .expect("resolve");
+                                            process_effects(&ctx, next_effects);
+                                            return;
+                                        }
+                                    },
                                     Err(_) => {
                                         let next_effects = ctx
                                             .core

@@ -192,8 +192,17 @@ pub fn build_document_table(app_view: &AppViewModel, ctx: &AppContext) -> gtk4::
         let mut col_idx = 0;
 
         if current_vis.flags[0] {
-            let grab_cursor = gtk4::gdk::Cursor::from_name("grab", None);
-            let grabbing_cursor = gtk4::gdk::Cursor::from_name("grabbing", None);
+            let fallback_cursor = gtk4::gdk::Cursor::from_name("move", None);
+            let grab_cursor = if cfg!(windows) {
+                fallback_cursor.clone()
+            } else {
+                gtk4::gdk::Cursor::from_name("grab", fallback_cursor.as_ref())
+            };
+            let grabbing_cursor = if cfg!(windows) {
+                fallback_cursor
+            } else {
+                gtk4::gdk::Cursor::from_name("grabbing", fallback_cursor.as_ref())
+            };
 
             let handle_box = gtk4::Box::builder()
                 .orientation(gtk4::Orientation::Horizontal)

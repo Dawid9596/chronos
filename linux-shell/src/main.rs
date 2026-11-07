@@ -2,7 +2,6 @@
 
 mod context;
 mod effects;
-mod fonts;
 mod tool;
 mod ui;
 
@@ -11,10 +10,6 @@ use gtk4::prelude::*;
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() -> gtk4::glib::ExitCode {
-    // Must happen before GTK initializes Pango's font map, so the bundled
-    // emoji font is available for the first text layout.
-    fonts::register_bundled_fonts();
-
     let app = gtk4::Application::builder().application_id(APP_ID).build();
 
     app.connect_startup(|_| {
