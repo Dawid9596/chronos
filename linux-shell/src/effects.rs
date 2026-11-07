@@ -67,9 +67,9 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
 
                 ctx.lang_label.set_markup(&t.flag_emoji);
                 ctx.settings_label.set_markup(&t.settings_tooltip);
-                ctx.edit_text_label.set_text(&t.tool_edit);
-                ctx.create_text_label.set_text(&t.tool_create);
-                ctx.delete_text_label.set_text(&t.tool_delete);
+                for (tool_variant, label) in ctx.tool_labels.iter() {
+                    label.set_text(tool_variant.label(t));
+                }
 
                 let new_table = crate::ui::table::build_document_table(&view, ctx);
                 ctx.scrolled_window.set_child(Some(&new_table));

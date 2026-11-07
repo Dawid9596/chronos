@@ -3,6 +3,7 @@
 mod context;
 mod effects;
 mod fonts;
+mod tool;
 mod ui;
 
 use gtk4::prelude::*;

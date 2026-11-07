@@ -1,4 +1,5 @@
-use crate::context::{AppContext, BarTool, ColumnVisibility};
+use crate::context::{AppContext, ColumnVisibility};
+use crate::tool::Tool;
 use chronos::bridge::{ConservationApp, Event};
 use crux_core::Core;
 use gtk4::glib;
@@ -9,7 +10,7 @@ use std::rc::Rc;
 pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, AppContext) {
     let core = Rc::new(Core::<ConservationApp>::default());
     let vis = Rc::new(RefCell::new(ColumnVisibility::default()));
-    let tool = Rc::new(Cell::new(BarTool::Edit));
+    let tool = Rc::new(Cell::new(Tool::Edit));
 
     let t = &core.view().translations;
 
@@ -49,80 +50,49 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     lang_box.append(&flag_label);
     let lang_btn = gtk4::Button::builder().child(&lang_box).build();
 
-    // Edit Button (Icon + Text)
-    let edit_btn = gtk4::ToggleButton::builder().active(true).build();
-    let edit_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .spacing(4)
-        .halign(gtk4::Align::Center)
-        .valign(gtk4::Align::Center)
-        .build();
-    let edit_icon = gtk4::Image::from_icon_name("document-edit-symbolic");
-    let edit_text_label = gtk4::Label::new(Some(&t.tool_edit));
-    edit_box.append(&edit_icon);
-    edit_box.append(&edit_text_label);
-    edit_btn.set_child(Some(&edit_box));
-
-    // Create Button (Icon + Text)
-    let create_btn = gtk4::ToggleButton::new();
-    let create_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .spacing(4)
-        .halign(gtk4::Align::Center)
-        .valign(gtk4::Align::Center)
-        .build();
-    let create_icon = gtk4::Image::from_icon_name("list-add-symbolic");
-    let create_text_label = gtk4::Label::new(Some(&t.tool_create));
-    create_box.append(&create_icon);
-    create_box.append(&create_text_label);
-    create_btn.set_child(Some(&create_box));
-
-    // Delete Button (Icon + Text)
-    let delete_btn = gtk4::ToggleButton::new();
-    let delete_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .spacing(4)
-        .halign(gtk4::Align::Center)
-        .valign(gtk4::Align::Center)
-        .build();
-    let trash_icon = gtk4::Image::from_icon_name("user-trash-symbolic");
-    delete_box.append(&trash_icon);
-    let delete_text_label = gtk4::Label::new(Some(&t.tool_delete));
-    delete_box.append(&delete_text_label);
-    delete_btn.set_child(Some(&delete_box));
-
-    edit_btn.set_group(Option::<&gtk4::ToggleButton>::None);
-    create_btn.set_group(Some(&edit_btn));
-    delete_btn.set_group(Some(&edit_btn));
-
-    let tool_edit = tool.clone();
-    edit_btn.connect_toggled(move |b| {
-        if b.is_active() {
-            tool_edit.set(BarTool::Edit);
-        }
-    });
-
-    let tool_edit = tool.clone();
-    create_btn.connect_toggled(move |b| {
-        if b.is_active() {
-            tool_edit.set(BarTool::Create);
-        }
-    });
-
-    let tool_edit = tool.clone();
-    delete_btn.connect_toggled(move |b| {
-        if b.is_active() {
-            tool_edit.set(BarTool::Delete);
-        }
-    });
-
     let tool_bar = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
         .spacing(4)
         .build();
-    tool_bar.append(&edit_btn);
-    tool_bar.append(&create_btn);
-    tool_bar.append(&delete_btn);
+
+    let mut tool_labels = Vec::with_capacity(Tool::ALL.len());
+    let mut first_btn: Option<gtk4::ToggleButton> = None;
+
+    for t_variant in Tool::ALL {
+        let btn = gtk4::ToggleButton::builder()
+            .active(t_variant == Tool::Edit)
+            .build();
+
+        let btn_box = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Horizontal)
+            .spacing(4)
+            .halign(gtk4::Align::Center)
+            .valign(gtk4::Align::Center)
+            .build();
+
+        let icon = gtk4::Image::from_icon_name(t_variant.icon_name());
+        let text_label = gtk4::Label::new(Some(t_variant.label(t)));
+        btn_box.append(&icon);
+        btn_box.append(&text_label);
+        btn.set_child(Some(&btn_box));
+
+        if let Some(ref group_leader) = first_btn {
+            btn.set_group(Some(group_leader));
+        } else {
+            btn.set_group(Option::<&gtk4::ToggleButton>::None);
+            first_btn = Some(btn.clone());
+        }
+
+        let tool_cell = tool.clone();
+        btn.connect_toggled(move |b| {
+            if b.is_active() {
+                tool_cell.set(t_variant);
+            }
+        });
+
+        tool_bar.append(&btn);
+        tool_labels.push((t_variant, text_label));
+    }
 
     let left_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -255,9 +225,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         export_btn: export_btn.clone(),
         lang_label: flag_label.clone(),
         settings_label: settings_label.clone(),
-        edit_text_label: edit_text_label.clone(),
-        create_text_label: create_text_label.clone(),
-        delete_text_label: delete_text_label.clone(),
+        tool_labels: Rc::new(tool_labels),
         scrolled_window: scrolled_window.clone(),
         last_message: Rc::new(RefCell::new(None)),
         status_timer: Rc::new(RefCell::new(None)),
