@@ -75,6 +75,8 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 ctx.settings_label.set_markup(&t.settings_tooltip);
                 ctx.menu_labels.update(t);
                 ctx.shortcuts.update_translations(t);
+                ctx.history_buttons.update_translations(t);
+                ctx.history_buttons.sync(view.can_undo, view.can_redo);
                 for (tool_variant, label) in ctx.tool_labels.iter() {
                     label.set_text(tool_variant.label(t));
                 }

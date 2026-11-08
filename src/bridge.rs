@@ -229,12 +229,53 @@ pub enum Event {
         new_pct: f32,
     },
     ToggleLanguage,
+    Undo,
+    Redo,
     RequestOpen,
     RequestSave,
     RequestSaveAs,
     FileOpenResponse(FilePickerResponse),
     FileSaveResponse(FilePickerResponse),
     ClearStatus,
+}
+
+impl Event {
+    /// Whether this event edits the document and therefore gets an undo step.
+    ///
+    /// Deliberately an exhaustive match (no `_` arm): adding an `Event`
+    /// variant forces a decision about whether it is undoable. Every edit is
+    /// its own step; the shell already sends one event per completed gesture
+    /// (a slot-edge drag only reports on release).
+    fn is_undoable_edit(&self) -> bool {
+        match self {
+            Event::DeleteLayer(_)
+            | Event::DuplicateLayer(_)
+            | Event::InsertLayerAfter(_)
+            | Event::MoveLayer { .. }
+            | Event::UpdateProjectName(_)
+            | Event::UpdateText { .. }
+            | Event::UpdateGroupText { .. }
+            | Event::CyclePattern { .. }
+            | Event::SetPattern { .. }
+            | Event::SplitGroupCell { .. }
+            | Event::MergeGroupCell { .. }
+            | Event::AddSlot { .. }
+            | Event::DeleteSlot { .. }
+            | Event::UpdateSlotEdge { .. } => true,
+            Event::Init
+            | Event::RequestPdfExport(..)
+            | Event::PdfExportFinished(_)
+            | Event::ToggleLanguage
+            | Event::Undo
+            | Event::Redo
+            | Event::RequestOpen
+            | Event::RequestSave
+            | Event::RequestSaveAs
+            | Event::FileOpenResponse(_)
+            | Event::FileSaveResponse(_)
+            | Event::ClearStatus => false,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -260,6 +301,8 @@ impl App for ConservationApp {
         model: &mut Self::Model,
         caps: &Self::Capabilities,
     ) -> Command<Self::Effect, Self::Event> {
+        let before = event.is_undoable_edit().then(|| model.document.clone());
+
         match event {
             Event::Init => {
                 caps.render.render();
@@ -685,6 +728,14 @@ impl App for ConservationApp {
                 }
                 caps.render.render();
             }
+            Event::Undo => {
+                model.history.undo(&mut model.document);
+                caps.render.render();
+            }
+            Event::Redo => {
+                model.history.redo(&mut model.document);
+                caps.render.render();
+            }
             Event::ToggleLanguage => {
                 model.language = match model.language {
                     crate::i18n::Language::English => crate::i18n::Language::Polish,
@@ -737,6 +788,7 @@ impl App for ConservationApp {
                                 model.next_id =
                                     doc.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
                                 model.document = doc;
+                                model.history.clear();
                                 model.current_file_path = Some(path.clone());
                                 model.last_error = Some(StatusMessage::Info(format!(
                                     "{}{}",
@@ -788,6 +840,10 @@ impl App for ConservationApp {
                 caps.render.render();
             }
         }
+
+        if let Some(before) = before {
+            model.history.record(before, &model.document, None);
+        }
         Command::done()
     }
 
@@ -800,6 +856,8 @@ impl App for ConservationApp {
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
             translations: t,
+            can_undo: model.history.can_undo(),
+            can_redo: model.history.can_redo(),
         }
     }
 }
@@ -921,5 +979,119 @@ mod tests {
             "Iron Age"
         );
         assert_eq!(vm.rows[2].chronological_phase.as_ref().unwrap().span, 1);
+    }
+
+    // ---- undo / redo -------------------------------------------------
+
+    fn end_pct(core: &Core<ConservationApp>) -> f32 {
+        core.view().document.rows[0].graphical_representation.slots[0].end_pct
+    }
+
+    fn drag_end_edge(core: &Core<ConservationApp>, pct: f32) {
+        let _ = core.process_event(Event::UpdateSlotEdge {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            slot_index: 0,
+            edge: SlotEdge::End,
+            new_pct: pct,
+        });
+    }
+
+    #[test]
+    fn undo_redo_round_trip() {
+        let core = Core::<ConservationApp>::default();
+        let original = core.view().document;
+        assert!(!core.view().can_undo);
+
+        let _ = core.process_event(Event::DeleteLayer(1));
+        let _ = core.process_event(Event::InsertLayerAfter(None));
+        let edited = core.view().document;
+        assert_ne!(edited, original);
+        assert!(core.view().can_undo);
+        assert!(!core.view().can_redo);
+
+        let _ = core.process_event(Event::Undo);
+        let _ = core.process_event(Event::Undo);
+        assert_eq!(core.view().document, original);
+        assert!(!core.view().can_undo);
+        assert!(core.view().can_redo);
+
+        let _ = core.process_event(Event::Redo);
+        let _ = core.process_event(Event::Redo);
+        assert_eq!(core.view().document, edited);
+        assert!(!core.view().can_redo);
+
+        // Extra undo/redo at the ends are harmless no-ops.
+        let _ = core.process_event(Event::Redo);
+        assert_eq!(core.view().document, edited);
+    }
+
+    #[test]
+    fn no_op_and_non_document_events_are_not_recorded() {
+        let core = Core::<ConservationApp>::default();
+        let _ = core.process_event(Event::ToggleLanguage);
+        let _ = core.process_event(Event::ClearStatus);
+        // `UpdateText` ignores group fields, so this changes nothing.
+        let _ = core.process_event(Event::UpdateText {
+            id: 1,
+            field: EditableField::ChronologicalPhase,
+            new_value: "x".into(),
+        });
+        let _ = core.process_event(Event::DeleteLayer(999));
+        assert!(!core.view().can_undo);
+    }
+
+    #[test]
+    fn new_edit_after_undo_discards_redo() {
+        let core = Core::<ConservationApp>::default();
+        let _ = core.process_event(Event::UpdateProjectName("A".into()));
+        let _ = core.process_event(Event::Undo);
+        assert!(core.view().can_redo);
+        let _ = core.process_event(Event::UpdateProjectName("B".into()));
+        assert!(!core.view().can_redo);
+    }
+
+    #[test]
+    fn each_slot_drag_is_its_own_undo_step() {
+        let core = Core::<ConservationApp>::default();
+        assert_eq!(end_pct(&core), 75.0);
+
+        // The bar reports once per completed drag, so two drags of the same
+        // edge must stay two steps.
+        drag_end_edge(&core, 80.0);
+        drag_end_edge(&core, 90.0);
+        assert_eq!(end_pct(&core), 90.0);
+
+        let _ = core.process_event(Event::Undo);
+        assert_eq!(end_pct(&core), 80.0);
+        let _ = core.process_event(Event::Undo);
+        assert_eq!(end_pct(&core), 75.0);
+        assert!(!core.view().can_undo);
+    }
+
+    #[test]
+    fn undo_never_reuses_layer_ids() {
+        let core = Core::<ConservationApp>::default();
+        let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
+        assert_eq!(core.view().document.rows[2].id, 3);
+        let _ = core.process_event(Event::Undo);
+        let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
+        assert_eq!(core.view().document.rows[2].id, 4);
+    }
+
+    #[test]
+    fn opening_a_file_clears_history() {
+        let core = Core::<ConservationApp>::default();
+        let _ = core.process_event(Event::DeleteLayer(1));
+        assert!(core.view().can_undo);
+
+        let content = serde_json::to_string(&AppState::default().document).unwrap();
+        let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+            path: "other.json".into(),
+            content,
+        }));
+        assert!(!core.view().can_undo);
+        assert!(!core.view().can_redo);
+        assert_eq!(core.view().document.rows.len(), 2);
     }
 }

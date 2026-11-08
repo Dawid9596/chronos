@@ -2,10 +2,11 @@ use crate::context::{AppContext, MenuLabels};
 use crate::settings::Settings;
 use crate::shortcuts::{Action, ShortcutRegistry};
 use crate::tool::Tool;
+use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
 use chronos::i18n::Language;
 use crux_core::Core;
-use gtk4::glib;
+use gtk4::{Align, glib};
 use gtk4::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -65,6 +66,17 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let t = &core.view().translations;
 
     let ctx_holder: Rc<RefCell<Option<AppContext>>> = Rc::new(RefCell::new(None));
+
+    // Lets widgets built before `AppContext` exists (menu rows, history buttons)
+    // send core events the same way the rest of the window does.
+    let send_event: Rc<dyn Fn(Event)> = {
+        let holder = ctx_holder.clone();
+        Rc::new(move |event| {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                defer_event(ctx, event);
+            }
+        })
+    };
 
     // --- Menu Bar (File, Edit, About, Help) ---
     let menu_bar = gtk4::Box::builder()
@@ -186,6 +198,25 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .margin_end(4)
         .build();
 
+    let (undo_item, edit_undo_lbl) = build_menu_row(
+        &t.menu_undo,
+        Some((&*shortcuts, Action::Undo)),
+        &edit_popover,
+        {
+            let send = send_event.clone();
+            move || send(Event::Undo)
+        },
+    );
+    let (redo_item, edit_redo_lbl) = build_menu_row(
+        &t.menu_redo,
+        Some((&*shortcuts, Action::Redo)),
+        &edit_popover,
+        {
+            let send = send_event.clone();
+            move || send(Event::Redo)
+        },
+    );
+
     let (canvas_item, edit_canvas_lbl) =
         build_menu_row(&t.menu_canvas_params, None, &edit_popover, {
             let holder = ctx_holder.clone();
@@ -215,6 +246,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             }
         });
 
+    edit_vbox.append(&undo_item);
+    edit_vbox.append(&redo_item);
+    edit_vbox.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
     edit_vbox.append(&canvas_item);
     edit_vbox.append(&prefs_item);
     edit_vbox.append(&shortcuts_item);
@@ -274,6 +308,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         file_save: file_save_lbl,
         file_save_as: file_save_as_lbl,
         file_export: file_export_lbl,
+        edit_undo: edit_undo_lbl,
+        edit_redo: edit_redo_lbl,
         edit_canvas: edit_canvas_lbl,
         edit_prefs: edit_prefs_lbl,
         edit_shortcuts: edit_shortcuts_lbl,
@@ -466,6 +502,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .orientation(gtk4::Orientation::Horizontal)
         .spacing(12)
         .build();
+    left_box.set_halign(Align::End);
+    left_box.set_valign(Align::Start);
     left_box.append(&lang_btn);
     left_box.append(&settings_btn);
     left_box.append(&export_btn);
@@ -473,6 +511,15 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let top_bar = gtk4::CenterBox::new();
     top_bar.set_start_widget(Some(&left_box));
     top_bar.set_center_widget(Some(&tool_section));
+
+    let history_buttons = Rc::new(HistoryButtons::new(
+        &shortcuts,
+        t,
+        send_event.clone(),
+        undo_item.clone(),
+        redo_item.clone(),
+    ));
+    top_bar.set_end_widget(Some(history_buttons.widget()));
 
     let status_stack = gtk4::Stack::new();
     status_stack.set_transition_type(gtk4::StackTransitionType::None);
@@ -605,6 +652,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         flag_area,
         tool_labels: Rc::new(tool_labels),
         tool_buttons: Rc::new(tool_buttons),
+        history_buttons: history_buttons.clone(),
         shortcuts: shortcuts.clone(),
         menu_labels,
         scrolled_window: scrolled_window.clone(),
@@ -724,6 +772,8 @@ fn run_action(ctx: &AppContext, action: Action) {
         Action::Open => defer_event(ctx, Event::RequestOpen),
         Action::Save => defer_event(ctx, Event::RequestSave),
         Action::SaveAs => defer_event(ctx, Event::RequestSaveAs),
+        Action::Undo => defer_event(ctx, Event::Undo),
+        Action::Redo => defer_event(ctx, Event::Redo),
         Action::Export => {
             let flags = ctx.vis.borrow().flags;
             let canvas_params = ctx.canvas_params.borrow().clone();

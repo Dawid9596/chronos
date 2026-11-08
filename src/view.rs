@@ -137,4 +137,6 @@ pub struct AppViewModel {
     pub last_error: Option<StatusMessage>,
     pub is_exporting: bool,
     pub translations: Translations,
+    pub can_undo: bool,
+    pub can_redo: bool,
 }

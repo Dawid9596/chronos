@@ -1,6 +1,7 @@
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutRegistry;
 use crate::tool::Tool;
+use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::ConservationApp;
 use chronos::i18n::{Language, Translations};
 use crux_core::Core;
@@ -35,6 +36,8 @@ pub struct MenuLabels {
     pub file_save: Label,
     pub file_save_as: Label,
     pub file_export: Label,
+    pub edit_undo: Label,
+    pub edit_redo: Label,
     pub edit_canvas: Label,
     pub edit_prefs: Label,
     pub edit_shortcuts: Label,
@@ -50,6 +53,8 @@ impl MenuLabels {
         self.file_save.set_text(&t.menu_save);
         self.file_save_as.set_text(&t.menu_save_as);
         self.file_export.set_text(&t.menu_export);
+        self.edit_undo.set_text(&t.menu_undo);
+        self.edit_redo.set_text(&t.menu_redo);
         self.edit_canvas.set_text(&t.menu_canvas_params);
         self.edit_prefs.set_text(&t.menu_preferences);
         self.edit_shortcuts.set_text(&t.menu_shortcuts);
@@ -72,6 +77,9 @@ pub struct AppContext {
     /// One toggle per toolbar tool family; used by the tool shortcuts so the
     /// toolbar highlight and variant pickers stay in sync with `tool`.
     pub tool_buttons: Rc<Vec<(Tool, ToggleButton)>>,
+    /// Undo / redo buttons to the right of the screen.
+    /// Enabled state refreshed by AppViewModel::{can_undo, can_redo}.
+    pub history_buttons: Rc<HistoryButtons>,
     pub shortcuts: Rc<ShortcutRegistry>,
     pub menu_labels: Rc<MenuLabels>,
     pub scrolled_window: ScrolledWindow,

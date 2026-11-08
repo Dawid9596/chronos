@@ -452,8 +452,9 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
         .margin_end(18)
         .build();
 
-    let sections: [(&str, &[Action]); 2] = [
+    let sections: [(&str, &[Action]); 3] = [
         (t.menu_file.as_str(), &Action::FILE[..]),
+        (t.menu_edit.as_str(), &Action::EDIT[..]),
         (t.shortcuts_section_tools.as_str(), &Action::TOOLS[..]),
     ];
     for (title, actions) in sections {

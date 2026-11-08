@@ -1,6 +1,7 @@
 pub mod bridge;
 pub mod context;
 pub mod generate_pdf;
+pub mod history;
 pub mod i18n;
 pub mod patterns;
 pub mod storage;

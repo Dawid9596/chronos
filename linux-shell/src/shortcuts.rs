@@ -20,6 +20,8 @@ pub enum Action {
     Save,
     SaveAs,
     Export,
+    Undo,
+    Redo,
     ToolEdit,
     ToolCreate,
     ToolDelete,
@@ -32,6 +34,9 @@ pub enum Action {
 impl Action {
     pub const FILE: [Action; 4] = [Action::Open, Action::Save, Action::SaveAs, Action::Export];
 
+    /// Document history; listed under the "Edit" heading in the shortcuts dialog.
+    pub const EDIT: [Action; 2] = [Action::Undo, Action::Redo];
+
     /// Must stay in the same order as `Tool::TOOLBAR_DEFAULTS`.
     pub const TOOLS: [Action; 7] = [
         Action::ToolEdit,
@@ -43,11 +48,13 @@ impl Action {
         Action::ToolMerge,
     ];
 
-    pub const ALL: [Action; 11] = [
+    pub const ALL: [Action; 13] = [
         Action::Open,
         Action::Save,
         Action::SaveAs,
         Action::Export,
+        Action::Undo,
+        Action::Redo,
         Action::ToolEdit,
         Action::ToolCreate,
         Action::ToolDelete,
@@ -63,6 +70,8 @@ impl Action {
             Action::Save => "save",
             Action::SaveAs => "save_as",
             Action::Export => "export",
+            Action::Undo => "undo",
+            Action::Redo => "redo",
             Action::ToolEdit => "tool_edit",
             Action::ToolCreate => "tool_create",
             Action::ToolDelete => "tool_delete",
@@ -83,6 +92,8 @@ impl Action {
             Action::Save => "<Control>s",
             Action::SaveAs => "<Control><Shift>s",
             Action::Export => "<Control>e",
+            Action::Undo => "<Control>z",
+            Action::Redo => "<Control><Shift>z",
             Action::ToolEdit => "e",
             Action::ToolCreate => "c",
             Action::ToolDelete => "d",
@@ -96,7 +107,11 @@ impl Action {
     /// Ensures a shorcut needs a modifier as bare keys
     /// are too easy to press accidentally.
     pub fn needs_modifier(self) -> bool {
-        Self::FILE.contains(&self)
+        Self::FILE.contains(&self) || Self::EDIT.contains(&self)
+    }
+
+    pub fn defers_to_text_input(self) -> bool {
+        Self::EDIT.contains(&self)
     }
 
     pub fn tool(self) -> Option<Tool> {
@@ -120,6 +135,8 @@ impl Action {
             Action::Save => t.menu_save.to_string(),
             Action::SaveAs => t.menu_save_as.to_string(),
             Action::Export => t.menu_export.to_string(),
+            Action::Undo => t.menu_undo.to_string(),
+            Action::Redo => t.menu_redo.to_string(),
             _ => self
                 .tool()
                 .map(|tool| tool.label(t).to_string())
@@ -288,7 +305,7 @@ impl ShortcutRegistry {
         let default = self.defaults[&action].clone();
         self.try_set(action, &default)
     }
-    
+
     /// Restore default for all.
     pub fn reset_all(&self) {
         *self.bindings.borrow_mut() = self.defaults.clone();
@@ -341,7 +358,9 @@ impl ShortcutRegistry {
                     .get(&action)
                     .map(|accel| !has_command_modifier(accel))
                     .unwrap_or(true);
-                if (is_tool || is_plain_key) && text_input_has_focus(&win_weak) {
+                if (is_tool || is_plain_key || action.defers_to_text_input())
+                    && text_input_has_focus(&win_weak)
+                {
                     return glib::Propagation::Proceed;
                 }
                 dispatch(action);
@@ -409,6 +428,21 @@ mod tests {
 
         // Letter case and spelling are normalised.
         assert_eq!(normalize("<Control>O"), normalize("<ctrl>o"));
+
+        // Undo/redo: bound by default, need a modifier, don't clash with anything.
+        assert_eq!(reg.label(Action::Undo), "Ctrl+Z");
+        let redo = reg.label(Action::Redo);
+        assert!(redo.contains("Shift") && redo.contains("Ctrl") && redo.ends_with('Z'));
+        assert_eq!(
+            reg.try_set(Action::Undo, "z"),
+            Err(AssignError::NeedsModifier)
+        );
+        assert_eq!(
+            reg.try_set(Action::Redo, "<Control>z"),
+            Err(AssignError::Conflict(Action::Undo))
+        );
+        assert!(Action::Undo.defers_to_text_input() && !Action::Open.defers_to_text_input());
+        assert_eq!(Action::from_id("redo"), Some(Action::Redo));
 
         // Validation.
         assert_eq!(

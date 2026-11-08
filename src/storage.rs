@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::history::History;
 use crate::i18n::Language;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -39,6 +40,7 @@ pub struct AppState {
     pub is_exporting: bool,
     pub language: Language,
     pub current_file_path: Option<String>,
+    pub history: History<ConservationDocument>,
 }
 
 impl Default for AppState {
@@ -101,18 +103,19 @@ impl Default for AppState {
             is_exporting: false,
             language: Language::English,
             current_file_path: None,
+            history: History::default(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ConservationDocument {
     pub project_name: String,
     pub date: String,
     pub entries: Vec<ConservationEntry>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ConservationEntry {
     pub id: u32,
     pub graphical_representation: ConditionBar,
