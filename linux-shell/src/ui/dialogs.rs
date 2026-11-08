@@ -85,6 +85,19 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     padding_row.append(&padding_spin);
     vbox.append(&padding_row);
 
+    // Bar / Pattern Cell Padding
+    let bar_padding_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
+    let bar_padding_lbl = gtk4::Label::builder()
+        .label(&t.dialog_bar_padding)
+        .halign(gtk4::Align::Start)
+        .hexpand(true)
+        .build();
+    let bar_padding_spin = gtk4::SpinButton::with_range(0.0, 20.0, 0.5);
+    bar_padding_spin.set_value(params.bar_padding_mm);
+    bar_padding_row.append(&bar_padding_lbl);
+    bar_padding_row.append(&bar_padding_spin);
+    vbox.append(&bar_padding_row);
+
     // Zero-Width Line
     let zero_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let zero_lbl = gtk4::Label::builder()
@@ -103,6 +116,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let landscape_check_clone = landscape_check.clone();
     let margin_spin_clone = margin_spin.clone();
     let padding_spin_clone = padding_spin.clone();
+    let bar_padding_spin_clone = bar_padding_spin.clone();
     let zero_spin_clone = zero_spin.clone();
     let mut col_checks = Vec::new();
     let mut col_spins = Vec::new();
@@ -133,6 +147,12 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     padding_spin.connect_value_changed(move |s| {
         ctx_padding.canvas_params.borrow_mut().cell_padding_mm = s.value();
         ctx_padding.persist_settings();
+    });
+
+    let ctx_bar_padding = ctx.clone();
+    bar_padding_spin.connect_value_changed(move |s| {
+        ctx_bar_padding.canvas_params.borrow_mut().bar_padding_mm = s.value();
+        ctx_bar_padding.persist_settings();
     });
 
     let ctx_zero = ctx.clone();
@@ -218,6 +238,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let landscape_check_clone2 = landscape_check_clone.clone();
     let margin_spin_clone2 = margin_spin_clone.clone();
     let padding_spin_clone2 = padding_spin_clone.clone();
+    let bar_padding_spin_clone2 = bar_padding_spin_clone.clone();
     let zero_spin_clone2 = zero_spin_clone.clone();
     let col_checks2 = col_checks.clone();
     let col_spins2 = col_spins.clone();
@@ -229,6 +250,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         landscape_check_clone2.set_active(default_params.landscape);
         margin_spin_clone2.set_value(default_params.page_margin_mm);
         padding_spin_clone2.set_value(default_params.cell_padding_mm);
+        bar_padding_spin_clone2.set_value(default_params.bar_padding_mm);
         zero_spin_clone2.set_value(default_params.zero_width_line_pt);
         for i in 0..7 {
             col_checks2[i].set_active(true);

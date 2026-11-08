@@ -102,6 +102,7 @@ impl Settings {
         }
         self.canvas.page_margin_mm = self.canvas.page_margin_mm.clamp(5.0, 50.0);
         self.canvas.cell_padding_mm = self.canvas.cell_padding_mm.clamp(0.0, 20.0);
+        self.canvas.bar_padding_mm = self.canvas.bar_padding_mm.clamp(0.0, 20.0);
         self.canvas.zero_width_line_pt = self.canvas.zero_width_line_pt.clamp(0.1, 5.0);
         for r in self.canvas.column_ratios.iter_mut() {
             *r = (*r).clamp(1, 100);

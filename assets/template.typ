@@ -11,40 +11,27 @@
   #line(start: (0pt, 5pt), end: (5pt, 0pt), stroke: 0.5pt + black)
   #line(start: (0pt, 0pt), end: (5pt, 5pt), stroke: 0.5pt + black)
 ]
-// Bolus: rings pattern, embedded from patterns/bolus.svg (viewBox 3108x343).
-// Tile height 12pt keeps the aspect ratio of the source SVG: 12pt * 3108/343 ~= 108.5pt.
-#let bolus-hatch = pattern(size: (108.5pt, 12pt))[
-  #image("bolus.svg", width: 108.5pt, height: 12pt)
-]
-// Brick: embedded from patterns/cegla.svg (viewBox 3108x299); 12pt height keeps the aspect.
-#let brick = pattern(size: (12pt * 3108 / 299, 12pt))[
-  #image("cegla.svg", width: 12pt * 3108 / 299, height: 12pt)
-]
-// Ceramics: embedded from patterns/ceramika.svg (viewBox 2845x321); 12pt height keeps the aspect.
-#let ceramics = pattern(size: (12pt * 2845 / 321, 12pt))[
-  #image("ceramika.svg", width: 12pt * 2845 / 321, height: 12pt)
-]
-// Wood: embedded from patterns/drewno.svg (viewBox 9436x1039); 12pt height keeps the aspect.
-#let wood = pattern(size: (12pt * 9436 / 1039, 12pt))[
-  #image("drewno.svg", width: 12pt * 9436 / 1039, height: 12pt)
-]
-// #let hatch-pattern = pattern(size: (8pt, 8pt))[
-//   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
-// ]
-// #let crossed-pattern = pattern(size: (8pt, 8pt))[
-//   #line(start: (0pt, 0pt), end: (8pt, 8pt), stroke: 0.5pt + black)
-//   #line(start: (0pt, 8pt), end: (8pt, 0pt), stroke: 0.5pt + black)
-// ]
-// #let wavy-pattern = pattern(size: (12pt, 12pt))[
-//   #path(
-//     stroke: 0.5pt + black,
-//     (0pt, 6pt),
-//     (3pt, 2pt),
-//     (9pt, 10pt),
-//     (12pt, 6pt),
-//   )
-// ]
-// #let solid-pattern = rgb("555555")
+
+#let svg-tiles = (
+  bolus: ("bolus.svg", 3108 / 343),
+  brick: ("cegla.svg", 3108 / 299),
+  ceramics: ("ceramika.svg", 2845 / 321),
+  wood: ("drewno.svg", 9436 / 1039),
+)
+
+#let bar-fill(name, height) = {
+  if name == "verticalHatch" {
+    vertical-hatch
+  } else if name == "denseGrid" {
+    dense-grid
+  } else if name in svg-tiles {
+    let (file, aspect) = svg-tiles.at(name)
+    let w = height * aspect
+    pattern(size: (w, height), image(file, width: w, height: height))
+  } else {
+    none
+  }
+}
 
 // Function to rotate column header
 #let rotated-header(content) = {
@@ -55,44 +42,40 @@
 // ---------------------------------------------------------
 // Bar Renderer
 // ---------------------------------------------------------
-#let render-bar(condition) = {
-  let fill-style = if condition.pattern == "verticalHatch" { 
-    vertical-hatch 
-  } else if condition.pattern == "denseGrid" {
-    dense-grid
-  } else if condition.pattern == "bolus" {
-    bolus-hatch
-  } else if condition.pattern == "brick" {
-    brick
-  } else if condition.pattern == "ceramics" {
-    ceramics
-  } else if condition.pattern == "wood" {
-    wood
-  } else { 
-    none 
-  }
+// Height a bar contributes to its row when nothing else makes the row taller.
+#let bar-min-height = 1.2em
+#let bar-stroke = 0.5pt
 
-  box(width: 100%, height: 1.2em, stroke: 0.5pt + luma(150), {
-    for slot in condition.slots {
-      let span = slot.end_pct - slot.start_pct
-      let x0 = slot.start_pct * 1%
-      if calc.abs(span) < 0.5 {
-        place(
-          left,
-          dx: x0,
-          line(
-            start: (0pt, 0%),
-            end: (0pt, 100%),
-            stroke: (params.zero_width_line_pt * 1pt) + luma(77),
-          ),
-        )
-      } else {
-        let w = span * 1%
-        place(left, dx: x0, box(width: w, height: 100%, fill: fill-style, stroke: none))
+#let render-bar(condition) = layout(size => {
+  box(width: size.width, height: size.height, inset: bar-stroke / 2, {
+    let bar-h = size.height - bar-stroke
+    box(width: 100%, height: 100%, stroke: bar-stroke + luma(150), {
+      for slot in condition.slots {
+        let span = slot.end_pct - slot.start_pct
+        let x0 = slot.start_pct * 1%
+        if calc.abs(span) < 0.5 {
+          place(
+            left,
+            dx: x0,
+            line(
+              start: (0pt, 0%),
+              end: (0pt, 100%),
+              stroke: (params.zero_width_line_pt * 1pt) + luma(77),
+            ),
+          )
+        } else {
+          let w = span * 1%
+          place(left, dx: x0, box(
+            width: w,
+            height: 100%,
+            fill: bar-fill(condition.pattern, bar-h),
+            stroke: none,
+          ))
+        }
       }
-    }
+    })
   })
-}
+})
 
 // ---------------------------------------------------------
 // Document Layout & Table Generation
@@ -102,11 +85,12 @@
   set page(
     lower(params.paper_size),
     margin: (x: page-margin-val, y: page-margin-val),
-    flipped: params.landscape
+    flipped: params.landscape,
   )
 
   // Cell padding
   let cell-inset-val = params.cell_padding_mm * 1mm
+  let bar-inset-val = params.at("bar_padding_mm", default: params.cell_padding_mm) * 1mm
   set text(font: "Linux Libertine", size: 10pt)
   align(center)[
     #text(size: 16pt, weight: "bold")[#data.project_name] \
@@ -128,7 +112,6 @@
   }
 
   let total-ratio = if active-ratios.len() == 0 { 1 } else { active-ratios.sum() }
-  let active-columns = if active-ratios.len() == 0 { () } else { active-ratios.map(r => (r / total-ratio) * 100%) }
 
   let all-headers = (
     rotated-header(data.translations.col_no),
@@ -147,8 +130,10 @@
 
   for row in data.rows {
     if data.visible_columns.at(0) { cells.push(str(row.row_number)) }
-    if data.visible_columns.at(1) { cells.push(render-bar(row.graphical_representation)) }
-    if data.visible_columns.at(2) { cells.push(render-bar(row.woven_trim)) }
+    if data.visible_columns.at(1) {
+      cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.graphical_representation)])
+    }
+    if data.visible_columns.at(2) { cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.woven_trim)]) }
     if data.visible_columns.at(3) { cells.push(row.layer_characteristics) }
     if data.visible_columns.at(4) { cells.push(row.layer_thickness) }
 
@@ -168,14 +153,60 @@
   }
 
   if active-ratios.len() > 0 {
-    table(
-      inset: cell-inset-val,
-      columns: active-columns,
-      align: active-aligns,
-      stroke: (x, y) => if y == 0 { 1pt + black } else { 0.5pt + luma(200) },
-      fill: (x, y) => if y == 0 { luma(240) } else { none },
-      ..cells
-    )
+    layout(avail => {
+      let col-w = active-ratios.map(r => r / total-ratio * avail.width)
+      let vis = data.visible_columns
+
+      let active-index(col) = vis.slice(0, col).filter(v => v).len()
+
+      // Row heights: Size each row
+      // here, from a one-row copy of the grid (probe) in which the bar cells are a
+      // placeholder of the minimum bar height, to then give the table explicit rows.
+      let row-height(row) = {
+        let probe = ()
+        if vis.at(0) { probe.push(str(row.row_number)) }
+        if vis.at(1) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
+        if vis.at(2) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
+        if vis.at(3) { probe.push(row.layer_characteristics) }
+        if vis.at(4) { probe.push(row.layer_thickness) }
+        if vis.at(5) { probe.push([]) }
+        if vis.at(6) { probe.push([]) }
+        measure(grid(
+          columns: col-w,
+          inset: cell-inset-val,
+          align: active-aligns,
+          ..probe
+        )).height
+      }
+      let heights = data.rows.map(row-height)
+
+      // Merged cells: combined height logic
+      for (i, row) in data.rows.enumerate() {
+        for (col, key) in ((5, "chronological_phase"), (6, "dating_period")) {
+          let group = if vis.at(col) { row.at(key, default: none) } else { none }
+          if group != none {
+            let inner = col-w.at(active-index(col)) - 2 * cell-inset-val
+            let need = measure(block(width: inner, group.value)).height + 2 * cell-inset-val
+            let have = heights.slice(i, i + group.span).sum()
+            if need > have {
+              for j in range(i, i + group.span) {
+                heights.at(j) += (need - have) / group.span
+              }
+            }
+          }
+        }
+      }
+
+      table(
+        inset: cell-inset-val,
+        columns: col-w,
+        rows: (auto, ..heights),
+        align: active-aligns,
+        stroke: (x, y) => if y == 0 { 1pt + black } else { 0.5pt + luma(200) },
+        fill: (x, y) => if y == 0 { luma(240) } else { none },
+        ..cells
+      )
+    })
   }
 }
 
