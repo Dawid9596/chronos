@@ -13,6 +13,10 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Manual triggering for rehearsing/debugging without creating tags.
+  # NB: action-gh-release will then still create a release named after the
+  # commit sha — fine while debugging, just delete the draft afterwards.
+  workflow_dispatch:
 
 permissions:
   contents: write
