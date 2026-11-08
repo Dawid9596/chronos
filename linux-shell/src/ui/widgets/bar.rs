@@ -8,18 +8,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 // --- SVG-file patterns ---
-// Tile artwork is owned by chronos::patterns — the single include_bytes!
-// site shared with the PDF side. Source file names are Polish and stay
-// that way; only the in-code variants are English.
 
-/// Upper bound on distinct cached (pattern, size) tiles.
 const SVG_TILES_CACHE_MAX: usize = 64;
 
 thread_local! {
     /// Cache of ready-to-tile SVG surfaces keyed by (pattern, height).
-    /// Heights are normally constant (the DrawingArea has a fixed
-    /// height_request), but the cache is bounded anyway so it can never
-    /// grow without limit if that assumption breaks.
     static SVG_TILES: RefCell<HashMap<(usize, i32), Option<gtk4::cairo::ImageSurface>>> =
         RefCell::new(HashMap::new());
 }
@@ -47,11 +40,9 @@ fn tree_for(idx: usize) -> Option<&'static resvg::usvg::Tree> {
 }
 
 /// Rasterizes tile `idx` at exactly the bar's height into a surface that can
-/// be tiled 1:1 without any pattern matrix. The target pixel size is derived
-/// from the SVG's own viewBox (aspect ratio preserved from a rounded
-/// height), and the X/Y scales are then computed directly from those
-/// integer target dimensions, so the rendered content fills the pixmap
-/// edge-to-edge. Deriving the scales from the unrounded h and rounding
+/// be tiled 1:1 without any pattern matrix. 
+/// 
+/// Deriving the scales from the unrounded h and rounding
 /// width/height separately can leave the content up to half a pixel short
 /// of the pixmap edge, which repeats as a 1px transparent seam between
 /// tiles.
@@ -73,9 +64,6 @@ fn svg_surface_for(idx: usize, h: f64) -> Option<gtk4::cairo::ImageSurface> {
         &mut pixmap.as_mut(),
     );
 
-    // Convert Pixmap (premultiplied RGBA) into cairo ARGB32 (premultiplied
-    // B, G, R, A in memory); the pixel buffer is kept alive inside the
-    // surface's data.
     let mut argb = Vec::with_capacity(pixmap.data().len());
     for chunk in pixmap.data().as_chunks::<4>().0 {
         argb.extend_from_slice(&[chunk[2], chunk[1], chunk[0], chunk[3]]);
@@ -91,8 +79,6 @@ fn svg_surface_for(idx: usize, h: f64) -> Option<gtk4::cairo::ImageSurface> {
     .ok()
 }
 
-/// Fills the currently clipped slot rect with tile `idx`, anchored at the
-/// drawing-area origin so adjacent slots line up seamlessly.
 fn fill_svg_tile(cr: &gtk4::cairo::Context, idx: usize, x0: f64, seg_w: f64, h: f64) {
     SVG_TILES.with(|cache| {
         let key = (idx, h.round().max(1.0) as i32);
@@ -106,28 +92,18 @@ fn fill_svg_tile(cr: &gtk4::cairo::Context, idx: usize, x0: f64, seg_w: f64, h: 
             .as_ref()
         {
             Some(surface) => surface,
-            // Rasterization failed; leave the slot empty rather than
-            // panicking inside a draw handler.
             None => return,
         };
 
         let pattern = gtk4::cairo::SurfacePattern::create(surface);
         pattern.set_extend(gtk4::cairo::Extend::Repeat);
 
-        // Fill the slot rect with the pre-scaled tile. Note that
-        // cairo_set_source() locks the pattern matrix to the user-space CTM
-        // in effect at that call, so no translate/save/restore games are
-        // used here: the tile is anchored at the drawing-area origin with
-        // an identity CTM and repeats continuously. The phase shift between
-        // slots is visually irrelevant for these organic fill textures, and
-        // a shared anchor keeps adjacent slots seamlessly aligned.
         cr.rectangle(x0, 0.0, seg_w, h);
         cr.set_source(&pattern).expect("set svg tile source");
         cr.fill().expect("fill svg tile");
     });
 }
 
-/// Draws `pattern` inside the rectangle `(x0, 0.0, seg_w, h)`.
 pub fn draw_pattern_rect(
     cr: &gtk4::cairo::Context,
     pattern: &BarPattern,
@@ -166,9 +142,6 @@ pub fn build_pattern_swatch(pattern: BarPattern, width: i32, height: i32) -> gtk
     area
 }
 
-/// Handle to a live condition bar. It shares the draw handler's state, so the
-/// table can push new model values into an existing bar and just repaint it,
-/// instead of rebuilding the widget (and the whole grid around it).
 #[derive(Clone)]
 pub struct ConditionBarHandle {
     area: gtk4::DrawingArea,
@@ -178,7 +151,6 @@ pub struct ConditionBarHandle {
 }
 
 impl ConditionBarHandle {
-    /// The widget to attach to the grid.
     pub fn widget(&self) -> gtk4::DrawingArea {
         self.area.clone()
     }
