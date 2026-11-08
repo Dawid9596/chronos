@@ -7,6 +7,8 @@ Brushes in menus: show name on hover
 
 When in Paint mode ctrl + scroll to select Brush
 
+fix: scroll obfuscates Paint mode variants
+
 Modify description
 
 "Flag, settings, export pdf should have margin right"
