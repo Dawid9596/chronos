@@ -10,6 +10,7 @@ pub const ABOUT_MD: &str = concat!(
 **Version:** "#,
     env!("CARGO_PKG_VERSION"),
     r#"
+**Author:** Dawid Pawelec — uliat@protonmail.com
 
 ---
 
@@ -22,6 +23,24 @@ Conservation Editor is a stratigraphic layer and condition documentation tool.
 - **PDF Generation**: Export reports to PDF. 
 
 Need assistance? Open the [User Guide](doc:help) or jump directly to [Keyboard Shortcuts](doc:help#shortcuts).
+
+---
+
+## License {#license}
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the **GNU General Public License v3** as published by the Free Software
+Foundation (see the `LICENSE` file with the program sources). It comes without any
+warranty; see the license for details. Its complete source code is available at
+[github.com/Dawid9596/chronos](https://github.com/Dawid9596/chronos) — published with the next public release.
+
+The bar-pattern artwork embedded in exported PDFs is copyright **@kationart** and
+licensed under **CC BY-SA 4.0** (see the `patterns/LICENSE` file).
+
+**Documents you create with this program are yours.** Neither the program's
+license nor the artwork license restricts the use, publishing, or sale of the
+reports you produce; the artwork attribution shown at the end of each export
+satisfies the artwork's license.
 "#
 );
 

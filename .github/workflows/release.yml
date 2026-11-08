@@ -1,0 +1,122 @@
+# Publishes installer artifacts to the GitHub release of a `v*` tag.
+#
+# Windows intentionally reuses ./build_installer.sh: the MSI must embed a
+# matched GTK4 runtime (ucrt64 DLL scan, loader cache, glib schemas, themes), so
+# the whole build happens inside the MSYS2 UCRT64 environment rather than with
+# a runner's default MSVC toolchain.
+#
+# NB: cargo-packager puts the .msi directly in ${CARGO_TARGET_DIR:-target}/release
+# (not in a packager/ subfolder); the Linux .deb does land in release/packager/.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (msi)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      # git on Windows runners converts LF->CRLF (core.autocrlf), which breaks
+      # the bash installer script ("\r: command not found"). Disable it before
+      # checkout.
+      - name: Disable CRLF conversion for this checkout
+        run: git config --global core.autocrlf input
+        shell: pwsh
+
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-librsvg
+            mingw-w64-ucrt-x86_64-ntldd
+            mingw-w64-ucrt-x86_64-pkgconf
+            gawk
+
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
+
+      - name: Build installer
+        run: bash ./build_installer.sh
+
+      # Stage the artifacts next to the repo. cargo-packager has moved outputs
+      # around between versions (the msi lands in release/, known locally), so
+      # try both candidate locations and fail loudly if nothing was produced.
+      - name: Stage msi
+        run: |
+          mkdir -p ./dist
+          cp "$CARGO_TARGET_DIR/release/"*.msi ./dist/ 2>/dev/null \
+            || cp "$CARGO_TARGET_DIR/release/packager/"*.msi ./dist/
+        env:
+          # build_installer.sh defaults it; mirror it here for the copy step
+          CARGO_TARGET_DIR: C:/build/chronos-target
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.msi
+
+  linux:
+    name: Linux (deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # NB: ubuntu-latest (= 24.04) ships GTK 4.14; if this ever drops to an
+      # image with GTK < 4.12 the build fails because linux-shell enables the
+      # gtk4 crate's "v4_12" feature.
+      - name: Install GTK dev dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
+
+      # cargo-packager does not build anything itself (mirrors the Windows
+      # job where build_installer.sh builds first).
+      - name: Build binary
+        run: cargo build --release -p linux-shell
+
+      # The dedicated Linux config keeps the Windows metadata in Cargo.toml
+      # clean: binary name differs per platform (linux-shell vs .exe), and the
+      # deb dependency list is Ubuntu 24.04-specific. NB: `--release` is
+      # ignored when --config is passed; the config's binaries_dir points at
+      # target/release regardless.
+      - name: Package deb
+        run: cargo packager --formats deb --verbose --config Packager.linux.toml
+
+      # Same dual-location staging as the Windows job: the deb lands in
+      # target/release/packager/ on current cargo-packager, but verify loudly.
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp target/release/packager/*.deb dist/ 2>/dev/null \
+            || cp target/release/*.deb dist/
+          test -n "$(ls dist)"
+
+      - name: Stage portable binary
+        run: |
+          cp target/release/linux-shell dist/chronos-linux-x64
+          tar -czf dist/chronos-linux-x64.tar.gz -C dist chronos-linux-x64
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/*.tar.gz

@@ -17,3 +17,26 @@ pub fn typst_compile_to_bytes(view_model: &DocumentViewModel) -> Result<Vec<u8>,
 
     Ok(pdf_bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::CanvasParams;
+    use crate::i18n::Translations;
+    use crate::storage::AppState;
+
+    /// The default document must compile end to end, including the embedded
+    /// artwork attribution on the last page (guards `template.typ` changes).
+    #[test]
+    fn default_document_compiles_to_pdf_with_attribution() {
+        let state = AppState::default();
+        let view_model = state.document.to_view_model(
+            Translations::get(state.language),
+            [true; 7],
+            CanvasParams::default(),
+        );
+
+        let bytes = typst_compile_to_bytes(&view_model).expect("default document compiles");
+        assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
+    }
+}

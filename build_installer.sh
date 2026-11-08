@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BIN_NAME="linux-shell"
-export CARGO_TARGET_DIR="C:/build/chronos-target"
-EXE_UNIX_PATH="/c/build/chronos-target/release/${BIN_NAME}.exe"
+# Paths are overridable so CI can redirect them, defaults keep the local
+# layout (everything on C: so the packaging happens on a short native path).
+BIN_NAME="${BIN_NAME:-linux-shell}"
+: "${CARGO_TARGET_DIR:=C:/build/chronos-target}"
+export CARGO_TARGET_DIR
+EXE_UNIX_PATH="$(cygpath -u "$CARGO_TARGET_DIR")/release/${BIN_NAME}.exe"
 
-PKG_WORK_DIR="/c/build/chronos-pkg"
+: "${PKG_WORK_DIR:=/c/build/chronos-pkg}"
 STAGE_DIR="${PKG_WORK_DIR}/dll_stage"
 
 echo "==> 1. Compiling the release binary..."
@@ -64,4 +67,4 @@ pushd "$PKG_WORK_DIR" > /dev/null
 cargo packager --release -v
 popd > /dev/null
 
-echo "==> Done! Installer is ready in ${CARGO_TARGET_DIR}/release/packager/"
+echo "==> Done! Installer is ready in ${CARGO_TARGET_DIR}/release/"
