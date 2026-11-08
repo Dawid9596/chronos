@@ -364,13 +364,12 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let bottom_stack = gtk4::Stack::builder()
         .transition_type(gtk4::StackTransitionType::Crossfade)
-        .halign(gtk4::Align::Center)
         .build();
 
     let bottom_revealer = gtk4::Revealer::builder()
         .transition_type(gtk4::RevealerTransitionType::SlideDown)
         .reveal_child(false)
-        .halign(gtk4::Align::Center)
+        .hexpand(true)
         .child(&bottom_stack)
         .build();
 
@@ -465,7 +464,14 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     .borrow_mut()
                     .push((default_tool, inline_rev));
             } else {
-                bottom_stack.add_named(&selector_box, Some(&stack_page_name));
+                let selector_view = gtk4::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk4::PolicyType::Automatic)
+                    .vscrollbar_policy(gtk4::PolicyType::Never)
+                    .hexpand(true)
+                    .child(&selector_box)
+                    .build();
+                selector_box.set_halign(gtk4::Align::Center);
+                bottom_stack.add_named(&selector_view, Some(&stack_page_name));
             }
         }
 
@@ -496,7 +502,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     }
 
     tool_section.append(&tool_bar_row);
-    tool_section.append(&bottom_revealer);
 
     let left_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -623,6 +628,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
     container.append(&menu_bar);
     container.append(&top_bar);
+    // The variant strip lives outside the (centered) toolbar box so it can
+    // span the full window width — the toolbar no longer constrains it.
+    container.append(&bottom_revealer);
     container.append(&status_stack);
 
     let scrolled_window = gtk4::ScrolledWindow::builder()

@@ -13,7 +13,7 @@ use std::rc::Rc;
 // that way; only the in-code variants are English.
 
 /// Upper bound on distinct cached (pattern, size) tiles.
-const SVG_TILES_CACHE_MAX: usize = 16;
+const SVG_TILES_CACHE_MAX: usize = 64;
 
 thread_local! {
     /// Cache of ready-to-tile SVG surfaces keyed by (pattern, height).
@@ -137,41 +137,8 @@ pub fn draw_pattern_rect(
 ) {
     cr.rectangle(x0, 0.0, seg_w, h);
     cr.clip();
-    cr.set_source_rgb(0.3, 0.3, 0.3);
-    cr.set_line_width(1.5);
-    match pattern {
-        BarPattern::VerticalHatch => {
-            let step = 8.0;
-            let mut x = x0;
-            while x <= x0 + seg_w {
-                cr.move_to(x, 0.0);
-                cr.line_to(x, h);
-                x += step;
-            }
-            cr.stroke().expect("stroke vertical hatch");
-        }
-        BarPattern::DenseGrid => {
-            let step = 8.0;
-            let mut x = x0 - h;
-            while x <= x0 + seg_w {
-                cr.move_to(x, h);
-                cr.line_to(x + h, 0.0);
-                x += step;
-            }
-            let mut x2 = x0;
-            while x2 <= x0 + seg_w + h {
-                cr.move_to(x2, 0.0);
-                cr.line_to(x2 - h, h);
-                x2 += step;
-            }
-            cr.stroke().expect("stroke dense grid");
-        }
-        BarPattern::Bolus | BarPattern::Brick | BarPattern::Ceramics | BarPattern::Wood => {
-            let idx =
-                chronos::patterns::tile_index(pattern).expect("arm covers all SVG-backed variants");
-            fill_svg_tile(cr, idx, x0, seg_w, h);
-        }
-    }
+    let idx = chronos::patterns::tile_index(pattern);
+    fill_svg_tile(cr, idx, x0, seg_w, h);
     cr.reset_clip();
 }
 

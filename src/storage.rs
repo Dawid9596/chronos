@@ -18,12 +18,35 @@ pub struct ConditionBar {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum BarPattern {
-    VerticalHatch,
-    DenseGrid,
     Bolus,
     Brick,
     Ceramics,
     Wood,
+    Textile,
+    MetalFoil,
+    Embroidery,
+    Stone,
+    Glue,
+    Bone,
+    SprayVarnish,
+    Painting,
+    Metal,
+    Paper,
+    Patina,
+    Parchment,
+    Whitewash,
+    Leather,
+    Stucco,
+    Glaze,
+    Plasterwork,
+    Cardboard,
+    Plastic,
+    MixedThread,
+    Varnish,
+    Wax,
+    Nonwoven,
+    Mortar,
+    GoldPowder,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -53,14 +76,14 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 1,
                         graphical_representation: ConditionBar {
-                            pattern: BarPattern::VerticalHatch,
+                            pattern: BarPattern::Bolus,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 75.0,
                             }],
                         },
                         woven_trim: ConditionBar {
-                            pattern: BarPattern::VerticalHatch,
+                            pattern: BarPattern::Bolus,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 75.0,
@@ -76,14 +99,14 @@ impl Default for AppState {
                     ConservationEntry {
                         id: 2,
                         graphical_representation: ConditionBar {
-                            pattern: BarPattern::VerticalHatch,
+                            pattern: BarPattern::Bolus,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 30.0,
                             }],
                         },
                         woven_trim: ConditionBar {
-                            pattern: BarPattern::VerticalHatch,
+                            pattern: BarPattern::Bolus,
                             slots: vec![Slot {
                                 start_pct: 0.0,
                                 end_pct: 10.0,

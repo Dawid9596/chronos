@@ -4,32 +4,43 @@
 // ---------------------------------------------------------
 // Define Patterns for the Condition Bars
 // ---------------------------------------------------------
-#let vertical-hatch = pattern(size: (4pt, 10pt))[
-  #line(start: (0pt, 0pt), end: (0pt, 10pt), stroke: 0.5pt + black)
-]
-#let dense-grid = pattern(size: (5pt, 5pt))[
-  #line(start: (0pt, 5pt), end: (5pt, 0pt), stroke: 0.5pt + black)
-  #line(start: (0pt, 0pt), end: (5pt, 5pt), stroke: 0.5pt + black)
-]
-
 #let svg-tiles = (
   bolus: ("bolus.svg", 3108 / 343),
   brick: ("cegla.svg", 3108 / 299),
   ceramics: ("ceramika.svg", 2845 / 321),
   wood: ("drewno.svg", 9436 / 1039),
+  textile: ("Tkanina, płótno, pasy tapicerskie.svg", 2371 / 959),
+  metalFoil: ("folie metalowe, złocenia, srebrzenia.svg", 3107 / 351),
+  embroidery: ("haft.svg", 3108 / 343),
+  stone: ("kamień.svg", 3081 / 329),
+  glue: ("klej.svg", 3032 / 343),
+  bone: ("kość kamienie szlachetne.svg", 2961 / 329),
+  sprayVarnish: ("laserunek.svg", 609 / 341),
+  painting: ("malowidło, przemalowania, retusz.svg", 1349 / 331),
+  metal: ("metal, blacha, gwoździe.svg", 751 / 343),
+  paper: ("papier.svg", 1697 / 309),
+  patina: ("patyna.svg", 3108 / 330),
+  parchment: ("pergamin.svg", 2985 / 343),
+  whitewash: ("pobiala.svg", 3108 / 308),
+  leather: ("skora.svg", 2833 / 333),
+  stucco: ("stiuk.svg", 3028 / 343),
+  glaze: ("szkliwo.svg", 2864 / 343),
+  plasterwork: ("sztukateria, odlewy i aplikacje gipsowe.svg", 9692 / 1070),
+  cardboard: ("tektura.svg", 1752 / 343),
+  plastic: ("tworzywo sztuczne.svg", 2934 / 330),
+  mixedThread: ("watek mieszany.svg", 2801 / 338),
+  varnish: ("werniks.svg", 2918 / 347),
+  wax: ("wosk, masy dublazowe.svg", 2721 / 340),
+  nonwoven: ("włóknina.svg", 2759 / 343),
+  mortar: ("zaprawa tynk.svg", 1711 / 343),
+  goldPowder: ("zloto w proszku.svg", 3082 / 340),
 )
 
 #let bar-fill(name, height) = {
-  if name == "verticalHatch" {
-    vertical-hatch
-  } else if name == "denseGrid" {
-    dense-grid
-  } else if name in svg-tiles {
+  if name in svg-tiles {
     let (file, aspect) = svg-tiles.at(name)
     let w = height * aspect
     pattern(size: (w, height), image(file, width: w, height: height))
-  } else {
-    none
   }
 }
 

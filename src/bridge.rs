@@ -92,13 +92,36 @@ pub enum MergeDirection {
     Up,
 }
 
-pub const PATTERN_ORDER: [BarPattern; 6] = [
-    BarPattern::VerticalHatch,
-    BarPattern::DenseGrid,
+pub const PATTERN_ORDER: [BarPattern; 29] = [
     BarPattern::Bolus,
     BarPattern::Brick,
     BarPattern::Ceramics,
     BarPattern::Wood,
+    BarPattern::Textile,
+    BarPattern::MetalFoil,
+    BarPattern::Embroidery,
+    BarPattern::Stone,
+    BarPattern::Glue,
+    BarPattern::Bone,
+    BarPattern::SprayVarnish,
+    BarPattern::Painting,
+    BarPattern::Metal,
+    BarPattern::Paper,
+    BarPattern::Patina,
+    BarPattern::Parchment,
+    BarPattern::Whitewash,
+    BarPattern::Leather,
+    BarPattern::Stucco,
+    BarPattern::Glaze,
+    BarPattern::Plasterwork,
+    BarPattern::Cardboard,
+    BarPattern::Plastic,
+    BarPattern::MixedThread,
+    BarPattern::Varnish,
+    BarPattern::Wax,
+    BarPattern::Nonwoven,
+    BarPattern::Mortar,
+    BarPattern::GoldPowder,
 ];
 
 /// The pattern one step from `current` in `direction`, wrapping at both ends.
@@ -368,11 +391,11 @@ impl App for ConservationApp {
                 let new_entry = ConservationEntry {
                     id: new_id,
                     graphical_representation: ConditionBar {
-                        pattern: BarPattern::VerticalHatch,
+                        pattern: BarPattern::Bolus,
                         slots: vec![],
                     },
                     woven_trim: ConditionBar {
-                        pattern: BarPattern::VerticalHatch,
+                        pattern: BarPattern::Bolus,
                         slots: vec![],
                     },
                     layer_characteristics: String::new(),

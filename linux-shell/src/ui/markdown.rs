@@ -44,7 +44,7 @@ The top toolbar provides interactive tools for editing condition bars and cells:
 - **Edit:** Drag slot edges to resize coverage, or click a bar to cycle through patterns. Right-click cycles backward.
 - **Create:** Click inside a condition bar to insert a new slot at the cursor position.
 - **Delete:** Click an existing slot inside a condition bar to remove it.
-- **Paint:** Select one of the 6 patterns (Vertical Hatch, Dense Grid, Bolus, Brick, Ceramics, Wood) and click any bar to apply it.
+- **Paint:** Select one of the 29 patterns (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) and click any bar to apply it.
 - **Split:** Click the highlighted horizontal divider inside a merged cell to split the group at that boundary.
 - **Duplicate:** Click a row number or condition bar to duplicate the entire stratigraphic layer.
 - **Merge:** Choose **Merge Down** or **Merge Up** and click a Chronological Phase or Dating Period cell to merge it with its neighbor.
