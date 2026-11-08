@@ -93,7 +93,7 @@ impl Action {
             Action::SaveAs => "<Control><Shift>s",
             Action::Export => "<Control>e",
             Action::Undo => "<Control>z",
-            Action::Redo => "<Control><Shift>z",
+            Action::Redo => "<Control>y",
             Action::ToolEdit => "e",
             Action::ToolCreate => "c",
             Action::ToolDelete => "d",
@@ -432,7 +432,7 @@ mod tests {
         // Undo/redo: bound by default, need a modifier, don't clash with anything.
         assert_eq!(reg.label(Action::Undo), "Ctrl+Z");
         let redo = reg.label(Action::Redo);
-        assert!(redo.contains("Shift") && redo.contains("Ctrl") && redo.ends_with('Z'));
+        assert!(redo.contains("Ctrl") && redo.ends_with('Y'));
         assert_eq!(
             reg.try_set(Action::Undo, "z"),
             Err(AssignError::NeedsModifier)

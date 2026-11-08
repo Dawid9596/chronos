@@ -8,9 +8,20 @@ use gtk4::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+const PAPER_SIZES: [&str; 5] = ["A4", "A3", "A5", "us-letter", "us-legal"];
+
+fn paper_size_index(size: &str) -> u32 {
+    let normalized = size.trim().to_ascii_lowercase();
+    PAPER_SIZES
+        .iter()
+        .position(|s| s.to_ascii_lowercase() == normalized)
+        .unwrap_or(0) as u32
+}
+
 pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let view = ctx.core.view();
     let t = &view.translations;
+
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
@@ -30,7 +41,25 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let params = ctx.canvas_params.borrow().clone();
     let flags = ctx.vis.borrow().flags;
 
-    // 1. Page Margin
+    // Paper Size
+    let paper_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
+    let paper_lbl = gtk4::Label::builder()
+        .label(&t.dialog_paper_size)
+        .halign(gtk4::Align::Start)
+        .hexpand(true)
+        .build();
+    let paper_dropdown = gtk4::DropDown::from_strings(&PAPER_SIZES);
+    paper_dropdown.set_selected(paper_size_index(&params.paper_size));
+    paper_row.append(&paper_lbl);
+    paper_row.append(&paper_dropdown);
+    vbox.append(&paper_row);
+
+    // Landscape Orientation
+    let landscape_check = gtk4::CheckButton::with_label(&t.dialog_landscape);
+    landscape_check.set_active(params.landscape);
+    vbox.append(&landscape_check);
+
+    // Page Margin
     let margin_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let margin_lbl = gtk4::Label::builder()
         .label(&t.dialog_page_margin)
@@ -43,7 +72,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     margin_row.append(&margin_spin);
     vbox.append(&margin_row);
 
-    // 2. Cell Padding
+    // Cell Padding
     let padding_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let padding_lbl = gtk4::Label::builder()
         .label(&t.dialog_cell_padding)
@@ -56,7 +85,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     padding_row.append(&padding_spin);
     vbox.append(&padding_row);
 
-    // 3. Zero-Width Line
+    // Zero-Width Line
     let zero_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let zero_lbl = gtk4::Label::builder()
         .label(&t.dialog_zero_width_line)
@@ -70,14 +99,30 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     vbox.append(&zero_row);
 
     // Clone the top-level widgets to use inside the restore closure
+    let paper_dropdown_clone = paper_dropdown.clone();
+    let landscape_check_clone = landscape_check.clone();
     let margin_spin_clone = margin_spin.clone();
     let padding_spin_clone = padding_spin.clone();
     let zero_spin_clone = zero_spin.clone();
-
     let mut col_checks = Vec::new();
     let mut col_spins = Vec::new();
 
     // Connect standard handlers
+    let ctx_paper = ctx.clone();
+    paper_dropdown.connect_selected_notify(move |dd| {
+        let idx = dd.selected() as usize;
+        if let Some(&size) = PAPER_SIZES.get(idx) {
+            ctx_paper.canvas_params.borrow_mut().paper_size = size.to_string();
+            ctx_paper.persist_settings();
+        }
+    });
+
+    let ctx_landscape = ctx.clone();
+    landscape_check.connect_toggled(move |chk| {
+        ctx_landscape.canvas_params.borrow_mut().landscape = chk.is_active();
+        ctx_landscape.persist_settings();
+    });
+
     let ctx_margin = ctx.clone();
     margin_spin.connect_value_changed(move |s| {
         ctx_margin.canvas_params.borrow_mut().page_margin_mm = s.value();
@@ -125,7 +170,6 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
 
     for i in 0..7 {
         let row_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
-
         let check = gtk4::CheckButton::new();
         check.set_active(flags[i]);
 
@@ -170,6 +214,8 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .build();
 
+    let paper_dropdown_clone2 = paper_dropdown_clone.clone();
+    let landscape_check_clone2 = landscape_check_clone.clone();
     let margin_spin_clone2 = margin_spin_clone.clone();
     let padding_spin_clone2 = padding_spin_clone.clone();
     let zero_spin_clone2 = zero_spin_clone.clone();
@@ -179,20 +225,16 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
 
     restore_btn.connect_clicked(move |_| {
         let default_params = CanvasParams::default();
-        {
-            let mut params = ctx_restore.canvas_params.borrow_mut();
-            params.paper_size = default_params.paper_size.clone();
-            params.landscape = default_params.landscape;
-        }
-
+        paper_dropdown_clone2.set_selected(paper_size_index(&default_params.paper_size));
+        landscape_check_clone2.set_active(default_params.landscape);
         margin_spin_clone2.set_value(default_params.page_margin_mm);
         padding_spin_clone2.set_value(default_params.cell_padding_mm);
         zero_spin_clone2.set_value(default_params.zero_width_line_pt);
-
         for i in 0..7 {
             col_checks2[i].set_active(true);
             col_spins2[i].set_value(default_params.column_ratios[i] as f64);
         }
+        ctx_restore.persist_settings();
     });
 
     vbox.append(&restore_btn);
