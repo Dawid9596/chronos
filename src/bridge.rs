@@ -3,7 +3,7 @@ use crate::i18n::Translations;
 use crate::pdf_attachment;
 use crate::project::{ExportSettings, ProjectFile};
 use crate::storage::StatusMessage;
-use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot, MIN_GAP_PCT, SLOT_PCT_MAX};
+use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot, MIN_GAP_PCT};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -716,13 +716,13 @@ impl App for ConservationApp {
                     let prev_end = if slot_index > 0 {
                         bar.slots[slot_index - 1].end_pct
                     } else {
-                        0.0
+                        Slot::PCT_MIN
                     };
                     let next_start = bar
                         .slots
                         .get(slot_index + 1)
                         .map(|s| s.start_pct)
-                        .unwrap_or(SLOT_PCT_MAX);
+                        .unwrap_or(Slot::PCT_MAX);
 
                     if let Some(slot) = bar.slots.get_mut(slot_index) {
                         match edge {

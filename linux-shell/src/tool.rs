@@ -198,8 +198,8 @@ impl Tool {
             Tool::Edit => {
                 let mut found_hover = None;
                 for (i, slot) in slots.iter().enumerate() {
-                    let x0 = w * (slot.start_pct as f64 / 100.0);
-                    let x1 = w * (slot.end_pct as f64 / 100.0);
+                    let x0 = slot.start_x(w);
+                    let x1 = slot.end_x(w);
                     if (x - x0).abs() <= grab_zone || (x - x1).abs() <= grab_zone {
                         found_hover = Some(i);
                         break;
@@ -249,8 +249,8 @@ impl Tool {
                 let mut target = DragTarget::None;
                 let mut ambiguous = false;
                 for (i, slot) in slots.iter().enumerate() {
-                    let x0 = w * (slot.start_pct as f64 / 100.0);
-                    let x1 = w * (slot.end_pct as f64 / 100.0);
+                    let x0 = slot.start_x(w);
+                    let x1 = slot.end_x(w);
                     if (start_x - x0).abs() <= grab_zone && (start_x - x1).abs() <= grab_zone {
                         target = DragTarget::Edge {
                             slot_index: i,
@@ -280,8 +280,8 @@ impl Tool {
             Tool::Delete => {
                 let mut target = DragTarget::None;
                 for (i, slot) in slots.iter().enumerate() {
-                    let x0 = w * (slot.start_pct as f64 / 100.0);
-                    let x1 = w * (slot.end_pct as f64 / 100.0);
+                    let x0 = slot.start_x(w);
+                    let x1 = slot.end_x(w);
                     if start_x >= x0 - 5.0 && start_x <= x1 + 5.0 {
                         target = DragTarget::Slot(i);
                         break;
@@ -318,16 +318,16 @@ impl Tool {
             }
             if let Some(sx) = start_x {
                 let current_x = sx + offset_x;
-                let new_pct = (current_x / w * 100.0).clamp(0.0, 100.0) as f32;
+                let new_pct = Slot::pct_at(current_x, w);
                 let min_start = if slot_idx > 0 {
                     slots[slot_idx - 1].end_pct + MIN_GAP_PCT
                 } else {
-                    0.0
+                    Slot::PCT_MIN
                 };
                 let max_end = if slot_idx + 1 < slots.len() {
                     slots[slot_idx + 1].start_pct - MIN_GAP_PCT
                 } else {
-                    100.0
+                    Slot::PCT_MAX
                 };
                 if let Some(slot) = slots.get_mut(slot_idx) {
                     match edge {
@@ -364,7 +364,7 @@ impl Tool {
             (Tool::Create, _) => Some(Event::AddSlot {
                 id,
                 bar_type,
-                at_pct: (start_x / w * 100.0).clamp(0.0, 100.0) as f32,
+                at_pct: Slot::pct_at(start_x, w),
             }),
             (Tool::Delete, DragTarget::Slot(slot_index)) => Some(Event::DeleteSlot {
                 id,
@@ -389,7 +389,7 @@ impl Tool {
                         bar_type,
                         slot_index,
                         edge,
-                        new_pct: ((start_x + offset_x) / w * 100.0).clamp(0.0, 100.0) as f32,
+                        new_pct: Slot::pct_at(start_x + offset_x, w),
                     })
                 }
             }

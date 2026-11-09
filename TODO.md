@@ -17,4 +17,6 @@ Remove legacy buttons
 
 Display shortcuts next to respective buttons on editing shortcuts.
 
+Add option to edit description
+
 Import custom .svg patterns?

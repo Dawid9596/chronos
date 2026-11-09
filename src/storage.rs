@@ -8,14 +8,53 @@ use crate::i18n::Language;
 /// and mirrored by the shell's live-drag preview; change in one place only.
 pub const MIN_GAP_PCT: f32 = 2.0;
 
-/// Upper bound of the slot-coordinate domain: `Slot::{start_pct,end_pct}` are
-/// percentages of a bar's drawn width, i.e. `0.0..=100.0`.
-pub const SLOT_PCT_MAX: f32 = 100.0;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Slot {
+    /// Left edge, in percent of the bar's drawn width.
     pub start_pct: f32,
+    /// Right edge, in percent of the bar's drawn width.
     pub end_pct: f32,
+}
+
+impl Slot {
+    pub const PCT_MIN: f32 = 0.0;
+    pub const PCT_MAX: f32 = 100.0;
+
+    /// Absolute x position, across a bar of width `w`, of the slot's start
+    /// edge. Inverse of [`Slot::pct_at`].
+    #[must_use]
+    pub fn start_x(self, w: f64) -> f64 {
+        pct_to_x(self.start_pct, w)
+    }
+
+    /// Same as [`Slot::start_x`] for the slot's end edge.
+    #[must_use]
+    pub fn end_x(self, w: f64) -> f64 {
+        pct_to_x(self.end_pct, w)
+    }
+
+    /// Inverse of [`Slot::start_x`]/[`Slot::end_x`]: the percentage position
+    /// across a bar of width `w` for an absolute `x` (e.g. a pointer
+    /// coordinate). Values beyond the bar clamp to the domain edges.
+    #[must_use]
+    pub fn pct_at(x: f64, w: f64) -> f32 {
+        x_to_pct(x, w)
+    }
+}
+
+/// Converts a slot-domain percentage (see [`Slot::PCT_MIN`]) into an absolute
+/// x coordinate across a bar of width `w`.
+#[must_use]
+fn pct_to_x(pct: f32, w: f64) -> f64 {
+    w * (f64::from(pct) / f64::from(Slot::PCT_MAX))
+}
+
+/// Inverse of [`pct_to_x`], clamped into the slot domain so a pointer
+/// position beyond the bar maps to the bar edge.
+#[must_use]
+fn x_to_pct(x: f64, w: f64) -> f32 {
+    (x / w * f64::from(Slot::PCT_MAX))
+        .clamp(f64::from(Slot::PCT_MIN), f64::from(Slot::PCT_MAX)) as f32
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -199,7 +238,7 @@ pub struct ConservationEntry {
 
 #[cfg(test)]
 mod tests {
-    use super::BarPattern;
+    use super::{BarPattern, Slot};
 
     /// `BarPattern::ALL` stands for the whole enum: entry `i` must be the
     /// `i`-th declared variant. Catches a re-ordered or duplicated list;
@@ -210,5 +249,21 @@ mod tests {
         for (i, pattern) in BarPattern::ALL.iter().enumerate() {
             assert_eq!(*pattern as usize, i);
         }
+    }
+
+    #[test]
+    fn pct_x_conversion_round_trips() {
+        let slot = Slot {
+            start_pct: 25.0,
+            end_pct: 75.0,
+        };
+        assert_eq!(slot.start_x(200.0), 50.0);
+        assert_eq!(slot.end_x(200.0), 150.0);
+        assert_eq!(Slot::pct_at(50.0, 200.0), 25.0);
+        assert_eq!(Slot::pct_at(150.0, 200.0), 75.0);
+
+        // Pointer positions beyond the bar clamp to the domain edges.
+        assert_eq!(Slot::pct_at(-5.0, 200.0), Slot::PCT_MIN);
+        assert_eq!(Slot::pct_at(999.0, 200.0), Slot::PCT_MAX);
     }
 }

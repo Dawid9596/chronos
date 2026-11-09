@@ -238,8 +238,8 @@ pub fn build_interactive_condition_bar(
         let current_tool = ctx_draw.tool.get();
 
         for (idx, slot) in slots.iter().enumerate() {
-            let x0 = w * (slot.start_pct as f64 / 100.0);
-            let x1 = w * (slot.end_pct as f64 / 100.0);
+            let x0 = slot.start_x(w);
+            let x1 = slot.end_x(w);
             let seg_w = (x1 - x0).max(1.5);
             let is_zero_thin = (x1 - x0).abs() < 0.5;
 
