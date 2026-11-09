@@ -7,6 +7,8 @@ Brushes in menus: show name on hover
 
 When in Paint mode ctrl + scroll to select Brush
 
+A single source of truth for clamping constants in project.rs
+
 fix: scroll obfuscates Paint mode variants
 
 Modify description

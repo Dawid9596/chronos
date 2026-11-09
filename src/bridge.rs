@@ -1,9 +1,8 @@
 use crate::context::CanvasParams;
 use crate::i18n::Translations;
+use crate::project::{ExportSettings, ProjectFile};
 use crate::storage::StatusMessage;
-use crate::storage::{
-    AppState, BarPattern, ConditionBar, ConservationDocument, ConservationEntry, Slot,
-};
+use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -15,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct ExportPdfRequest {
     pub file_name: String,
     pub view_model: crate::view::DocumentViewModel,
+    pub project_json: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -44,11 +44,13 @@ where
         &self,
         file_name: String,
         view_model: crate::view::DocumentViewModel,
+        project_json: Option<String>,
         on_complete: impl Fn(ExportPdfResponse) -> Ev + Send + Sync + 'static,
     ) {
         let request = ExportPdfRequest {
             file_name,
             view_model,
+            project_json,
         };
         self.context.spawn({
             let context = self.context.clone();
@@ -195,7 +197,10 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
-    RequestPdfExport([bool; 7], CanvasParams),
+    RequestPdfExport {
+        settings: ExportSettings,
+        embed_project_data: bool,
+    },
     PdfExportFinished(ExportPdfResponse),
     DeleteLayer(u32),
     DuplicateLayer(u32),
@@ -255,8 +260,8 @@ pub enum Event {
     Undo,
     Redo,
     RequestOpen,
-    RequestSave,
-    RequestSaveAs,
+    RequestSave(ExportSettings),
+    RequestSaveAs(ExportSettings),
     FileOpenResponse(FilePickerResponse),
     FileSaveResponse(FilePickerResponse),
     ClearStatus,
@@ -286,19 +291,25 @@ impl Event {
             | Event::DeleteSlot { .. }
             | Event::UpdateSlotEdge { .. } => true,
             Event::Init
-            | Event::RequestPdfExport(..)
+            | Event::RequestPdfExport { .. }
             | Event::PdfExportFinished(_)
             | Event::ToggleLanguage
             | Event::Undo
             | Event::Redo
             | Event::RequestOpen
-            | Event::RequestSave
-            | Event::RequestSaveAs
+            | Event::RequestSave(_)
+            | Event::RequestSaveAs(_)
             | Event::FileOpenResponse(_)
             | Event::FileSaveResponse(_)
             | Event::ClearStatus => false,
         }
     }
+}
+
+fn is_pdf_path(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
 }
 
 #[derive(Default)]
@@ -330,16 +341,23 @@ impl App for ConservationApp {
             Event::Init => {
                 caps.render.render();
             }
-            Event::RequestPdfExport(visible_columns, canvas_params) => {
+            Event::RequestPdfExport {
+                settings,
+                embed_project_data,
+            } => {
                 model.is_exporting = true;
                 model.last_error = None;
                 // Trigger an immediate UI render so the export button disables and shows "Exporting..."
                 caps.render.render();
 
                 let t = Translations::get(model.language);
-                let view_model = model
-                    .document
-                    .to_view_model(t, visible_columns, canvas_params);
+                let project_json = embed_project_data.then(|| {
+                    ProjectFile::new(model.document.clone(), settings.clone()).to_json()
+                });
+                let view_model =
+                    model
+                        .document
+                        .to_view_model(t, settings.visible_columns, settings.canvas);
                 let safe_stem: String = model
                     .document
                     .project_name
@@ -354,8 +372,12 @@ impl App for ConservationApp {
                     .collect();
                 let file_name = format!("{}.pdf", safe_stem.trim());
 
-                caps.export_pdf
-                    .export(file_name, view_model, Event::PdfExportFinished);
+                caps.export_pdf.export(
+                    file_name,
+                    view_model,
+                    project_json,
+                    Event::PdfExportFinished,
+                );
             }
             Event::PdfExportFinished(response) => {
                 model.is_exporting = false;
@@ -771,13 +793,13 @@ impl App for ConservationApp {
                 caps.file_picker.pick(
                     FilePickerRequest::OpenFile {
                         title: t.dialog_open_title,
-                        filter_name: t.filter_json_name,
+                        filter_name: t.filter_project_name,
                     },
                     Event::FileOpenResponse,
                 );
             }
-            Event::RequestSave => {
-                let content = serde_json::to_string(&model.document).unwrap_or_default();
+            Event::RequestSave(settings) => {
+                let content = ProjectFile::new(model.document.clone(), settings).to_json();
                 let t = Translations::get(model.language);
                 caps.file_picker.pick(
                     FilePickerRequest::SaveFile {
@@ -789,8 +811,8 @@ impl App for ConservationApp {
                     Event::FileSaveResponse,
                 );
             }
-            Event::RequestSaveAs => {
-                let content = serde_json::to_string(&model.document).unwrap_or_default();
+            Event::RequestSaveAs(settings) => {
+                let content = ProjectFile::new(model.document.clone(), settings).to_json();
                 let t = Translations::get(model.language);
                 caps.file_picker.pick(
                     FilePickerRequest::SaveFile {
@@ -806,13 +828,17 @@ impl App for ConservationApp {
                 let t = Translations::get(model.language);
                 match response {
                     FilePickerResponse::Opened { path, content } => {
-                        match serde_json::from_str::<ConservationDocument>(&content) {
-                            Ok(doc) => {
+                        // Only the document is taken. Export settings in the file are
+                        // left for the canvas dialog's "Import from file".
+                        match ProjectFile::parse(&content) {
+                            Ok(ProjectFile { document: doc, .. }) => {
                                 model.next_id =
                                     doc.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
                                 model.document = doc;
                                 model.history.clear();
-                                model.current_file_path = Some(path.clone());
+                                // Opened from a PDF there is nothing to save back to: Save
+                                // must ask for a new JSON file, not overwrite the PDF.
+                                model.current_file_path = (!is_pdf_path(&path)).then(|| path.clone());
                                 model.last_error = Some(StatusMessage::Info(format!(
                                     "{}{}",
                                     t.status_loaded_prefix, path
@@ -1116,5 +1142,150 @@ mod tests {
         assert!(!core.view().can_undo);
         assert!(!core.view().can_redo);
         assert_eq!(core.view().document.rows.len(), 2);
+    }
+
+    // ---- project files: export embedding, save envelope, open ---------
+
+    fn settings_with(margin: f64, hidden_column: usize) -> ExportSettings {
+        let mut s = ExportSettings::default();
+        s.canvas.page_margin_mm = margin;
+        s.visible_columns[hidden_column] = false;
+        s
+    }
+
+    fn pdf_export_request(
+        core: &Core<ConservationApp>,
+        settings: ExportSettings,
+        embed: bool,
+    ) -> ExportPdfRequest {
+        core.process_event(Event::RequestPdfExport {
+            settings,
+            embed_project_data: embed,
+        })
+        .into_iter()
+        .find_map(|effect| match effect {
+            Effect::ExportPdf(request) => Some(request.operation),
+            _ => None,
+        })
+        .expect("an ExportPdf effect")
+    }
+
+    fn save_request(core: &Core<ConservationApp>, event: Event) -> FilePickerRequest {
+        core.process_event(event)
+            .into_iter()
+            .find_map(|effect| match effect {
+                Effect::FilePicker(request) => Some(request.operation),
+                _ => None,
+            })
+            .expect("a FilePicker effect")
+    }
+
+    #[test]
+    fn export_embeds_document_and_settings_when_enabled() {
+        let core = Core::<ConservationApp>::default();
+        let settings = settings_with(31.0, 2);
+        let request = pdf_export_request(&core, settings.clone(), true);
+
+        let project = ProjectFile::parse(&request.project_json.expect("embedded")).unwrap();
+        assert_eq!(project.document.project_name, "Sample Conservation Project");
+        assert_eq!(project.document.entries.len(), 2);
+        assert_eq!(project.export_settings, Some(settings));
+        assert_eq!(project.version, crate::project::PROJECT_FORMAT_VERSION);
+    }
+
+    #[test]
+    fn export_embeds_nothing_when_disabled() {
+        let core = Core::<ConservationApp>::default();
+        let request = pdf_export_request(&core, ExportSettings::default(), false);
+        assert!(request.project_json.is_none());
+    }
+
+    #[test]
+    fn export_still_uses_the_given_settings_for_layout() {
+        let core = Core::<ConservationApp>::default();
+        let request = pdf_export_request(&core, settings_with(42.0, 5), true);
+        assert_eq!(request.view_model.canvas_params.page_margin_mm, 42.0);
+        assert!(!request.view_model.visible_columns[5]);
+    }
+
+    #[test]
+    fn save_writes_the_envelope_with_the_current_settings() {
+        let core = Core::<ConservationApp>::default();
+        let settings = settings_with(28.0, 1);
+        let FilePickerRequest::SaveFile { content, .. } =
+            save_request(&core, Event::RequestSaveAs(settings.clone()))
+        else {
+            panic!("expected SaveFile");
+        };
+        let project = ProjectFile::parse(&content).unwrap();
+        assert_eq!(project.export_settings, Some(settings));
+        assert_eq!(project.document.entries.len(), 2);
+    }
+
+    #[test]
+    fn opening_a_project_leaves_the_document_only() {
+        // A file with different export settings changes the document, and the
+        // core has nowhere to put the settings: they stay with the caller.
+        let core = Core::<ConservationApp>::default();
+        let mut doc = AppState::default().document;
+        doc.project_name = "From file".into();
+        let content = ProjectFile::new(doc, settings_with(45.0, 0)).to_json();
+        let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+            path: "p.json".into(),
+            content,
+        }));
+        assert_eq!(core.view().document.project_name, "From file");
+    }
+
+    #[test]
+    fn opened_json_becomes_the_save_target_but_a_pdf_never_does() {
+        let content = ProjectFile::new(AppState::default().document, ExportSettings::default())
+            .to_json();
+        for (path, expected) in [
+            ("/tmp/project.json", Some("/tmp/project.json")),
+            ("/tmp/report.pdf", None),
+            ("/tmp/REPORT.PDF", None),
+        ] {
+            let core = Core::<ConservationApp>::default();
+            let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+                path: path.into(),
+                content: content.clone(),
+            }));
+            let FilePickerRequest::SaveFile { path: target, .. } =
+                save_request(&core, Event::RequestSave(ExportSettings::default()))
+            else {
+                panic!("expected SaveFile");
+            };
+            assert_eq!(target.as_deref(), expected, "opened {path}");
+        }
+    }
+
+    #[test]
+    fn open_offers_pdf_files_too() {
+        let core = Core::<ConservationApp>::default();
+        let FilePickerRequest::OpenFile { filter_name, .. } = save_request(&core, Event::RequestOpen)
+        else {
+            panic!("expected OpenFile");
+        };
+        assert!(filter_name.contains("PDF"), "{filter_name}");
+    }
+
+    #[test]
+    fn newer_project_format_is_reported_not_loaded() {
+        let core = Core::<ConservationApp>::default();
+        let mut v = serde_json::to_value(ProjectFile::new(
+            AppState::default().document,
+            ExportSettings::default(),
+        ))
+        .unwrap();
+        v["version"] = serde_json::json!(crate::project::PROJECT_FORMAT_VERSION + 1);
+        let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+            path: "future.json".into(),
+            content: v.to_string(),
+        }));
+        assert!(matches!(
+            core.view().last_error,
+            Some(StatusMessage::Error(ref m)) if m.contains("newer version")
+        ));
     }
 }

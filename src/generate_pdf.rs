@@ -1,7 +1,11 @@
+use crate::pdf_attachment::attach_project_json;
 use crate::view::DocumentViewModel;
 use crate::view_model::ConservationWorld;
 
-pub fn typst_compile_to_bytes(view_model: &DocumentViewModel) -> Result<Vec<u8>, String> {
+pub fn typst_compile_to_bytes(
+    view_model: &DocumentViewModel,
+    project_json: Option<&str>,
+) -> Result<Vec<u8>, String> {
     let json_data = serde_json::to_string(view_model)
         .map_err(|e| format!("JSON serialization failed: {}", e))?;
 
@@ -15,15 +19,29 @@ pub fn typst_compile_to_bytes(view_model: &DocumentViewModel) -> Result<Vec<u8>,
     let pdf_bytes = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default())
         .map_err(|err| format!("PDF generation failed: {:?}", err))?;
 
-    Ok(pdf_bytes)
+    match project_json {
+        Some(json) => attach_project_json(&pdf_bytes, json)
+            .map_err(|e| format!("Embedding project data failed: {e}")),
+        None => Ok(pdf_bytes),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::context::CanvasParams;
-    use crate::i18n::Translations;
+    use crate::i18n::{Language, Translations};
+    use crate::pdf_attachment::{PdfProjectError, extract_project_json};
+    use crate::project::{ExportSettings, ProjectFile};
     use crate::storage::AppState;
+
+    fn sample_view_model() -> DocumentViewModel {
+        AppState::default().document.to_view_model(
+            Translations::get(Language::English),
+            [true; 7],
+            CanvasParams::default(),
+        )
+    }
 
     /// The default document must compile end to end, including the embedded
     /// artwork attribution on the last page (guards `template.typ` changes).
@@ -36,7 +54,41 @@ mod tests {
             CanvasParams::default(),
         );
 
-        let bytes = typst_compile_to_bytes(&view_model).expect("default document compiles");
+        let bytes =
+            typst_compile_to_bytes(&view_model, None).expect("default document compiles");
         assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
+    }
+
+    #[test]
+    fn exported_pdf_carries_the_project_and_reopens_it() {
+        let document = AppState::default().document;
+        let mut settings = ExportSettings::default();
+        settings.visible_columns[4] = false;
+        settings.canvas.page_margin_mm = 27.0;
+        let project = ProjectFile::new(document, settings);
+
+        let pdf = typst_compile_to_bytes(&sample_view_model(), Some(&project.to_json())).unwrap();
+        assert!(pdf.starts_with(b"%PDF"));
+
+        let json = extract_project_json(&pdf).unwrap();
+        assert_eq!(ProjectFile::parse(&json).unwrap(), project);
+    }
+
+    #[test]
+    fn attaching_does_not_damage_the_report() {
+        let plain = typst_compile_to_bytes(&sample_view_model(), None).unwrap();
+        let with = typst_compile_to_bytes(&sample_view_model(), Some("{}")).unwrap();
+        let pages = |bytes: &[u8]| lopdf::Document::load_mem(bytes).unwrap().get_pages().len();
+        assert_eq!(pages(&plain), 1);
+        assert_eq!(pages(&with), pages(&plain));
+    }
+
+    #[test]
+    fn pdf_without_embedding_has_no_project_data() {
+        let pdf = typst_compile_to_bytes(&sample_view_model(), None).unwrap();
+        assert_eq!(
+            extract_project_json(&pdf),
+            Err(PdfProjectError::NoProjectData)
+        );
     }
 }

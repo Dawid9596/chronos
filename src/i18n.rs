@@ -51,6 +51,7 @@ pub struct Translations {
     pub dialog_open_title: String,
     pub dialog_save_title: String,
     pub filter_json_name: String,
+    pub filter_project_name: String,
     pub dialog_restore_defaults: String,
     pub dialog_close: String,
     // Canvas Parameters & Preferences Dialogs
@@ -62,6 +63,8 @@ pub struct Translations {
     pub dialog_zero_width_line: String,
     pub dialog_visible_columns_heading: String,
     pub dialog_interface_language: String,
+    pub dialog_embed_project_data: String,
+    pub dialog_import_from_file: String,
     // Keyboard Shortcuts Dialog & Tooltips
     pub shortcut_tooltip_prefix: String,
     pub shortcuts_section_tools: String,
@@ -83,6 +86,8 @@ pub struct Translations {
     pub error_parse_prefix: String,
     pub error_open_prefix: String,
     pub error_save_prefix: String,
+    pub error_no_project_data: String,
+    pub error_no_export_settings: String,
 }
 
 impl Translations {
@@ -126,6 +131,7 @@ impl Translations {
                 dialog_open_title: "Open File".into(),
                 dialog_save_title: "Save File".into(),
                 filter_json_name: "JSON Files".into(),
+                filter_project_name: "Project files (JSON, PDF)".into(),
                 dialog_restore_defaults: "Restore Defaults".into(),
                 dialog_close: "Close".into(),
                 dialog_paper_size: "Paper Size:".into(),
@@ -136,6 +142,8 @@ impl Translations {
                 dialog_zero_width_line: "Zero-Width Line (pt):".into(),
                 dialog_visible_columns_heading: "Visible Output Columns & Ratios".into(),
                 dialog_interface_language: "Interface Language:".into(),
+                dialog_embed_project_data: "Embed project data in PDF".into(),
+                dialog_import_from_file: "Import from file...".into(),
                 shortcut_tooltip_prefix: "Shortcut: ".into(),
                 shortcuts_section_tools: "Tools".into(),
                 shortcuts_section_fixed: "Fixed".into(),
@@ -155,6 +163,8 @@ impl Translations {
                 error_parse_prefix: "Error parsing file: ".into(),
                 error_open_prefix: "Error opening file: ".into(),
                 error_save_prefix: "Error saving file: ".into(),
+                error_no_project_data: "This PDF has no embedded project data. Only PDFs exported with project data embedded can be opened.".into(),
+                error_no_export_settings: "This file contains no export settings.".into(),
             },
             Language::Polish => Self {
                 language: Language::Polish,
@@ -194,6 +204,7 @@ impl Translations {
                 dialog_open_title: "Otwórz plik".into(),
                 dialog_save_title: "Zapisz plik".into(),
                 filter_json_name: "Pliki JSON".into(),
+                filter_project_name: "Pliki projektu (JSON, PDF)".into(),
                 dialog_restore_defaults: "Przywróć domyślne".into(),
                 dialog_close: "Zamknij".into(),
                 dialog_paper_size: "Format papieru:".into(),
@@ -204,6 +215,8 @@ impl Translations {
                 dialog_zero_width_line: "Linia zerowej szerokości (pt):".into(),
                 dialog_visible_columns_heading: "Widoczne kolumny wyjściowe i proporcje".into(),
                 dialog_interface_language: "Język interfejsu:".into(),
+                dialog_embed_project_data: "Osadź dane projektu w PDF".into(),
+                dialog_import_from_file: "Importuj z pliku...".into(),
                 shortcut_tooltip_prefix: "Skrót: ".into(),
                 shortcuts_section_tools: "Narzędzia".into(),
                 shortcuts_section_fixed: "Stałe".into(),
@@ -223,6 +236,8 @@ impl Translations {
                 error_parse_prefix: "Błąd parsowania pliku: ".into(),
                 error_open_prefix: "Błąd otwierania pliku: ".into(),
                 error_save_prefix: "Błąd zapisywania pliku: ".into(),
+                error_no_project_data: "Ten plik PDF nie zawiera osadzonych danych projektu. Można otworzyć tylko pliki PDF wyeksportowane z osadzonymi danymi projektu.".into(),
+                error_no_export_settings: "Ten plik nie zawiera ustawień eksportu.".into(),
             },
         }
     }

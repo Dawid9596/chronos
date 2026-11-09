@@ -124,7 +124,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 if let Some(ctx) = holder.borrow().as_ref() {
                     let ctx_idle = ctx.clone();
                     glib::idle_add_local_once(move || {
-                        let effects = ctx_idle.core.process_event(Event::RequestSave);
+                        let event = Event::RequestSave(ctx_idle.export_settings());
+                        let effects = ctx_idle.core.process_event(event);
                         crate::effects::process_effects(&ctx_idle, effects);
                     });
                 }
@@ -142,7 +143,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 if let Some(ctx) = holder.borrow().as_ref() {
                     let ctx_idle = ctx.clone();
                     glib::idle_add_local_once(move || {
-                        let effects = ctx_idle.core.process_event(Event::RequestSaveAs);
+                        let event = Event::RequestSaveAs(ctx_idle.export_settings());
+                        let effects = ctx_idle.core.process_event(event);
                         crate::effects::process_effects(&ctx_idle, effects);
                     });
                 }
@@ -159,12 +161,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             move || {
                 if let Some(ctx) = holder.borrow().as_ref() {
                     let ctx_idle = ctx.clone();
-                    let flags = ctx_idle.vis.borrow().flags;
-                    let canvas_params = ctx_idle.canvas_params.borrow().clone();
+                    let event = ctx_idle.pdf_export_event();
                     glib::idle_add_local_once(move || {
-                        let effects = ctx_idle
-                            .core
-                            .process_event(Event::RequestPdfExport(flags, canvas_params));
+                        let effects = ctx_idle.core.process_event(event);
                         crate::effects::process_effects(&ctx_idle, effects);
                     });
                 }
@@ -652,6 +651,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         core: core.clone(),
         vis: vis.clone(),
         canvas_params,
+        embed_project_data: Rc::new(Cell::new(settings.embed_project_data.unwrap_or(true))),
         tool: tool.clone(),
         status: status_label.clone(),
         export_btn: export_btn.clone(),
@@ -734,11 +734,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let ctx_export = ctx.clone();
     export_btn.connect_clicked(move |_| {
-        let current_vis = ctx_export.vis.borrow().flags;
-        let canvas_params = ctx_export.canvas_params.borrow().clone();
-        let effects = ctx_export
-            .core
-            .process_event(Event::RequestPdfExport(current_vis, canvas_params));
+        let event = ctx_export.pdf_export_event();
+        let effects = ctx_export.core.process_event(event);
         crate::effects::process_effects(&ctx_export, effects);
     });
 
@@ -778,15 +775,11 @@ fn select_tool(ctx: &AppContext, tool: Tool) {
 fn run_action(ctx: &AppContext, action: Action) {
     match action {
         Action::Open => defer_event(ctx, Event::RequestOpen),
-        Action::Save => defer_event(ctx, Event::RequestSave),
-        Action::SaveAs => defer_event(ctx, Event::RequestSaveAs),
+        Action::Save => defer_event(ctx, Event::RequestSave(ctx.export_settings())),
+        Action::SaveAs => defer_event(ctx, Event::RequestSaveAs(ctx.export_settings())),
         Action::Undo => defer_event(ctx, Event::Undo),
         Action::Redo => defer_event(ctx, Event::Redo),
-        Action::Export => {
-            let flags = ctx.vis.borrow().flags;
-            let canvas_params = ctx.canvas_params.borrow().clone();
-            defer_event(ctx, Event::RequestPdfExport(flags, canvas_params));
-        }
+        Action::Export => defer_event(ctx, ctx.pdf_export_event()),
         tool_action => {
             if let Some(tool) = tool_action.tool() {
                 select_tool(ctx, tool);

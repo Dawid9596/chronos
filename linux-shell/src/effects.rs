@@ -88,10 +88,14 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 glib::spawn_future_local(async move {
                     let file_name = request.operation.file_name.clone();
                     let view_model = request.operation.view_model.clone();
+                    let project_json = request.operation.project_json.clone();
 
                     let response = gtk4::gio::spawn_blocking(move || {
-                        let pdf_bytes = chronos::generate_pdf::typst_compile_to_bytes(&view_model)
-                            .map_err(|e| format!("Error: {e}"))?;
+                        let pdf_bytes = chronos::generate_pdf::typst_compile_to_bytes(
+                            &view_model,
+                            project_json.as_deref(),
+                        )
+                        .map_err(|e| format!("Error: {e}"))?;
 
                         let save_dir = dirs::document_dir().unwrap_or_else(|| PathBuf::from("."));
                         let file_path = save_dir.join(file_name);
@@ -124,23 +128,21 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                             let dialog = gtk4::FileDialog::new();
                             dialog.set_title(title);
 
-                            let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
-                            let filter = gtk4::FileFilter::new();
-                            filter.add_pattern("*.json");
-                            filter.add_suffix("json");
-                            filter.set_name(Some(filter_name));
-                            filters.append(&filter);
-                            dialog.set_filters(Some(&filters));
+                            dialog.set_filters(Some(&crate::ui::project_io::project_file_filters(
+                                filter_name,
+                            )));
 
                             match dialog.open_future(Some(&ctx.window)).await {
                                 Ok(file) => match file.path() {
                                     Some(path_buf) => {
                                         let path = path_buf.to_string_lossy().to_string();
-                                        match std::fs::read_to_string(&path) {
+                                        match crate::ui::project_io::read_project_text(&path_buf) {
                                             Ok(content) => {
                                                 FilePickerResponse::Opened { path, content }
                                             }
-                                            Err(e) => FilePickerResponse::Error(e.to_string()),
+                                            Err(e) => FilePickerResponse::Error(
+                                                e.describe(&ctx.core.view().translations),
+                                            ),
                                         }
                                     }
                                     None => FilePickerResponse::Error("Invalid file path".into()),

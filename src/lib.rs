@@ -4,6 +4,8 @@ pub mod generate_pdf;
 pub mod history;
 pub mod i18n;
 pub mod patterns;
+pub mod pdf_attachment;
+pub mod project;
 pub mod storage;
 pub mod view;
 pub mod view_model;

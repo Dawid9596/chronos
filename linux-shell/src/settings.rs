@@ -23,6 +23,9 @@ pub struct Settings {
     pub shortcuts: BTreeMap<String, String>,
     pub columns: ColumnVisibility,
     pub canvas: CanvasParams,
+    /// Attach the project to exported PDFs so they can be opened for editing.
+    /// `None` means the default, which is on.
+    pub embed_project_data: Option<bool>,
 }
 
 pub fn settings_path() -> Option<PathBuf> {
@@ -144,6 +147,14 @@ mod tests {
             s.canvas.page_margin_mm,
             CanvasParams::default().page_margin_mm
         );
+    }
+
+    #[test]
+    fn embedding_is_on_unless_switched_off() {
+        let s: Settings = serde_json::from_str("{}").unwrap();
+        assert!(s.embed_project_data.unwrap_or(true));
+        let s: Settings = serde_json::from_str(r#"{ "embed_project_data": false }"#).unwrap();
+        assert!(!s.embed_project_data.unwrap_or(true));
     }
 
     #[test]

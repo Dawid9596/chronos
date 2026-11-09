@@ -1,8 +1,10 @@
 use crate::context::AppContext;
 use crate::context::CanvasParams;
 use crate::shortcuts::{Action, AssignError};
+use crate::ui::project_io::{project_file_filters, read_project_text};
 use chronos::bridge::Event;
 use chronos::i18n::Language;
+use chronos::project::{ExportSettings, ProjectFile};
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::cell::{Cell, RefCell};
@@ -110,6 +112,16 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     zero_row.append(&zero_lbl);
     zero_row.append(&zero_spin);
     vbox.append(&zero_row);
+
+    // Embed the project data to exported PDFs
+    let embed_check = gtk4::CheckButton::with_label(&t.dialog_embed_project_data);
+    embed_check.set_active(ctx.embed_project_data.get());
+    let ctx_embed = ctx.clone();
+    embed_check.connect_toggled(move |c| {
+        ctx_embed.embed_project_data.set(c.is_active());
+        ctx_embed.persist_settings();
+    });
+    vbox.append(&embed_check);
 
     // Clone the top-level widgets to use inside the restore closure
     let paper_dropdown_clone = paper_dropdown.clone();
@@ -230,8 +242,6 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     // Create the Restore Defaults button
     let restore_btn = gtk4::Button::builder()
         .label(&t.dialog_restore_defaults)
-        .margin_top(12)
-        .halign(gtk4::Align::Start)
         .build();
 
     let paper_dropdown_clone2 = paper_dropdown_clone.clone();
@@ -243,6 +253,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let col_checks2 = col_checks.clone();
     let col_spins2 = col_spins.clone();
     let ctx_restore = ctx.clone();
+    let embed_restore = embed_check.clone();
 
     restore_btn.connect_clicked(move |_| {
         let default_params = CanvasParams::default();
@@ -256,10 +267,39 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
             col_checks2[i].set_active(true);
             col_spins2[i].set_value(default_params.column_ratios[i] as f64);
         }
+        embed_restore.set_active(true);
         ctx_restore.persist_settings();
     });
 
-    vbox.append(&restore_btn);
+    // Import the export settings
+    let import_btn = gtk4::Button::with_label(&t.dialog_import_from_file);
+    let canvas_widgets = CanvasWidgets {
+        paper: paper_dropdown.clone(),
+        landscape: landscape_check.clone(),
+        margin: margin_spin.clone(),
+        padding: padding_spin.clone(),
+        bar_padding: bar_padding_spin.clone(),
+        zero_width: zero_spin.clone(),
+        col_checks: col_checks.clone(),
+        col_spins: col_spins.clone(),
+    };
+    let ctx_import = ctx.clone();
+    let win_import = win.clone();
+    import_btn.connect_clicked(move |_| {
+        let ctx = ctx_import.clone();
+        let win = win_import.clone();
+        let widgets = canvas_widgets.clone();
+        glib::spawn_future_local(async move {
+            import_export_settings(&ctx, &win, &widgets).await;
+        });
+    });
+
+    let button_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+    button_row.set_margin_top(12);
+    button_row.set_halign(gtk4::Align::Start);
+    button_row.append(&restore_btn);
+    button_row.append(&import_btn);
+    vbox.append(&button_row);
 
     let close_btn = gtk4::Button::with_label(&t.dialog_close);
     close_btn.set_halign(gtk4::Align::End);
@@ -271,6 +311,76 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
 
     win.set_child(Some(&vbox));
     win.present();
+}
+
+#[derive(Clone)]
+struct CanvasWidgets {
+    paper: gtk4::DropDown,
+    landscape: gtk4::CheckButton,
+    margin: gtk4::SpinButton,
+    padding: gtk4::SpinButton,
+    bar_padding: gtk4::SpinButton,
+    zero_width: gtk4::SpinButton,
+    col_checks: Vec<gtk4::CheckButton>,
+    col_spins: Vec<gtk4::SpinButton>,
+}
+
+impl CanvasWidgets {
+    fn show(&self, settings: &ExportSettings) {
+        let canvas = &settings.canvas;
+        self.paper.set_selected(paper_size_index(&canvas.paper_size));
+        self.landscape.set_active(canvas.landscape);
+        self.margin.set_value(canvas.page_margin_mm);
+        self.padding.set_value(canvas.cell_padding_mm);
+        self.bar_padding.set_value(canvas.bar_padding_mm);
+        self.zero_width.set_value(canvas.zero_width_line_pt);
+        for i in 0..7 {
+            self.col_checks[i].set_active(settings.visible_columns[i]);
+            self.col_spins[i].set_value(canvas.column_ratios[i] as f64);
+        }
+    }
+}
+
+fn show_message(parent: &gtk4::Window, message: &str) {
+    gtk4::AlertDialog::builder()
+        .message(message)
+        .modal(true)
+        .build()
+        .show(Some(parent));
+}
+
+async fn import_export_settings(ctx: &AppContext, parent: &gtk4::Window, widgets: &CanvasWidgets) {
+    let t = ctx.core.view().translations;
+
+    let dialog = gtk4::FileDialog::new();
+    dialog.set_title(&t.dialog_open_title);
+    dialog.set_filters(Some(&project_file_filters(&t.filter_project_name)));
+    let Ok(file) = dialog.open_future(Some(parent)).await else {
+        return; // cancelled
+    };
+    let Some(path) = file.path() else {
+        return;
+    };
+
+    let outcome = read_project_text(&path)
+        .map_err(|e| format!("{}{}", t.error_open_prefix, e.describe(&t)))
+        .and_then(|text| {
+            ProjectFile::parse(&text).map_err(|e| format!("{}{}", t.error_parse_prefix, e))
+        })
+        .and_then(|project| {
+            project
+                .export_settings
+                .ok_or_else(|| t.error_no_export_settings.clone())
+        });
+
+    match outcome {
+        Ok(settings) => {
+            *ctx.canvas_params.borrow_mut() = settings.canvas.clone();
+            widgets.show(&settings);
+            ctx.persist_settings();
+        }
+        Err(message) => show_message(parent, &message),
+    }
 }
 
 pub fn show_preferences_dialog(ctx: &AppContext) {

@@ -2,8 +2,9 @@ use crate::settings::Settings;
 use crate::shortcuts::ShortcutRegistry;
 use crate::tool::Tool;
 use crate::ui::widgets::history_buttons::HistoryButtons;
-use chronos::bridge::ConservationApp;
+use chronos::bridge::{ConservationApp, Event};
 use chronos::i18n::{Language, Translations};
+use chronos::project::ExportSettings;
 use crux_core::Core;
 use gtk4::glib;
 use gtk4::prelude::*;
@@ -67,6 +68,8 @@ pub struct AppContext {
     pub core: Rc<Core<ConservationApp>>,
     pub vis: Rc<RefCell<ColumnVisibility>>,
     pub canvas_params: Rc<RefCell<CanvasParams>>,
+    /// Whether exported PDFs carry the project for re-opening (on by default).
+    pub embed_project_data: Rc<Cell<bool>>,
     pub tool: Rc<Cell<Tool>>,
     pub status: Label,
     pub export_btn: Button,
@@ -98,6 +101,20 @@ pub struct AppContext {
 }
 
 impl AppContext {
+    pub fn export_settings(&self) -> ExportSettings {
+        ExportSettings {
+            visible_columns: self.vis.borrow().flags,
+            canvas: self.canvas_params.borrow().clone(),
+        }
+    }
+
+    pub fn pdf_export_event(&self) -> Event {
+        Event::RequestPdfExport {
+            settings: self.export_settings(),
+            embed_project_data: self.embed_project_data.get(),
+        }
+    }
+
     /// Saves language, visible columns, canvas parameters and any customised
     /// shortcuts to the user's settings file. Cheap enough to call on every
     /// change; failures are logged and never interrupt the user.
@@ -108,6 +125,7 @@ impl AppContext {
             shortcuts: self.shortcuts.overrides(),
             columns: self.vis.borrow().clone(),
             canvas: self.canvas_params.borrow().clone(),
+            embed_project_data: Some(self.embed_project_data.get()),
         };
         if let Err(e) = settings.save() {
             eprintln!("settings: could not save: {e}");
