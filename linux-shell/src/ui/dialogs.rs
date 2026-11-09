@@ -3,14 +3,16 @@ use crate::context::CanvasParams;
 use crate::shortcuts::{Action, AssignError};
 use crate::ui::project_io::{project_file_filters, read_project_text};
 use chronos::bridge::Event;
+use chronos::context::{
+    COLUMN_COUNT, COLUMN_RATIO_RANGE, PAGE_MARGIN_MM_RANGE, PAPER_SIZES, PADDING_MM_RANGE,
+    ZERO_WIDTH_LINE_PT_RANGE,
+};
 use chronos::i18n::Language;
 use chronos::project::{ExportSettings, ProjectFile};
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-
-const PAPER_SIZES: [&str; 5] = ["A4", "A3", "A5", "us-letter", "us-legal"];
 
 fn paper_size_index(size: &str) -> u32 {
     let normalized = size.trim().to_ascii_lowercase();
@@ -68,7 +70,11 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let margin_spin = gtk4::SpinButton::with_range(5.0, 50.0, 1.0);
+    let margin_spin = gtk4::SpinButton::with_range(
+        PAGE_MARGIN_MM_RANGE.0,
+        PAGE_MARGIN_MM_RANGE.1,
+        1.0,
+    );
     margin_spin.set_value(params.page_margin_mm);
     margin_row.append(&margin_lbl);
     margin_row.append(&margin_spin);
@@ -81,7 +87,11 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let padding_spin = gtk4::SpinButton::with_range(0.0, 20.0, 0.5);
+    let padding_spin = gtk4::SpinButton::with_range(
+        PADDING_MM_RANGE.0,
+        PADDING_MM_RANGE.1,
+        0.5,
+    );
     padding_spin.set_value(params.cell_padding_mm);
     padding_row.append(&padding_lbl);
     padding_row.append(&padding_spin);
@@ -94,7 +104,11 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let bar_padding_spin = gtk4::SpinButton::with_range(0.0, 20.0, 0.5);
+    let bar_padding_spin = gtk4::SpinButton::with_range(
+        PADDING_MM_RANGE.0,
+        PADDING_MM_RANGE.1,
+        0.5,
+    );
     bar_padding_spin.set_value(params.bar_padding_mm);
     bar_padding_row.append(&bar_padding_lbl);
     bar_padding_row.append(&bar_padding_spin);
@@ -107,7 +121,11 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let zero_spin = gtk4::SpinButton::with_range(0.1, 5.0, 0.1);
+    let zero_spin = gtk4::SpinButton::with_range(
+        ZERO_WIDTH_LINE_PT_RANGE.0,
+        ZERO_WIDTH_LINE_PT_RANGE.1,
+        0.1,
+    );
     zero_spin.set_value(params.zero_width_line_pt);
     zero_row.append(&zero_lbl);
     zero_row.append(&zero_spin);
@@ -200,7 +218,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         t.col_dating.clone(),
     ];
 
-    for i in 0..7 {
+    for i in 0..COLUMN_COUNT {
         let row_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
         let check = gtk4::CheckButton::new();
         check.set_active(flags[i]);
@@ -212,7 +230,11 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
             .hexpand(true)
             .build();
 
-        let spin = gtk4::SpinButton::with_range(1.0, 100.0, 1.0);
+        let spin = gtk4::SpinButton::with_range(
+            COLUMN_RATIO_RANGE.0 as f64,
+            COLUMN_RATIO_RANGE.1 as f64,
+            1.0,
+        );
         spin.set_value(params.column_ratios[i] as f64);
 
         // Store clones for the restore button
@@ -263,7 +285,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         padding_spin_clone2.set_value(default_params.cell_padding_mm);
         bar_padding_spin_clone2.set_value(default_params.bar_padding_mm);
         zero_spin_clone2.set_value(default_params.zero_width_line_pt);
-        for i in 0..7 {
+        for i in 0..COLUMN_COUNT {
             col_checks2[i].set_active(true);
             col_spins2[i].set_value(default_params.column_ratios[i] as f64);
         }
@@ -335,7 +357,7 @@ impl CanvasWidgets {
         self.padding.set_value(canvas.cell_padding_mm);
         self.bar_padding.set_value(canvas.bar_padding_mm);
         self.zero_width.set_value(canvas.zero_width_line_pt);
-        for i in 0..7 {
+        for i in 0..COLUMN_COUNT {
             self.col_checks[i].set_active(settings.visible_columns[i]);
             self.col_spins[i].set_value(canvas.column_ratios[i] as f64);
         }

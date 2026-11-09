@@ -7,6 +7,10 @@
 //! | Windows  | `%APPDATA%\Chronos\settings.json`               |
 
 use crate::context::{CanvasParams, ColumnVisibility};
+use chronos::context::{
+    clamp_finite_range, sanitize_paper_size, COLUMN_RATIO_RANGE, PAGE_MARGIN_MM_RANGE,
+    PADDING_MM_RANGE, ZERO_WIDTH_LINE_PT_RANGE,
+};
 use chronos::i18n::Language;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -95,20 +99,14 @@ impl Settings {
     }
 
     fn sanitize(&mut self) {
-        if !matches!(
-            self.canvas.paper_size.trim().to_ascii_lowercase().as_str(),
-            "a4" | "a3" | "a5" | "us-letter" | "us-legal"
-        ) {
-            self.canvas.paper_size = "A4".to_string();
-        } else {
-            self.canvas.paper_size = self.canvas.paper_size.trim().to_string();
-        }
-        self.canvas.page_margin_mm = self.canvas.page_margin_mm.clamp(5.0, 50.0);
-        self.canvas.cell_padding_mm = self.canvas.cell_padding_mm.clamp(0.0, 20.0);
-        self.canvas.bar_padding_mm = self.canvas.bar_padding_mm.clamp(0.0, 20.0);
-        self.canvas.zero_width_line_pt = self.canvas.zero_width_line_pt.clamp(0.1, 5.0);
+        self.canvas.paper_size = sanitize_paper_size(&self.canvas.paper_size);
+        self.canvas.page_margin_mm = clamp_finite_range(self.canvas.page_margin_mm, PAGE_MARGIN_MM_RANGE);
+        self.canvas.cell_padding_mm = clamp_finite_range(self.canvas.cell_padding_mm, PADDING_MM_RANGE);
+        self.canvas.bar_padding_mm = clamp_finite_range(self.canvas.bar_padding_mm, PADDING_MM_RANGE);
+        self.canvas.zero_width_line_pt =
+            clamp_finite_range(self.canvas.zero_width_line_pt, ZERO_WIDTH_LINE_PT_RANGE);
         for r in self.canvas.column_ratios.iter_mut() {
-            *r = (*r).clamp(1, 100);
+            *r = (*r).clamp(COLUMN_RATIO_RANGE.0, COLUMN_RATIO_RANGE.1);
         }
     }
 }

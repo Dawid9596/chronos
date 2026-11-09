@@ -1,5 +1,7 @@
 use crate::{
-    context::CanvasParams,
+    context::{
+        CanvasParams, COLUMN_COUNT,
+    },
     i18n::Translations,
     storage::{ConditionBar, ConservationDocument, StatusMessage},
 };
@@ -10,7 +12,7 @@ pub struct DocumentViewModel {
     pub project_name: String,
     pub rows: Vec<RowViewModel>,
     pub translations: Translations,
-    pub visible_columns: [bool; 7],
+    pub visible_columns: [bool; COLUMN_COUNT],
     pub canvas_params: CanvasParams,
 }
 
@@ -38,7 +40,7 @@ impl ConservationDocument {
     pub fn to_view_model(
         &self,
         translations: Translations,
-        visible_columns: [bool; 7],
+        visible_columns: [bool; COLUMN_COUNT],
         canvas_params: CanvasParams,
     ) -> DocumentViewModel {
         let len = self.entries.len();

@@ -3,6 +3,15 @@ use serde::{Deserialize, Serialize};
 use crate::history::History;
 use crate::i18n::Language;
 
+/// Minimum separation, in percent of the bar width, between the edges of two
+/// neighbouring slots. Enforced by the core when inserting or resizing slots
+/// and mirrored by the shell's live-drag preview; change in one place only.
+pub const MIN_GAP_PCT: f32 = 2.0;
+
+/// Upper bound of the slot-coordinate domain: `Slot::{start_pct,end_pct}` are
+/// percentages of a bar's drawn width, i.e. `0.0..=100.0`.
+pub const SLOT_PCT_MAX: f32 = 100.0;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Slot {
     pub start_pct: f32,

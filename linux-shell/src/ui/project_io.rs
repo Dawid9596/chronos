@@ -4,7 +4,7 @@
 //! has embedded data in.
 
 use chronos::i18n::Translations;
-use chronos::pdf_attachment::{PdfProjectError, extract_project_json};
+use chronos::pdf_attachment::{PdfProjectError, extract_project_json, is_pdf_path};
 use gtk4::gio;
 use std::path::Path;
 
@@ -24,13 +24,8 @@ impl ReadProjectError {
     }
 }
 
-fn is_pdf(path: &Path) -> bool {
-    path.extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
-}
-
 pub fn read_project_text(path: &Path) -> Result<String, ReadProjectError> {
-    if is_pdf(path) {
+    if is_pdf_path(path) {
         let bytes = std::fs::read(path).map_err(|e| ReadProjectError::Io(e.to_string()))?;
         extract_project_json(&bytes).map_err(ReadProjectError::Pdf)
     } else {

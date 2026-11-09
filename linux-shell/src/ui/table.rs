@@ -3,6 +3,7 @@ use crate::tool::Tool;
 use crate::ui::widgets::bar::ConditionBarHandle;
 use crate::ui::widgets::editable::EditableCell;
 use chronos::bridge::{BarType, EditableField, Event};
+use chronos::context::COLUMN_COUNT;
 use chronos::i18n::Language;
 use chronos::view::AppViewModel;
 use gtk4::glib;
@@ -35,12 +36,12 @@ struct RowSig {
 #[derive(Clone, PartialEq)]
 struct TableSignature {
     language: Language,
-    visible: [bool; 7],
+    visible: [bool; COLUMN_COUNT],
     rows: Vec<RowSig>,
 }
 
 impl TableSignature {
-    fn from_view(app_view: &AppViewModel, visible: [bool; 7]) -> Self {
+    fn from_view(app_view: &AppViewModel, visible: [bool; COLUMN_COUNT]) -> Self {
         let group = |g: &chronos::view::GroupSpan| GroupSig {
             member_ids: g.member_ids.clone(),
             span: g.span,
@@ -352,7 +353,7 @@ fn build_document_table(
     let mut total_visible_cols = 0;
     let mut col_idx = 0;
     for (i, title) in headers.iter().enumerate() {
-        let is_visible = if i == 7 { true } else { current_vis.flags[i] };
+        let is_visible = if i == COLUMN_COUNT { true } else { current_vis.flags[i] };
         if is_visible {
             let label = gtk4::Label::builder()
                 .use_markup(true)

@@ -18,7 +18,10 @@
 //!   UI allows, and unreadable settings are dropped instead of failing the
 //!   whole file.
 
-use crate::context::CanvasParams;
+use crate::context::{
+    clamp_finite_range, sanitize_paper_size, CanvasParams, COLUMN_COUNT, COLUMN_RATIO_RANGE,
+    PAGE_MARGIN_MM_RANGE, PADDING_MM_RANGE, ZERO_WIDTH_LINE_PT_RANGE,
+};
 use crate::storage::ConservationDocument;
 use serde::{Deserialize, Serialize};
 
@@ -32,14 +35,14 @@ pub const EMBEDDED_FILE_NAME: &str = "chronos-project.json";
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ExportSettings {
-    pub visible_columns: [bool; 7],
+    pub visible_columns: [bool; COLUMN_COUNT],
     pub canvas: CanvasParams,
 }
 
 impl Default for ExportSettings {
     fn default() -> Self {
         Self {
-            visible_columns: [true; 7],
+            visible_columns: [true; COLUMN_COUNT],
             canvas: CanvasParams::default(),
         }
     }
@@ -48,25 +51,15 @@ impl Default for ExportSettings {
 impl ExportSettings {
     pub fn sanitize(&mut self) {
         let canvas = &mut self.canvas;
-        let paper = canvas.paper_size.trim();
-        canvas.paper_size = match paper.to_ascii_lowercase().as_str() {
-            "a4" | "a3" | "a5" | "us-letter" | "us-legal" => paper.to_string(),
-            _ => "A4".to_string(),
-        };
-        canvas.page_margin_mm = clamp_finite(canvas.page_margin_mm, 5.0, 50.0);
-        canvas.cell_padding_mm = clamp_finite(canvas.cell_padding_mm, 0.0, 20.0);
-        canvas.zero_width_line_pt = clamp_finite(canvas.zero_width_line_pt, 0.1, 5.0);
+        canvas.paper_size = sanitize_paper_size(&canvas.paper_size);
+        canvas.page_margin_mm = clamp_finite_range(canvas.page_margin_mm, PAGE_MARGIN_MM_RANGE);
+        canvas.cell_padding_mm = clamp_finite_range(canvas.cell_padding_mm, PADDING_MM_RANGE);
+        canvas.bar_padding_mm = clamp_finite_range(canvas.bar_padding_mm, PADDING_MM_RANGE);
+        canvas.zero_width_line_pt =
+            clamp_finite_range(canvas.zero_width_line_pt, ZERO_WIDTH_LINE_PT_RANGE);
         for ratio in canvas.column_ratios.iter_mut() {
-            *ratio = (*ratio).clamp(1, 100);
+            *ratio = (*ratio).clamp(COLUMN_RATIO_RANGE.0, COLUMN_RATIO_RANGE.1);
         }
-    }
-}
-
-fn clamp_finite(value: f64, min: f64, max: f64) -> f64 {
-    if value.is_finite() {
-        value.clamp(min, max)
-    } else {
-        min
     }
 }
 
@@ -219,12 +212,14 @@ mod tests {
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v["export_settings"]["canvas"]["page_margin_mm"] = serde_json::json!(9999);
         v["export_settings"]["canvas"]["cell_padding_mm"] = serde_json::json!(-5);
+        v["export_settings"]["canvas"]["bar_padding_mm"] = serde_json::json!(-5);
         v["export_settings"]["canvas"]["zero_width_line_pt"] = serde_json::json!(99);
         v["export_settings"]["canvas"]["paper_size"] = serde_json::json!("tabloid");
         v["export_settings"]["canvas"]["column_ratios"] = serde_json::json!([0, 200, 5, 5, 5, 5, 5]);
         let s = ProjectFile::parse(&v.to_string()).unwrap().export_settings.unwrap();
         assert_eq!(s.canvas.page_margin_mm, 50.0);
         assert_eq!(s.canvas.cell_padding_mm, 0.0);
+        assert_eq!(s.canvas.bar_padding_mm, 0.0);
         assert_eq!(s.canvas.zero_width_line_pt, 5.0);
         assert_eq!(s.canvas.paper_size, "A4");
         assert_eq!(s.canvas.column_ratios[0], 1);

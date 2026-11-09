@@ -1,6 +1,6 @@
 use chronos::bridge::{BarType, CycleDirection, EditableField, Event, MergeDirection, SlotEdge};
 use chronos::i18n::Translations;
-use chronos::storage::{BarPattern, Slot};
+use chronos::storage::{BarPattern, Slot, MIN_GAP_PCT};
 use gtk4::cairo;
 use gtk4::prelude::*;
 
@@ -342,12 +342,12 @@ impl Tool {
                 let current_x = sx + offset_x;
                 let new_pct = (current_x / w * 100.0).clamp(0.0, 100.0) as f32;
                 let min_start = if slot_idx > 0 {
-                    slots[slot_idx - 1].end_pct + 2.0
+                    slots[slot_idx - 1].end_pct + MIN_GAP_PCT
                 } else {
                     0.0
                 };
                 let max_end = if slot_idx + 1 < slots.len() {
-                    slots[slot_idx + 1].start_pct - 2.0
+                    slots[slot_idx + 1].start_pct - MIN_GAP_PCT
                 } else {
                     100.0
                 };

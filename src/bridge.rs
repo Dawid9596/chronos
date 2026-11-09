@@ -1,8 +1,9 @@
-use crate::context::CanvasParams;
+use crate::context::{CanvasParams, COLUMN_COUNT};
 use crate::i18n::Translations;
+use crate::pdf_attachment;
 use crate::project::{ExportSettings, ProjectFile};
 use crate::storage::StatusMessage;
-use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot};
+use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot, MIN_GAP_PCT, SLOT_PCT_MAX};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -307,9 +308,7 @@ impl Event {
 }
 
 fn is_pdf_path(path: &str) -> bool {
-    std::path::Path::new(path)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+    pdf_attachment::is_pdf_path(std::path::Path::new(path))
 }
 
 #[derive(Default)]
@@ -703,7 +702,6 @@ impl App for ConservationApp {
                         BarType::GraphicalRepresentation => &mut entry.graphical_representation,
                         BarType::WovenTrim => &mut entry.woven_trim,
                     };
-                    const MIN_GAP_PCT: f32 = 2.0;
                     let clashes = bar.slots.iter().any(|s| {
                         at_pct >= s.start_pct - MIN_GAP_PCT && at_pct <= s.end_pct + MIN_GAP_PCT
                     });
@@ -755,8 +753,7 @@ impl App for ConservationApp {
                         .slots
                         .get(slot_index + 1)
                         .map(|s| s.start_pct)
-                        .unwrap_or(100.0);
-                    const MIN_GAP_PCT: f32 = 2.0;
+                        .unwrap_or(SLOT_PCT_MAX);
 
                     if let Some(slot) = bar.slots.get_mut(slot_index) {
                         match edge {
@@ -901,7 +898,7 @@ impl App for ConservationApp {
         AppViewModel {
             document: model
                 .document
-                .to_view_model(t.clone(), [true; 7], CanvasParams::default()),
+                .to_view_model(t.clone(), [true; COLUMN_COUNT], CanvasParams::default()),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
             translations: t,

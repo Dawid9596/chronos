@@ -29,7 +29,7 @@ pub fn typst_compile_to_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::CanvasParams;
+    use crate::context::{CanvasParams, COLUMN_COUNT};
     use crate::i18n::{Language, Translations};
     use crate::pdf_attachment::{PdfProjectError, extract_project_json};
     use crate::project::{ExportSettings, ProjectFile};
@@ -38,7 +38,7 @@ mod tests {
     fn sample_view_model() -> DocumentViewModel {
         AppState::default().document.to_view_model(
             Translations::get(Language::English),
-            [true; 7],
+            [true; COLUMN_COUNT],
             CanvasParams::default(),
         )
     }
@@ -50,7 +50,7 @@ mod tests {
         let state = AppState::default();
         let view_model = state.document.to_view_model(
             Translations::get(state.language),
-            [true; 7],
+            [true; COLUMN_COUNT],
             CanvasParams::default(),
         );
 

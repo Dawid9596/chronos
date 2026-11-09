@@ -6,8 +6,14 @@
 use crate::project::EMBEDDED_FILE_NAME;
 use lopdf::{Dictionary, Document, Object, Stream, dictionary};
 use std::fmt;
+use std::path::Path;
 
 const ATTACHMENT_DESCRIPTION: &str = "Chronos project data";
+
+pub fn is_pdf_path(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PdfProjectError {

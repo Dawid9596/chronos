@@ -9,6 +9,7 @@ use crux_core::Core;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{ApplicationWindow, Button, DrawingArea, Label, ScrolledWindow, ToggleButton};
+use chronos::context::COLUMN_COUNT;
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -17,12 +18,12 @@ use std::time::Duration;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColumnVisibility {
-    pub flags: [bool; 7],
+    pub flags: [bool; COLUMN_COUNT],
 }
 
 impl Default for ColumnVisibility {
     fn default() -> Self {
-        Self { flags: [true; 7] }
+        Self { flags: [true; COLUMN_COUNT] }
     }
 }
 

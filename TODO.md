@@ -19,6 +19,4 @@ Remove legacy buttons
 
 Display shortcuts next to respective buttons on editing shortcuts.
 
-Rewrite and localise about / help.
-
 Import custom .svg patterns?
