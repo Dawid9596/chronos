@@ -432,11 +432,14 @@ pub fn show_preferences_dialog(ctx: &AppContext) {
         .hexpand(true)
         .build();
 
-    let lang_dropdown = gtk4::DropDown::from_strings(&["English", "Polski"]);
-    lang_dropdown.set_selected(match ctx.current_lang.get() {
-        Language::English => 0,
-        Language::Polish => 1,
-    });
+    let lang_entries: Vec<&'static str> = Language::ALL.iter().map(|l| l.display_name()).collect();
+    let lang_dropdown = gtk4::DropDown::from_strings(&lang_entries);
+    lang_dropdown.set_selected(
+        Language::ALL
+            .iter()
+            .position(|l| *l == ctx.current_lang.get())
+            .unwrap_or(0) as u32,
+    );
 
     let close_btn = gtk4::Button::with_label(&t.dialog_close);
     close_btn.set_halign(gtk4::Align::End);
@@ -446,11 +449,7 @@ pub fn show_preferences_dialog(ctx: &AppContext) {
     let lang_lbl_clone = lang_lbl.clone();
     let close_btn_clone = close_btn.clone();
     lang_dropdown.connect_selected_notify(move |dd| {
-        let selected_lang = if dd.selected() == 0 {
-            Language::English
-        } else {
-            Language::Polish
-        };
+        let selected_lang = Language::ALL[dd.selected() as usize];
         if selected_lang != ctx_lang.current_lang.get() {
             let ctx_idle = ctx_lang.clone();
             let win_idle = win_lang.clone();

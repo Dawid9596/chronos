@@ -748,10 +748,7 @@ impl App for ConservationApp {
                 caps.render.render();
             }
             Event::ToggleLanguage => {
-                model.language = match model.language {
-                    crate::i18n::Language::English => crate::i18n::Language::Polish,
-                    crate::i18n::Language::Polish => crate::i18n::Language::English,
-                };
+                model.language = model.language.next();
                 caps.render.render();
             }
             Event::RequestOpen => {

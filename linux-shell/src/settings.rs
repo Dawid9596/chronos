@@ -39,18 +39,11 @@ pub fn settings_path() -> Option<PathBuf> {
 
 impl Settings {
     pub fn language_code(lang: Language) -> &'static str {
-        match lang {
-            Language::English => "en",
-            Language::Polish => "pl",
-        }
+        lang.code()
     }
 
     pub fn saved_language(&self) -> Option<Language> {
-        match self.language.as_deref()? {
-            "en" => Some(Language::English),
-            "pl" => Some(Language::Polish),
-            _ => None,
-        }
+        self.language.as_deref().and_then(Language::from_code)
     }
 
     /// Loads settings, doesn't fail: a missing file gives defaults, and an

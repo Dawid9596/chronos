@@ -6,6 +6,50 @@ pub enum Language {
     Polish,
 }
 
+impl Language {
+    /// All languages in declaration order.
+    pub const ALL: [Language; 2] = [Self::English, Self::Polish];
+
+    /// Native display name of the language, for language pickers only.
+    /// Deliberately *never* translated into the current UI language: a
+    /// selector is expected to list every language in its own words.
+    #[must_use]
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::English => "English",
+            Self::Polish => "Polski",
+        }
+    }
+
+    /// ISO 639-1 code used to persist the language in the settings file.
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::English => "en",
+            Self::Polish => "pl",
+        }
+    }
+
+    /// The language stored under a settings-code string (case-insensitive),
+    /// or `None` for anything unrecognized — which keeps defaults instead of
+    /// guessing.
+    #[must_use]
+    pub fn from_code(code: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|lang| lang.code().eq_ignore_ascii_case(code))
+    }
+
+    /// The next language in [`Language::ALL`], wrapping around. Drives the
+    /// core's toggle event and the toolbar's language flag button.
+    #[must_use]
+    pub fn next(self) -> Self {
+        let idx = Self::ALL.iter().position(|l| *l == self).unwrap_or(0);
+        Self::ALL[(idx + 1) % Self::ALL.len()]
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Translations {
     pub language: Language,
@@ -444,5 +488,44 @@ Powrót na [początek pomocy](#top) lub odczytaj [informacje o programie](doc:ab
 "#.into(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Language, Translations};
+
+    /// Every picker iterates `ALL` instead of hard-mapping indices; ALL must
+    /// be exactly the declared variants, in order.
+    #[test]
+    fn all_lists_every_language_in_declaration_order() {
+        for (i, lang) in Language::ALL.iter().enumerate() {
+            assert_eq!(*lang as usize, i);
+        }
+    }
+
+    #[test]
+    fn codes_are_stable_and_round_trip() {
+        for lang in Language::ALL {
+            // Written to the settings file and read back at startup.
+            assert_eq!(Language::from_code(lang.code()), Some(lang));
+            // The native picker name must never collide with a code.
+            assert_ne!(lang.display_name(), lang.code());
+            // Every language must have usable translations for all fields.
+            Translations::get(lang);
+        }
+    }
+
+    #[test]
+    fn next_wraps_through_every_language() {
+        let mut seen = vec![Language::English];
+        while *seen.last().unwrap() != seen[0] || seen.len() == 1 {
+            let next = seen.last().unwrap().next();
+            if seen.contains(&next) {
+                break;
+            }
+            seen.push(next);
+        }
+        assert_eq!(seen.len(), Language::ALL.len(), "next() must visit all");
     }
 }
