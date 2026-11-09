@@ -1,15 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "linux-shell"
+    "desktop"
 ]
 
 
 [package]
 name = "chronos"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-# TODO: remove once the real repo exists (published with the next public release)
 repository = "https://github.com/Dawid9596/chronos"
 license = "GPL-3.0-only"
 
@@ -37,15 +36,14 @@ serde_json = "1.0.151"
 # Windows packager
 [package.metadata.packager]
 product_name = "Chronos"
-version = "0.1.0"
+version = "0.2.0"
 identifier = "com.chronos.app"
-# TODO: remove once the real repo exists (published with the next public release)
 homepage = "https://github.com/Dawid9596/chronos"
 formats = ["wix"]
 icons = ["icons/icon.ico"]
 
 binaries = [
-  { path = "linux-shell.exe", main = true }
+  { path = "chronos.exe", main = true }
 ]
 
 resources = [

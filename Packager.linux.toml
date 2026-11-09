@@ -1,13 +1,15 @@
 # cargo-packager config for Linux targets (deb / future appimage).
-# Passed explicitly: `cargo packager --config packager/linux.toml --formats deb`.
-# or a `name` field — if `name` is unset, cargo-packager 0.11.x does
-# `set_current_dir(<config file path>)` and fails with ENOTDIR.
+# Passed explicitly: `cargo packager --config Packager.linux.toml --formats deb`.
+# It needs an explicit `name` field — if `name` is unset, cargo-packager
+# 0.11.x does `set_current_dir(<config file path>)` and fails with ENOTDIR.
 # The Windows flow keeps its own metadata in [package.metadata.packager] of
-# Cargo.toml, because the binary file name differs per platform
-# (linux-shell vs linux-shell.exe).
-name = "linux-shell"
+# Cargo.toml, because the packager build/PKGDIST paths differ per platform.
+# The built binary is `chronos` on every platform; the packaged artifacts
+# (msi/deb) get their OS stamp from the release workflow, which renames them
+# after cargo-packager derives the file name from the binary name.
+name = "desktop"
 product_name = "Chronos"
-version = "0.1.0"
+version = "0.2.0"
 identifier = "com.chronos.app"
 publisher = "Dawid Pawelec"
 copyright = "Copyright (c) Dawid Pawelec (GPL-3.0); pattern artwork (c) kationart (CC BY-SA 4.0)"
@@ -16,12 +18,12 @@ description = "Conservation Editor"
 long_description = "Stratigraphic layer and condition documentation tool for conservation projects."
 icons = ["icons/bitmap.png"]
 
-# The shell binary directory; paths below are relative to it.
+# The desktop crate's output directory; paths below are relative to it.
 binaries_dir = "target/release"
 out_dir = "target/release/packager"
 
 binaries = [
-  { path = "linux-shell", main = true },
+  { path = "chronos", main = true },
 ]
 
 [deb]

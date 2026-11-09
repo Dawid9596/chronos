@@ -12,7 +12,8 @@ use gtk4::prelude::*;
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() -> gtk4::glib::ExitCode {
-    /// Detach and quit the terminal in release build
+    // Detach from the terminal in release builds (`windows_subsystem` does
+    // not apply on Linux).
     #[cfg(all(not(debug_assertions), target_os = "linux"))]
     {
         use std::process;

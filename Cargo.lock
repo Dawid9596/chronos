@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "chronos"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "comemo",
@@ -648,6 +648,22 @@ name = "deranged"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e9de72ce2ad1f90dc62fa25f0f430ef85eb4b0d8fa0be4f30373bc40a21d28e"
+
+[[package]]
+name = "desktop"
+version = "0.2.0"
+dependencies = [
+ "chronos",
+ "crux_core",
+ "dirs",
+ "gtk4",
+ "libc",
+ "open",
+ "resvg",
+ "serde",
+ "serde_json",
+ "winresource",
+]
 
 [[package]]
 name = "digest"
@@ -1833,22 +1849,6 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
-
-[[package]]
-name = "linux-shell"
-version = "0.1.0"
-dependencies = [
- "chronos",
- "crux_core",
- "dirs",
- "gtk4",
- "libc",
- "open",
- "resvg",
- "serde",
- "serde_json",
- "winresource",
-]
 
 [[package]]
 name = "lipsum"

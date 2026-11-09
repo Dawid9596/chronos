@@ -1,8 +1,14 @@
 [package]
-name = "linux-shell"
-version = "0.1.0"
+name = "desktop"
+version = "0.2.0"
 edition = "2024"
 build = "build.rs"
+
+# The package is named generically (`desktop`); the shipped binary is the app
+# itself, `chronos` on every platform.
+[[bin]]
+name = "chronos"
+path = "src/main.rs"
 
 [dependencies]
 chronos = { path = ".." }

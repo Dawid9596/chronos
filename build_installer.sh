@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Paths are overridable so CI can redirect them, defaults keep the local
 # layout (everything on C: so the packaging happens on a short native path).
-BIN_NAME="${BIN_NAME:-linux-shell}"
+BIN_NAME="${BIN_NAME:-chronos}"
+: "${PKG_NAME:=desktop}"
 : "${CARGO_TARGET_DIR:=C:/build/chronos-target}"
 export CARGO_TARGET_DIR
 EXE_UNIX_PATH="$(cygpath -u "$CARGO_TARGET_DIR")/release/${BIN_NAME}.exe"
@@ -12,7 +13,7 @@ EXE_UNIX_PATH="$(cygpath -u "$CARGO_TARGET_DIR")/release/${BIN_NAME}.exe"
 STAGE_DIR="${PKG_WORK_DIR}/dll_stage"
 
 echo "==> 1. Compiling the release binary..."
-cargo build --package linux-shell --release
+cargo build --package desktop --release
 
 if [ ! -f "$EXE_UNIX_PATH" ]; then
     echo "Error: Executable not found at $EXE_UNIX_PATH"
@@ -25,7 +26,7 @@ mkdir -p "$STAGE_DIR/schemas"
 mkdir -p "$PKG_WORK_DIR/icons"
 
 cp Cargo.toml Cargo.lock "$PKG_WORK_DIR/"
-cp -r linux-shell "$PKG_WORK_DIR/"
+cp -r "$PKG_NAME" "$PKG_WORK_DIR/"
 cp -r src "$PKG_WORK_DIR/"
 cp -r icons/* "$PKG_WORK_DIR/icons/"
 
