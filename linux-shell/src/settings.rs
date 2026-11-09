@@ -119,8 +119,10 @@ mod tests {
 
     #[test]
     fn round_trips() {
-        let mut s = Settings::default();
-        s.language = Some("pl".into());
+        let mut s = Settings {
+            language: Some("pl".into()),
+            ..Settings::default()
+        };
         s.shortcuts.insert("save".into(), "<Control>j".into());
         s.columns.flags[3] = false;
         s.canvas.page_margin_mm = 33.0;

@@ -80,6 +80,9 @@ pub struct AppContext {
     /// One toggle per toolbar tool family; used by the tool shortcuts so the
     /// toolbar highlight and variant pickers stay in sync with `tool`.
     pub tool_buttons: Rc<Vec<(Tool, ToggleButton)>>,
+    /// One toggle per tool variant (Paint patterns, Merge directions); used by
+    /// the variant cycling actions to switch through them like mouse clicks.
+    pub variant_buttons: Rc<RefCell<Vec<(Tool, ToggleButton)>>>,
     /// Undo / redo buttons to the right of the screen.
     /// Enabled state refreshed by AppViewModel::{can_undo, can_redo}.
     pub history_buttons: Rc<HistoryButtons>,

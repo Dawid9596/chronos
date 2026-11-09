@@ -96,6 +96,23 @@ impl Tool {
         std::mem::discriminant(&self) == std::mem::discriminant(&other)
     }
 
+    pub fn cycle_variant(self, forward: bool) -> Option<Tool> {
+        let variants = self.variants();
+        if variants.is_empty() {
+            return None;
+        }
+        let idx = variants
+            .iter()
+            .position(|&v| v == self)
+            .unwrap_or(0);
+        let next_idx = if forward {
+            (idx + 1) % variants.len()
+        } else {
+            (idx + variants.len() - 1) % variants.len()
+        };
+        Some(variants[next_idx])
+    }
+
     /// Builds the child widget displayed inside a variant selector button.
     pub fn build_variant_widget(self) -> gtk4::Widget {
         match self {
@@ -452,5 +469,46 @@ impl Tool {
                 });
             }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cycling_wraps_and_stops_for_variantless_tools() {
+        // Wraps at both ends of the list.
+        assert_eq!(
+            Tool::Paint(BarPattern::Bolus).cycle_variant(true),
+            Some(Tool::Paint(BarPattern::Brick))
+        );
+        assert_eq!(
+            Tool::Paint(BarPattern::Bolus).cycle_variant(false),
+            Some(Tool::Paint(BarPattern::GoldPowder))
+        );
+        let last = Tool::PAINT_VARIANTS[Tool::PAINT_VARIANTS.len() - 1];
+        assert_eq!(
+            last.cycle_variant(true),
+            Some(Tool::Paint(BarPattern::Bolus))
+        );
+        assert_eq!(
+            last.cycle_variant(false),
+            Some(Tool::PAINT_VARIANTS[Tool::PAINT_VARIANTS.len() - 2])
+        );
+
+        // Merge has two variants; the direction is also part of the identity.
+        assert_eq!(
+            Tool::Merge(MergeDirection::Down).cycle_variant(true),
+            Some(Tool::Merge(MergeDirection::Up))
+        );
+        assert_eq!(
+            Tool::Merge(MergeDirection::Down).cycle_variant(false),
+            Some(Tool::Merge(MergeDirection::Up))
+        );
+
+        // A tool without variants has nothing to cycle.
+        assert_eq!(Tool::Edit.cycle_variant(true), None);
+        assert_eq!(Tool::Split.cycle_variant(false), None);
     }
 }

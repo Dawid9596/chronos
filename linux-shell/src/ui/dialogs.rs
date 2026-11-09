@@ -328,7 +328,8 @@ struct CanvasWidgets {
 impl CanvasWidgets {
     fn show(&self, settings: &ExportSettings) {
         let canvas = &settings.canvas;
-        self.paper.set_selected(paper_size_index(&canvas.paper_size));
+        self.paper
+            .set_selected(paper_size_index(&canvas.paper_size));
         self.landscape.set_active(canvas.landscape);
         self.margin.set_value(canvas.page_margin_mm);
         self.padding.set_value(canvas.cell_padding_mm);
@@ -626,10 +627,11 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
         .margin_end(18)
         .build();
 
-    let sections: [(&str, &[Action]); 3] = [
+    let sections: [(&str, &[Action]); 4] = [
         (t.menu_file.as_str(), &Action::FILE[..]),
         (t.menu_edit.as_str(), &Action::EDIT[..]),
         (t.shortcuts_section_tools.as_str(), &Action::TOOLS[..]),
+        (t.shortcuts_section_variants.as_str(), &Action::VARIANTS[..]),
     ];
     for (title, actions) in sections {
         list.append(&section_header(title));
@@ -711,6 +713,39 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
         });
     }
     win.add_controller(key_ctrl);
+
+    let mouse_ctrl = gtk4::GestureClick::new();
+    mouse_ctrl.set_button(0);
+    {
+        let ctx = ctx.clone();
+        let state = state.clone();
+        mouse_ctrl.connect_pressed(move |gesture, _n_press, _x, _y| {
+            let button = gesture.current_button();
+            let Some(action) = state.capturing.get() else {
+                gesture.set_state(gtk4::EventSequenceState::Denied);
+                return;
+            };
+            // The primary button keeps working normally: dialog buttons and
+            // Cancel (Escape) must stay clickable while a key is awaited.
+            if button == 1 {
+                gesture.set_state(gtk4::EventSequenceState::Denied);
+                return;
+            }
+            gesture.set_state(gtk4::EventSequenceState::Claimed);
+            let mods = gesture.current_event_state() & gtk4::accelerator_get_default_mod_mask();
+            let accel = crate::shortcuts::mouse_string(button, mods);
+            match ctx.shortcuts.try_set(action, &accel) {
+                Ok(()) => {
+                    state.capturing.set(None);
+                    state.set_message("", false);
+                    ctx.persist_settings();
+                    state.refresh(&ctx);
+                }
+                Err(err) => state.show_error(&ctx, err),
+            }
+        });
+    }
+    win.add_controller(mouse_ctrl);
 
     let reset_all_btn = gtk4::Button::with_label(&t.shortcuts_restore_all);
     {

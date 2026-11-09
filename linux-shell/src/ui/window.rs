@@ -374,6 +374,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let mut tool_labels = Vec::with_capacity(Tool::TOOLBAR_DEFAULTS.len());
     let mut tool_buttons = Vec::with_capacity(Tool::TOOLBAR_DEFAULTS.len());
+    let variant_buttons: Rc<RefCell<Vec<(Tool, gtk4::ToggleButton)>>> =
+        Rc::new(RefCell::new(Vec::new()));
     let mut first_btn: Option<gtk4::ToggleButton> = None;
     let inline_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
         Rc::new(RefCell::new(Vec::new()));
@@ -384,6 +386,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
         let btn = gtk4::ToggleButton::builder()
             .active(default_tool == Tool::Edit)
+            .focus_on_click(false)
+            .can_focus(false)
             .build();
 
         let btn_box = gtk4::Box::builder()
@@ -424,6 +428,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 let var_btn = gtk4::ToggleButton::builder()
                     .child(&var_widget)
                     .active(variant == default_tool)
+                    .focus_on_click(false)
+                    .can_focus(false)
                     .build();
 
                 if let Some(ref leader) = first_var_btn {
@@ -447,6 +453,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     }
                 });
 
+                variant_buttons.borrow_mut().push((variant, var_btn.clone()));
                 selector_box.append(&var_btn);
             }
 
@@ -660,6 +667,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         flag_area,
         tool_labels: Rc::new(tool_labels),
         tool_buttons: Rc::new(tool_buttons),
+        variant_buttons,
         history_buttons: history_buttons.clone(),
         shortcuts: shortcuts.clone(),
         menu_labels,
@@ -744,6 +752,51 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         shortcuts.install(&window, Rc::new(move |action| run_action(&ctx_sc, action)));
     }
 
+    let scroll_ctrl = gtk4::EventControllerScroll::new(gtk4::EventControllerScrollFlags::VERTICAL);
+    scroll_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
+    let ctx_scroll = ctx.clone();
+    scroll_ctrl.connect_scroll(move |ctrl, _dx, dy| {
+        if ctrl
+            .current_event_state()
+            .intersects(gtk4::gdk::ModifierType::CONTROL_MASK)
+        {
+            let action = if dy > 0.0 {
+                Action::PrevVariant
+            } else {
+                Action::NextVariant
+            };
+            run_action(&ctx_scroll, action);
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    window.add_controller(scroll_ctrl);
+
+    // Extra mouse buttons (M3/M4/M5, ...) can be bound like keys. The gesture
+    // runs in the capture phase and claims the press for bound buttons only,
+    // so every other click keeps working with the app's own gestures.
+    let button_ctrl = gtk4::GestureClick::new();
+    button_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
+    // Button 0 listens to every button (the default of 1 only sees the
+    // primary button); bound buttons are claimed and dispatched, the rest
+    // is explicitly denied so the app's own gestures keep working.
+    button_ctrl.set_button(0);
+    let ctx_btn = ctx.clone();
+    button_ctrl.connect_pressed(move |gesture, _n_press, _x, _y| {
+        let button = gesture.current_button();
+        let mods =
+            gesture.current_event_state() & gtk4::accelerator_get_default_mod_mask();
+        if let Some(action) = ctx_btn.shortcuts.mouse_action(button, mods)
+            && !ctx_btn.shortcuts.should_defer(action, &ctx_btn.window)
+        {
+            gesture.set_state(gtk4::EventSequenceState::Claimed);
+            run_action(&ctx_btn, action);
+        } else {
+            gesture.set_state(gtk4::EventSequenceState::Denied);
+        }
+    });
+    window.add_controller(button_ctrl);
+
     if let Some(saved) = settings.saved_language()
         && saved != ctx.current_lang.get()
     {
@@ -780,11 +833,26 @@ fn run_action(ctx: &AppContext, action: Action) {
         Action::Undo => defer_event(ctx, Event::Undo),
         Action::Redo => defer_event(ctx, Event::Redo),
         Action::Export => defer_event(ctx, ctx.pdf_export_event()),
+        Action::NextVariant => cycle_tool_variant(ctx, true),
+        Action::PrevVariant => cycle_tool_variant(ctx, false),
         tool_action => {
             if let Some(tool) = tool_action.tool() {
                 select_tool(ctx, tool);
             }
         }
+    }
+}
+
+fn cycle_tool_variant(ctx: &AppContext, forward: bool) {
+    let current_tool = ctx.tool.get();
+    if let Some(next_variant) = current_tool.cycle_variant(forward)
+        && let Some((_, btn)) = ctx
+            .variant_buttons
+            .borrow()
+            .iter()
+            .find(|(t, _)| *t == next_variant)
+    {
+        btn.set_active(true);
     }
 }
 
