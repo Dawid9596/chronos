@@ -85,6 +85,9 @@ pub struct Translations {
     pub tool_split: String,
     pub tool_duplicate: String,
     pub tool_merge: String,
+    /// The PDF footer credits the pattern artwork (CC BY-SA 4.0 requires it);
+    /// passed to the typst template as plain text, already in this language.
+    pub artwork_attribution: String,
     pub status_ready: String,
     pub project_prefix: String,
     // Settings Popover
@@ -176,6 +179,7 @@ impl Translations {
                 tool_split: "Split".into(),
                 tool_duplicate: "Duplicate".into(),
                 tool_merge: "Merge".into(),
+                artwork_attribution: "Pattern artwork: @kationart, CC BY-SA 4.0".into(),
                 status_ready: "Ready".into(),
                 project_prefix: "Project: ".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
@@ -348,6 +352,7 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 tool_split: "Rozdziel".into(),
                 tool_duplicate: "Duplikuj".into(),
                 tool_merge: "Scal".into(),
+                artwork_attribution: "Grafika wzorów: @kationart, CC BY-SA 4.0".into(),
                 status_ready: "Gotowy".into(),
                 project_prefix: "Projekt: ".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),

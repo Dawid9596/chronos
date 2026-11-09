@@ -57,6 +57,14 @@ mod tests {
         let bytes =
             typst_compile_to_bytes(&view_model, None).expect("default document compiles");
         assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
+
+        // Same for the Polish attribution text.
+        let polish = state.document.to_view_model(
+            Translations::get(Language::Polish),
+            [true; COLUMN_COUNT],
+            CanvasParams::default(),
+        );
+        typst_compile_to_bytes(&polish, None).expect("Polish document compiles");
     }
 
     #[test]

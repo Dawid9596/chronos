@@ -222,11 +222,11 @@
 
   // Artwork attribution — required by CC BY-SA 4.0 (patterns/LICENSE).
   v(1.2em)
-  align(center, text(
-    size: 8pt,
+  align(right, text(
+    size: 7pt,
     fill: luma(110),
     style: "italic",
-    [Pattern artwork: \@kationart, CC BY-SA 4.0],
+    [#data.translations.artwork_attribution],
   ))
 }
 
