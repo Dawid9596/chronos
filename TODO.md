@@ -3,8 +3,6 @@ Tracking:Track a has_unsaved_changes: bool flag in AppState (set on document-mut
 
 Brushes in menus: show name on hover
 
-A single source of truth for clamping constants in project.rs
-
 A single source of truth for project's version
 
 Rename linux-shell and make releases screen guide the users as to which version goes with which OS.

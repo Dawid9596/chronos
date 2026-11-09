@@ -45,37 +45,15 @@ impl Tool {
         Tool::Merge(MergeDirection::Down),
     ];
 
-    pub const PAINT_VARIANTS: [Tool; 29] = [
-        Tool::Paint(BarPattern::Bolus),
-        Tool::Paint(BarPattern::Brick),
-        Tool::Paint(BarPattern::Ceramics),
-        Tool::Paint(BarPattern::Wood),
-        Tool::Paint(BarPattern::Textile),
-        Tool::Paint(BarPattern::MetalFoil),
-        Tool::Paint(BarPattern::Embroidery),
-        Tool::Paint(BarPattern::Stone),
-        Tool::Paint(BarPattern::Glue),
-        Tool::Paint(BarPattern::Bone),
-        Tool::Paint(BarPattern::SprayVarnish),
-        Tool::Paint(BarPattern::Painting),
-        Tool::Paint(BarPattern::Metal),
-        Tool::Paint(BarPattern::Paper),
-        Tool::Paint(BarPattern::Patina),
-        Tool::Paint(BarPattern::Parchment),
-        Tool::Paint(BarPattern::Whitewash),
-        Tool::Paint(BarPattern::Leather),
-        Tool::Paint(BarPattern::Stucco),
-        Tool::Paint(BarPattern::Glaze),
-        Tool::Paint(BarPattern::Plasterwork),
-        Tool::Paint(BarPattern::Cardboard),
-        Tool::Paint(BarPattern::Plastic),
-        Tool::Paint(BarPattern::MixedThread),
-        Tool::Paint(BarPattern::Varnish),
-        Tool::Paint(BarPattern::Wax),
-        Tool::Paint(BarPattern::Nonwoven),
-        Tool::Paint(BarPattern::Mortar),
-        Tool::Paint(BarPattern::GoldPowder),
-    ];
+    pub const PAINT_VARIANTS: [Tool; BarPattern::ALL.len()] = {
+        let mut out = [Tool::Paint(BarPattern::Bolus); BarPattern::ALL.len()];
+        let mut i = 0;
+        while i < BarPattern::ALL.len() {
+            out[i] = Tool::Paint(BarPattern::ALL[i]);
+            i += 1;
+        }
+        out
+    };
 
     pub const MERGE_VARIANTS: [Tool; 2] = [
         Tool::Merge(MergeDirection::Down),
@@ -475,6 +453,16 @@ impl Tool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paint_variants_track_all_patterns() {
+        // `PAINT_VARIANTS` is a compile-time derivation of `BarPattern::ALL`;
+        // this pins the derivation to the intended nesting (`Tool::Paint`).
+        for (tool, pattern) in Tool::PAINT_VARIANTS.iter().zip(BarPattern::ALL) {
+            assert_eq!(*tool, Tool::Paint(pattern));
+        }
+        assert_eq!(Tool::PAINT_VARIANTS.len(), BarPattern::ALL.len());
+    }
 
     #[test]
     fn cycling_wraps_and_stops_for_variantless_tools() {

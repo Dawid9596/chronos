@@ -61,7 +61,7 @@ impl ConservationWorld {
         inputs.insert("json_data".into(), Value::Str(json_view_model.into()));
 
         let mut assets = HashMap::new();
-        for &(name, bytes) in &crate::patterns::TILES {
+        for (name, bytes) in crate::patterns::all_tiles() {
             assets.insert(name, Bytes::from_static(bytes));
         }
 

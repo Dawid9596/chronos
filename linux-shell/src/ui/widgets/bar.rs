@@ -12,31 +12,31 @@ use std::rc::Rc;
 const SVG_TILES_CACHE_MAX: usize = 64;
 
 thread_local! {
-    /// Cache of ready-to-tile SVG surfaces keyed by (pattern, height).
-    static SVG_TILES: RefCell<HashMap<(usize, i32), Option<gtk4::cairo::ImageSurface>>> =
+    /// Cache of ready-to-tile SVG surfaces keyed by (tile name, height).
+    static SVG_TILES: RefCell<HashMap<(&'static str, i32), Option<gtk4::cairo::ImageSurface>>> =
         RefCell::new(HashMap::new());
 }
 
-static SVG_TREES: std::sync::OnceLock<Vec<Option<resvg::usvg::Tree>>> = std::sync::OnceLock::new();
+static SVG_TREES: std::sync::OnceLock<HashMap<&'static str, Option<resvg::usvg::Tree>>> =
+    std::sync::OnceLock::new();
 
-/// Parses all tile SVGs once, lazily. Parse failures become None entries so
-/// the matching tile is skipped (never a panic inside a draw handler).
-fn tree_for(idx: usize) -> Option<&'static resvg::usvg::Tree> {
+/// Parses all tile SVGs once, lazily, keyed by their file names (as given by
+/// `patterns::tile`, which is also the name the PDF world serves them under).
+/// Parse failures become None entries so the matching tile is skipped (never
+/// a panic inside a draw handler).
+fn tree_for(name: &'static str) -> Option<&'static resvg::usvg::Tree> {
     let trees = SVG_TREES.get_or_init(|| {
-        (0..chronos::patterns::TILES.len())
-            .map(|i| match chronos::patterns::TILES.get(i) {
-                Some((_, data)) => {
-                    let options = resvg::usvg::Options {
-                        fontdb: std::sync::Arc::new(resvg::usvg::fontdb::Database::new()),
-                        ..resvg::usvg::Options::default()
-                    };
-                    resvg::usvg::Tree::from_data(data, &options).ok()
-                }
-                None => None,
+        chronos::patterns::all_tiles()
+            .map(|(name, data)| {
+                let options = resvg::usvg::Options {
+                    fontdb: std::sync::Arc::new(resvg::usvg::fontdb::Database::new()),
+                    ..resvg::usvg::Options::default()
+                };
+                (name, resvg::usvg::Tree::from_data(data, &options).ok())
             })
             .collect()
     });
-    trees.get(idx).and_then(|tree| tree.as_ref())
+    trees.get(name).and_then(|tree| tree.as_ref())
 }
 
 /// Rasterizes tile `idx` at exactly the bar's height into a surface that can
@@ -46,8 +46,8 @@ fn tree_for(idx: usize) -> Option<&'static resvg::usvg::Tree> {
 /// width/height separately can leave the content up to half a pixel short
 /// of the pixmap edge, which repeats as a 1px transparent seam between
 /// tiles.
-fn svg_surface_for(idx: usize, h: f64) -> Option<gtk4::cairo::ImageSurface> {
-    let tree = tree_for(idx)?;
+fn svg_surface_for(name: &'static str, h: f64) -> Option<gtk4::cairo::ImageSurface> {
+    let tree = tree_for(name)?;
     let size = tree.size();
     let tile_w = size.width() as f64;
     let tile_h = size.height() as f64;
@@ -79,16 +79,16 @@ fn svg_surface_for(idx: usize, h: f64) -> Option<gtk4::cairo::ImageSurface> {
     .ok()
 }
 
-fn fill_svg_tile(cr: &gtk4::cairo::Context, idx: usize, x0: f64, seg_w: f64, h: f64) {
+fn fill_svg_tile(cr: &gtk4::cairo::Context, name: &'static str, x0: f64, seg_w: f64, h: f64) {
     SVG_TILES.with(|cache| {
-        let key = (idx, h.round().max(1.0) as i32);
+        let key = (name, h.round().max(1.0) as i32);
         let mut cache = cache.borrow_mut();
         if !cache.contains_key(&key) && cache.len() >= SVG_TILES_CACHE_MAX {
             cache.clear();
         }
         let surface = match cache
             .entry(key)
-            .or_insert_with(|| svg_surface_for(idx, h))
+            .or_insert_with(|| svg_surface_for(name, h))
             .as_ref()
         {
             Some(surface) => surface,
@@ -113,8 +113,8 @@ pub fn draw_pattern_rect(
 ) {
     cr.rectangle(x0, 0.0, seg_w, h);
     cr.clip();
-    let idx = chronos::patterns::tile_index(pattern);
-    fill_svg_tile(cr, idx, x0, seg_w, h);
+    let (name, _) = chronos::patterns::tile(*pattern);
+    fill_svg_tile(cr, name, x0, seg_w, h);
     cr.reset_clip();
 }
 

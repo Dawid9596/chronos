@@ -95,50 +95,19 @@ pub enum MergeDirection {
     Up,
 }
 
-pub const PATTERN_ORDER: [BarPattern; 29] = [
-    BarPattern::Bolus,
-    BarPattern::Brick,
-    BarPattern::Ceramics,
-    BarPattern::Wood,
-    BarPattern::Textile,
-    BarPattern::MetalFoil,
-    BarPattern::Embroidery,
-    BarPattern::Stone,
-    BarPattern::Glue,
-    BarPattern::Bone,
-    BarPattern::SprayVarnish,
-    BarPattern::Painting,
-    BarPattern::Metal,
-    BarPattern::Paper,
-    BarPattern::Patina,
-    BarPattern::Parchment,
-    BarPattern::Whitewash,
-    BarPattern::Leather,
-    BarPattern::Stucco,
-    BarPattern::Glaze,
-    BarPattern::Plasterwork,
-    BarPattern::Cardboard,
-    BarPattern::Plastic,
-    BarPattern::MixedThread,
-    BarPattern::Varnish,
-    BarPattern::Wax,
-    BarPattern::Nonwoven,
-    BarPattern::Mortar,
-    BarPattern::GoldPowder,
-];
-
 /// The pattern one step from `current` in `direction`, wrapping at both ends.
+/// Cycle order is [`BarPattern::ALL`], the canonical enumeration.
 fn cycled_pattern(current: &BarPattern, direction: CycleDirection) -> BarPattern {
-    let len = PATTERN_ORDER.len();
-    let idx = PATTERN_ORDER
+    let all = BarPattern::ALL;
+    let idx = all
         .iter()
-        .position(|p| std::mem::discriminant(p) == std::mem::discriminant(current))
+        .position(|p| p == current)
         .unwrap_or(0);
     let next = match direction {
-        CycleDirection::Forward => (idx + 1) % len,
-        CycleDirection::Backward => (idx + len - 1) % len,
+        CycleDirection::Forward => (idx + 1) % all.len(),
+        CycleDirection::Backward => (idx + all.len() - 1) % all.len(),
     };
-    PATTERN_ORDER[next]
+    all[next]
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

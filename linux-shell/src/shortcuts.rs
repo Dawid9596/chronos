@@ -42,37 +42,49 @@ impl Action {
     /// Document history; listed under the "Edit" heading in the shortcuts dialog.
     pub const EDIT: [Action; 2] = [Action::Undo, Action::Redo];
 
-    /// Must stay in the same order as `Tool::TOOLBAR_DEFAULTS`.
-    pub const TOOLS: [Action; 7] = [
-        Action::ToolEdit,
-        Action::ToolCreate,
-        Action::ToolDelete,
-        Action::ToolPaint,
-        Action::ToolSplit,
-        Action::ToolDuplicate,
-        Action::ToolMerge,
-    ];
+    pub const TOOLS: [Action; Tool::TOOLBAR_DEFAULTS.len()] = {
+        let mut out = [Action::Open; Tool::TOOLBAR_DEFAULTS.len()];
+        let mut i = 0;
+        while i < Tool::TOOLBAR_DEFAULTS.len() {
+            out[i] = Self::tool_action(Tool::TOOLBAR_DEFAULTS[i]);
+            i += 1;
+        }
+        out
+    };
 
     /// Steps through a tool family's variants (Paint patterns, Merge directions).
     pub const VARIANTS: [Action; 2] = [Action::NextVariant, Action::PrevVariant];
 
-    pub const ALL: [Action; 15] = [
-        Action::Open,
-        Action::Save,
-        Action::SaveAs,
-        Action::Export,
-        Action::Undo,
-        Action::Redo,
-        Action::ToolEdit,
-        Action::ToolCreate,
-        Action::ToolDelete,
-        Action::ToolPaint,
-        Action::ToolSplit,
-        Action::ToolDuplicate,
-        Action::ToolMerge,
-        Action::NextVariant,
-        Action::PrevVariant,
-    ];
+    /// (File, Edit, Tools, Variants).
+    pub const ALL: [Action; Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()] = {
+        let mut out = [Action::Open; Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()];
+        let mut i = 0;
+        let mut src = 0;
+        while src < Self::FILE.len() {
+            out[i] = Self::FILE[src];
+            i += 1;
+            src += 1;
+        }
+        let mut src = 0;
+        while src < Self::EDIT.len() {
+            out[i] = Self::EDIT[src];
+            i += 1;
+            src += 1;
+        }
+        let mut src = 0;
+        while src < Self::TOOLS.len() {
+            out[i] = Self::TOOLS[src];
+            i += 1;
+            src += 1;
+        }
+        let mut src = 0;
+        while src < Self::VARIANTS.len() {
+            out[i] = Self::VARIANTS[src];
+            i += 1;
+            src += 1;
+        }
+        out
+    };
 
     pub fn id(self) -> &'static str {
         match self {
@@ -129,6 +141,18 @@ impl Action {
 
     pub fn defers_to_text_input(self) -> bool {
         Self::EDIT.contains(&self)
+    }
+
+    const fn tool_action(tool: Tool) -> Action {
+        match tool {
+            Tool::Edit => Action::ToolEdit,
+            Tool::Create => Action::ToolCreate,
+            Tool::Delete => Action::ToolDelete,
+            Tool::Paint(_) => Action::ToolPaint,
+            Tool::Split => Action::ToolSplit,
+            Tool::Duplicate => Action::ToolDuplicate,
+            Tool::Merge(_) => Action::ToolMerge,
+        }
     }
 
     pub fn tool(self) -> Option<Tool> {

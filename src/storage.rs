@@ -58,6 +58,41 @@ pub enum BarPattern {
     GoldPowder,
 }
 
+impl BarPattern {
+    /// All patterns in declaration order — THE canonical enumeration.
+    pub const ALL: [BarPattern; 29] = [
+        Self::Bolus,
+        Self::Brick,
+        Self::Ceramics,
+        Self::Wood,
+        Self::Textile,
+        Self::MetalFoil,
+        Self::Embroidery,
+        Self::Stone,
+        Self::Glue,
+        Self::Bone,
+        Self::SprayVarnish,
+        Self::Painting,
+        Self::Metal,
+        Self::Paper,
+        Self::Patina,
+        Self::Parchment,
+        Self::Whitewash,
+        Self::Leather,
+        Self::Stucco,
+        Self::Glaze,
+        Self::Plasterwork,
+        Self::Cardboard,
+        Self::Plastic,
+        Self::MixedThread,
+        Self::Varnish,
+        Self::Wax,
+        Self::Nonwoven,
+        Self::Mortar,
+        Self::GoldPowder,
+    ];
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum StatusMessage {
     Info(String),
@@ -160,4 +195,20 @@ pub struct ConservationEntry {
     pub chrono_group: u32,
     #[serde(default)]
     pub dating_group: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BarPattern;
+
+    /// `BarPattern::ALL` stands for the whole enum: entry `i` must be the
+    /// `i`-th declared variant. Catches a re-ordered or duplicated list;
+    /// a *missing* variant cannot occur without `patterns::tile` failing to
+    /// compile (it has one exhaustive arm per schema pattern).
+    #[test]
+    fn all_lists_every_variant_in_declaration_order() {
+        for (i, pattern) in BarPattern::ALL.iter().enumerate() {
+            assert_eq!(*pattern as usize, i);
+        }
+    }
 }
