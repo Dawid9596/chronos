@@ -91,6 +91,11 @@ pub struct Translations {
     pub error_save_prefix: String,
     pub error_no_project_data: String,
     pub error_no_export_settings: String,
+    // Help & About documentation windows
+    pub doc_about_title: String,
+    pub doc_help_title: String,
+    pub about_markdown: String,
+    pub help_markdown: String,
 }
 
 impl Translations {
@@ -171,6 +176,102 @@ impl Translations {
                 error_save_prefix: "Error saving file: ".into(),
                 error_no_project_data: "This PDF has no embedded project data. Only PDFs exported with project data embedded can be opened.".into(),
                 error_no_export_settings: "This file contains no export settings.".into(),
+                doc_about_title: "About Chronos".into(),
+                doc_help_title: "Chronos Help".into(),
+                // `{version}` is replaced with the program version on display;
+                // the `{#anchor}` markers must stay stable, they are link targets.
+                about_markdown: r#"# Conservation Editor (Chronos)
+
+**Version:** {version}
+**Author:** Dawid Pawelec — uliat@protonmail.com
+
+---
+
+## Overview {#overview}
+
+Conservation Editor is a stratigraphic layer and condition documentation tool.
+
+- **Editor:** Manage documents in standard format including layer characteristics, thickness, chronological phases, and dating periods.
+- **WYSIWYG:** Visually specify graphical representations.
+- **PDF Generation:** Export reports to PDF.
+
+Need assistance? Open the [User Guide](doc:help) or jump directly to [Keyboard Shortcuts](doc:help#shortcuts).
+
+---
+
+## License {#license}
+
+This program is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License v3** as published by the Free Software Foundation (see the `LICENSE` file shipped with the program sources). It comes without any warranty; see the license for details. Its complete source code is available at [github.com/Dawid9596/chronos](https://github.com/Dawid9596/chronos).
+
+The bar-pattern artwork embedded in exported PDFs is copyright **@kationart** and licensed under **CC BY-SA 4.0** (see the `patterns/LICENSE` file).
+
+**Documents you create with this program are yours.** Neither the program's license nor the artwork license restricts the use, publishing, or sale of the reports you produce; the artwork attribution shown at the end of each export satisfies the artwork's license.
+"#.into(),
+                help_markdown: r#"# Chronos Help & Documentation
+
+Welcome to the Conservation Editor documentation. Use the internal links below to jump to a topic:
+
+- [Working with Tools](#tools)
+- [Managing Layers & Groups](#layers)
+- [Saving & Exporting](#files)
+- [Keyboard Shortcuts](#shortcuts)
+- [About Chronos](doc:about)
+
+---
+
+## Working with Tools {#tools}
+
+The top toolbar provides interactive tools for editing condition bars and cells:
+
+- **Edit:** Drag slot edges to resize coverage, or click a bar to cycle through patterns. Right-click cycles backward.
+- **Create:** Click inside a condition bar to insert a new slot at the cursor position.
+- **Delete:** Click an existing slot inside a condition bar to remove it.
+- **Paint:** Select one of the 29 patterns (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) and click any bar to apply it.
+- **Split:** Click the highlighted horizontal divider inside a merged cell to split the group at that boundary.
+- **Duplicate:** Click a row number or condition bar to duplicate the entire stratigraphic layer.
+- **Merge:** Choose **Merge Down** or **Merge Up** and click a Chronological Phase or Dating Period cell to merge it with its neighbor.
+
+---
+
+## Managing Layers & Groups {#layers}
+
+- **Insert Layer:** Click the thin gap above, below, or between groups to insert a blank layer.
+- **Reorder Layer:** Double-click and hold a row number in the **No.** column, then drag vertically to reorder.
+- **Edit Text:** Double-click any text cell or the project title to edit inline. Press `Enter` to commit or `Escape` to cancel.
+
+---
+
+## Saving & Exporting {#files}
+
+Projects are saved as `.json` files and can be exported directly to `.pdf` from the **File** menu or the toolbar button. Exported PDFs can carry the embedded project, so they can be re-opened for editing; that behaviour can be switched off in the **Output Canvas Parameters** dialog.
+
+Export settings (column visibility and canvas parameters) are stored in every Save file. To apply settings from another file or from a PDF without opening it as a project, choose **Import from file...** in the output canvas parameters dialog.
+
+---
+
+## Keyboard Shortcuts {#shortcuts}
+Defaults are
+```
+Ctrl + O          Open Project (.json)
+Ctrl + S          Save Project
+Ctrl + Shift + S  Save Project As...
+Ctrl + E          Export to PDF
+Ctrl + Z          Undo
+Ctrl + Y          Redo
+E                 Edit Tool
+C                 Create Tool
+D                 Delete Tool
+P                 Paint Tool
+S                 Split Tool
+R                 Duplicate Tool
+M                 Merge Tool
+]                 Next Variant
+[                 Previous Variant
+```
+`Ctrl + Mouse wheel` also cycles through the active tool's variants. All of these, as well as extra mouse buttons, can be rebound in the **Keyboard Shortcuts** dialog.
+
+Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
+"#.into(),
             },
             Language::Polish => Self {
                 language: Language::Polish,
@@ -247,6 +348,100 @@ impl Translations {
                 error_save_prefix: "Błąd zapisywania pliku: ".into(),
                 error_no_project_data: "Ten plik PDF nie zawiera osadzonych danych projektu. Można otworzyć tylko pliki PDF wyeksportowane z osadzonymi danymi projektu.".into(),
                 error_no_export_settings: "Ten plik nie zawiera ustawień eksportu.".into(),
+                doc_about_title: "O programie".into(),
+                doc_help_title: "Pomoc Chronos".into(),
+                about_markdown: r#"# Conservation Editor (Chronos)
+
+**Wersja:** {version}
+**Autor:** Dawid Pawelec — uliat@protonmail.com
+
+---
+
+## Przegląd {#overview}
+
+Conservation Editor to narzędzie do dokumentacji warstw stratygraficznych i ich stanu.
+
+- **Edytor:** Zarządzanie dokumentami w standardowym formacie, obejmującym charakterystykę warstw, miąższość, fazy chronologiczne i okresy datowania.
+- **WYSIWYG:** Wizualne określanie przedstawienia graficznego.
+- **Generowanie PDF:** Eksport raportów do formatu PDF.
+
+Potrzebujesz pomocy? Otwórz [Przewodnik użytkownika](doc:help) lub przejdź od razu do [Skrótów klawiszowych](doc:help#shortcuts).
+
+---
+
+## Licencja {#license}
+
+Ten program jest wolnym oprogramowaniem: można go redystrybuować i modyfikować na warunkach licencji **GNU General Public License v3**, opublikowanej przez Free Software Foundation (zob. plik `LICENSE` dołączony do kodu źródłowego programu). Program jest oferowany bez jakichkolwiek gwarancji; szczegóły znajdują się w treści licencji. Pełny kod źródłowy jest dostępny pod adresem [github.com/Dawid9596/chronos](https://github.com/Dawid9596/chronos).
+
+Grafika wzorów komórek osadzana w eksportowanych plikach PDF podlega prawom autorskim podmiotu **@kationart** i jest licencjonowana na warunkach **CC BY-SA 4.0** (zob. plik `patterns/LICENSE`).
+
+**Dokumenty utworzone w tym programie są własnością użytkownika.** Ani licencja programu, ani licencja grafiki nie ograniczają wykorzystywania, publikowania ani sprzedaży wygenerowanych raportów; nota o autorstwie grafiki pokazana na końcu każdego eksportu spełnia wymagania licencji grafiki.
+"#.into(),
+                help_markdown: r#"# Pomoc i dokumentacja Chronos
+
+Witaj w dokumentacji Conservation Editor. Odnośniki poniżej prowadzą do kolejnych tematów:
+
+- [Praca z narzędziami](#tools)
+- [Warstwy i grupy](#layers)
+- [Zapis i eksport](#files)
+- [Skróty klawiszowe](#shortcuts)
+- [O programie](doc:about)
+
+---
+
+## Praca z narzędziami {#tools}
+
+Pasek narzędzi na górze okna zawiera narzędzia przeznaczone do edycji pasków stanu zachowania oraz komórek:
+
+- **Edytuj:** Przeciągaj krawędzie slotów, aby zmieniać pokrycie, lub klikaj pasek, aby przechodzić przez wzory; prawy przycisk myszy przechodzi przez nie w drugą stronę.
+- **Utwórz:** Kliknięcie wewnątrz paska wstawia nowy slot w miejscu kursora.
+- **Usuń:** Kliknięcie istniejącego slotu wewnątrz paska usuwa go.
+- **Maluj:** Wybierz jeden z 29 wzorów (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) i kliknij dowolny pasek, aby go nanieść.
+- **Dziel:** Kliknij podświetloną poziomą linię podziału w połączonej komórce, aby rozdzielić grupę w tym miejscu.
+- **Duplikuj:** Kliknij numer wiersza albo pasek, aby zduplikować całą warstwę.
+- **Scalaj:** Wybierz **Scal w dół** lub **Scal w górę**, a następnie kliknij komórkę fazy chronologicznej lub okresu datowania, aby połączyć ją z sąsiednią.
+
+---
+
+## Warstwy i grupy {#layers}
+
+- **Wstawianie warstwy:** Kliknij cienką przerwę nad, pod lub między grupami, aby wstawić pustą warstwę.
+- **Zmiana kolejności:** Dwukrotnie kliknij i przytrzymaj numer wiersza w kolumnie **Nr warstwy**, a następnie przeciągnij go pionowo, aby zmienić kolejność.
+- **Edycja tekstu:** Dwukrotne kliknięcie dowolnej komórki tekstowej lub tytułu projektu rozpoczyna edycję w miejscu. `Enter` zatwierdza zmianę, `Escape` ją anuluje.
+
+---
+
+## Zapis i eksport {#files}
+
+Projekty są zapisywane jako pliki `.json`, a eksport bezpośrednio do `.pdf` jest dostępny z menu **Plik** lub przycisku na pasku narzędzi. Eksportowane pliki PDF mogą osadzać dane projektu, dzięki czemu można je ponownie otworzyć do dalszej edycji; to zachowanie można wyłączyć w oknie **Parametry obszaru wyjściowego**.
+
+Ustawienia eksportu (widoczne kolumny i parametry obszaru wyjściowego) są zapisywane w każdym pliku projektu. Aby przyjąć ustawienia z innego pliku lub pliku PDF bez otwierania go jako projektu, wybierz **Importuj z pliku...** w oknie parametrów obszaru wyjściowego.
+
+---
+
+## Skróty klawiszowe {#shortcuts}
+Domyślne skróty:
+```
+Ctrl + O          Otwórz projekt (.json)
+Ctrl + S          Zapisz projekt
+Ctrl + Shift + S  Zapisz projekt jako...
+Ctrl + E          Eksport do PDF
+Ctrl + Z          Cofnij
+Ctrl + Y          Ponów
+E                 narzędzie Edytuj
+C                 narzędzie Utwórz
+D                 narzędzie Usuń
+P                 narzędzie Maluj
+S                 narzędzie Dziel
+R                 narzędzie Duplikuj
+M                 narzędzie Scalaj
+]                 następny wariant
+[                 poprzedni wariant
+```
+Skrót `Ctrl + kółko myszy` również przechodzi przez warianty aktywnego narzędzia. Wszystkie te skróty, a także dodatkowe przyciski myszy, można zmienić w oknie **Skróty klawiszowe**.
+
+Powrót na [początek pomocy](#top) lub odczytaj [informacje o programie](doc:about).
+"#.into(),
             },
         }
     }

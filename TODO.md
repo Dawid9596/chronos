@@ -3,8 +3,6 @@ Tracking:Track a has_unsaved_changes: bool flag in AppState (set on document-mut
 
 Brushes in menus: show name on hover
 
-When in Paint mode ctrl + scroll to select Brush
-
 A single source of truth for clamping constants in project.rs
 
 A single source of truth for project's version
@@ -13,7 +11,7 @@ Rename linux-shell and make releases screen guide the users as to which version 
 
 fix: scroll obfuscates Paint mode variants
 
-Modify description
+Remove legacy buttons
 
 "Flag, settings, export pdf should have margin right"
 

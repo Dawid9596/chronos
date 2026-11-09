@@ -271,8 +271,12 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         let holder = ctx_holder.clone();
         about_menu_btn.connect_clicked(move |_| {
             if let Some(ctx) = holder.borrow().as_ref() {
-                let title = ctx.core.view().translations.menu_about;
-                crate::ui::markdown::show_markdown_window(&ctx.window, &title, "about");
+                let view = ctx.core.view();
+                crate::ui::markdown::show_markdown_window(
+                    &ctx.window,
+                    &view.translations,
+                    "about",
+                );
             }
         });
     }
@@ -287,8 +291,12 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         let holder = ctx_holder.clone();
         help_menu_btn.connect_clicked(move |_| {
             if let Some(ctx) = holder.borrow().as_ref() {
-                let title = ctx.core.view().translations.menu_help;
-                crate::ui::markdown::show_markdown_window(&ctx.window, &title, "help");
+                let view = ctx.core.view();
+                crate::ui::markdown::show_markdown_window(
+                    &ctx.window,
+                    &view.translations,
+                    "help",
+                );
             }
         });
     }

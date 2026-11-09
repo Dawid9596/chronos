@@ -1,108 +1,14 @@
+use chronos::i18n::Translations;
 use gtk4::glib;
 use gtk4::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub const ABOUT_MD: &str = concat!(
-    r#"# Conservation Editor (Chronos)
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-**Version:** "#,
-    env!("CARGO_PKG_VERSION"),
-    r#"
-**Author:** Dawid Pawelec — uliat@protonmail.com
-
----
-
-## Overview {#overview}
-
-Conservation Editor is a stratigraphic layer and condition documentation tool.
-
-- **Editor:** Manage documents in standard format including layer characteristics, thickness, chronological phases, and dating periods.
-- **WYSIWYG:** Visually specify graphical representations.
-- **PDF Generation**: Export reports to PDF. 
-
-Need assistance? Open the [User Guide](doc:help) or jump directly to [Keyboard Shortcuts](doc:help#shortcuts).
-
----
-
-## License {#license}
-
-This program is free software: you can redistribute it and/or modify it under the
-terms of the **GNU General Public License v3** as published by the Free Software
-Foundation (see the `LICENSE` file with the program sources). It comes without any
-warranty; see the license for details. Its complete source code is available at
-[github.com/Dawid9596/chronos](https://github.com/Dawid9596/chronos) — published with the next public release.
-
-The bar-pattern artwork embedded in exported PDFs is copyright **@kationart** and
-licensed under **CC BY-SA 4.0** (see the `patterns/LICENSE` file).
-
-**Documents you create with this program are yours.** Neither the program's
-license nor the artwork license restricts the use, publishing, or sale of the
-reports you produce; the artwork attribution shown at the end of each export
-satisfies the artwork's license.
-"#
-);
-
-pub const HELP_MD: &str = r#"# Chronos Help & Documentation
-
-Welcome to the Conservation Editor documentation. Use the internal links below to jump to a topic:
-
-- [Working with Tools](#tools)
-- [Managing Layers & Groups](#layers)
-- [Saving & Exporting](#files)
-- [Keyboard Shortcuts](#shortcuts)
-- [About Chronos](doc:about)
-
----
-
-## Working with Tools {#tools}
-
-The top toolbar provides interactive tools for editing condition bars and cells:
-
-- **Edit:** Drag slot edges to resize coverage, or click a bar to cycle through patterns. Right-click cycles backward.
-- **Create:** Click inside a condition bar to insert a new slot at the cursor position.
-- **Delete:** Click an existing slot inside a condition bar to remove it.
-- **Paint:** Select one of the 29 patterns (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) and click any bar to apply it.
-- **Split:** Click the highlighted horizontal divider inside a merged cell to split the group at that boundary.
-- **Duplicate:** Click a row number or condition bar to duplicate the entire stratigraphic layer.
-- **Merge:** Choose **Merge Down** or **Merge Up** and click a Chronological Phase or Dating Period cell to merge it with its neighbor.
-
----
-
-## Managing Layers & Groups {#layers}
-
-- **Insert Layer:** Click the thin gap above, below, or between groups to insert a blank layer.
-- **Reorder Layer:** Double-click and hold a row number in the **No.** column, then drag vertically to reorder.
-- **Edit Text:** Double-click any text cell or the project title to edit inline. Press `Enter` to commit or `Escape` to cancel.
-
----
-
-## Saving & Exporting {#files}
-
-Projects are saved in `.json` format and can be exported directly to `.pdf` using the **File** menu or toolbar button. You can customize column visibility and bar dimensions under **Edit -> Output Canvas Parameters**.
-
----
-
-## Keyboard Shortcuts {#shortcuts}
-Defaults are
-```
-Ctrl + O          Open Project (.json)
-Ctrl + S          Save Project
-Ctrl + Shift + S  Save Project As...
-Ctrl + E          Export to PDF
-E                 Edit Tool
-C                 Create Tool
-D                 Delete Tool
-P                 Paint Tool
-S                 Split Tool
-R                 Duplicate Tool
-M                 Merge Tool
-Double-Click      Inline Edit / Reorder Handle
-Escape            Cancel Inline Edit
-```
-Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
-"#;
+const ABOUT_PAGE: &str = "about";
+const HELP_PAGE: &str = "help";
 
 type NavFn = Rc<RefCell<Option<Box<dyn Fn(&str)>>>>;
 
@@ -113,9 +19,18 @@ thread_local! {
 /// Opens a window capable of rendering predetermined basic markdown with internal links.
 pub fn show_markdown_window(
     parent: &gtk4::ApplicationWindow,
-    initial_title: &str,
+    t: &Translations,
     initial_doc_id: &str,
 ) {
+    let page_of = |doc_id: &str| -> (&str, &str) {
+        // (page-id, window title)
+        if doc_id == ABOUT_PAGE {
+            (ABOUT_PAGE, &t.doc_about_title)
+        } else {
+            (HELP_PAGE, &t.doc_help_title)
+        }
+    };
+
     // Reuse existing documentation window if one is already open
     let reused = ACTIVE_MD_WIN.with(|slot| {
         if let Some((weak_win, nav_fn)) = slot.borrow().as_ref()
@@ -123,7 +38,7 @@ pub fn show_markdown_window(
                 if let Some(ref f) = *nav_fn.borrow() {
                     f(&format!("doc:{initial_doc_id}"));
                 }
-                win.set_title(Some(initial_title));
+                win.set_title(Some(page_of(initial_doc_id).1));
                 win.present();
                 return true;
             }
@@ -133,9 +48,16 @@ pub fn show_markdown_window(
         return;
     }
 
-    let mut pages: HashMap<String, (String, &'static str)> = HashMap::new();
-    pages.insert("about".to_string(), ("About".to_string(), ABOUT_MD));
-    pages.insert("help".to_string(), ("Help".to_string(), HELP_MD));
+    let (_, initial_title) = page_of(initial_doc_id);
+    let mut pages: HashMap<String, (String, String)> = HashMap::new();
+    pages.insert(
+        ABOUT_PAGE.to_string(),
+        (t.doc_about_title.clone(), t.about_markdown.replace("{version}", APP_VERSION)),
+    );
+    pages.insert(
+        HELP_PAGE.to_string(),
+        (t.doc_help_title.clone(), t.help_markdown.clone()),
+    );
     let pages = Rc::new(pages);
 
     let win = gtk4::Window::builder()

@@ -29,9 +29,10 @@ fn main() -> gtk4::glib::ExitCode {
 
         let icon_theme = gtk4::IconTheme::for_display(&display);
         if let Ok(exe_path) = std::env::current_exe()
-            && let Some(exe_dir) = exe_path.parent() {
-                icon_theme.add_search_path(exe_dir.join("share/icons"));
-            }
+            && let Some(exe_dir) = exe_path.parent()
+        {
+            icon_theme.add_search_path(exe_dir.join("share/icons"));
+        }
         let settings = gtk4::Settings::for_display(&display);
         settings.set_gtk_icon_theme_name(Some("Adwaita"));
         gtk4::Window::set_default_icon_name("chronos");
