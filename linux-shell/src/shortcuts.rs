@@ -361,8 +361,9 @@ pub struct ShortcutRegistry {
     bindings: Rc<RefCell<HashMap<Action, String>>>,
     shortcuts: RefCell<Vec<(Action, gtk4::Shortcut)>>,
     hint_labels: RefCell<Vec<(Action, gtk4::Label)>>,
-    tooltips: RefCell<Vec<(Action, gtk4::Widget)>>,
+    tooltips: RefCell<Vec<(Action, gtk4::Widget, bool)>>,
     shortcut_prefix: RefCell<String>,
+    action_names: RefCell<HashMap<Action, String>>,
 }
 
 impl ShortcutRegistry {
@@ -418,6 +419,7 @@ impl ShortcutRegistry {
             hint_labels: RefCell::new(Vec::new()),
             tooltips: RefCell::new(Vec::new()),
             shortcut_prefix: RefCell::new("Shortcut: ".to_string()),
+            action_names: RefCell::new(HashMap::new()),
         }
     }
 
@@ -499,19 +501,57 @@ impl ShortcutRegistry {
 
     /// Adds "Shortcut: X" as `widget`'s tooltip and keeps it up to date.
     pub fn bind_tooltip(&self, action: Action, widget: &impl IsA<gtk4::Widget>, t: &Translations) {
-        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
+        self.bind_tooltip_inner(action, widget, t, false);
+    }
+
+    /// Adds "<Action Name> (Shortcut: X)" as `widget`'s tooltip and keeps it up to date.
+    pub fn bind_named_tooltip(
+        &self,
+        action: Action,
+        widget: &impl IsA<gtk4::Widget>,
+        t: &Translations,
+    ) {
+        self.bind_tooltip_inner(action, widget, t, true);
+    }
+
+    fn bind_tooltip_inner(
+        &self,
+        action: Action,
+        widget: &impl IsA<gtk4::Widget>,
+        t: &Translations,
+        include_name: bool,
+    ) {
+        self.sync_translation_cache(t);
         let widget = widget.upcast_ref::<gtk4::Widget>().clone();
+        let text = self.format_tooltip(action, include_name);
+        widget.set_tooltip_text(Some(&text));
+        self.tooltips.borrow_mut().push((action, widget, include_name));
+    }
+
+    fn sync_translation_cache(&self, t: &Translations) {
+        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
+        let mut names = self.action_names.borrow_mut();
+        for a in Action::ALL {
+            names.insert(a, a.display_name(t));
+        }
+    }
+
+    fn format_tooltip(&self, action: Action, include_name: bool) -> String {
         let prefix = self.shortcut_prefix.borrow();
-        widget.set_tooltip_text(Some(&tooltip_text(&prefix, &self.label(action))));
-        self.tooltips.borrow_mut().push((action, widget));
+        let accel = self.label(action);
+        if include_name {
+            if let Some(name) = self.action_names.borrow().get(&action) {
+                return format!("{name} ({prefix}{accel})");
+            }
+        }
+        tooltip_text(&prefix, &accel)
     }
 
     pub fn update_translations(&self, t: &Translations) {
-        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
-        let prefix = self.shortcut_prefix.borrow();
-        for (a, widget) in self.tooltips.borrow().iter() {
-            let label = self.label(*a);
-            widget.set_tooltip_text(Some(&tooltip_text(&prefix, &label)));
+        self.sync_translation_cache(t);
+        for (a, widget, include_name) in self.tooltips.borrow().iter() {
+            let text = self.format_tooltip(*a, *include_name);
+            widget.set_tooltip_text(Some(&text));
         }
     }
 
@@ -570,10 +610,10 @@ impl ShortcutRegistry {
                 hint.set_text(&label);
             }
         }
-        for (a, widget) in self.tooltips.borrow().iter() {
+        for (a, widget, include_name) in self.tooltips.borrow().iter() {
             if *a == action {
-                let prefix = self.shortcut_prefix.borrow();
-                widget.set_tooltip_text(Some(&tooltip_text(&prefix, &label)));
+                let text = self.format_tooltip(*a, *include_name);
+                widget.set_tooltip_text(Some(&text));
             }
         }
     }

@@ -6,8 +6,8 @@ use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
 use chronos::i18n::Language;
 use crux_core::Core;
-use gtk4::{Align, glib};
 use gtk4::prelude::*;
+use gtk4::{Align, glib};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -272,11 +272,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         about_menu_btn.connect_clicked(move |_| {
             if let Some(ctx) = holder.borrow().as_ref() {
                 let view = ctx.core.view();
-                crate::ui::markdown::show_markdown_window(
-                    &ctx.window,
-                    &view.translations,
-                    "about",
-                );
+                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "about");
             }
         });
     }
@@ -292,11 +288,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         help_menu_btn.connect_clicked(move |_| {
             if let Some(ctx) = holder.borrow().as_ref() {
                 let view = ctx.core.view();
-                crate::ui::markdown::show_markdown_window(
-                    &ctx.window,
-                    &view.translations,
-                    "help",
-                );
+                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "help");
             }
         });
     }
@@ -371,6 +363,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let bottom_stack = gtk4::Stack::builder()
         .transition_type(gtk4::StackTransitionType::Crossfade)
+        .hhomogeneous(false)
+        .vhomogeneous(false)
+        .hexpand(true)
         .build();
 
     let bottom_revealer = gtk4::Revealer::builder()
@@ -420,7 +415,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
         tool_bar_row.append(&btn);
         tool_labels.push((default_tool, text_label));
-        shortcuts.bind_tooltip(Action::for_tool(default_tool), &btn, t);
+        shortcuts.bind_named_tooltip(Action::for_tool(default_tool), &btn, t);
         tool_buttons.push((default_tool, btn.clone()));
 
         let stack_page_name = format!("tool-variants-{tool_idx}");
@@ -461,7 +456,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     }
                 });
 
-                variant_buttons.borrow_mut().push((variant, var_btn.clone()));
+                variant_buttons
+                    .borrow_mut()
+                    .push((variant, var_btn.clone()));
                 selector_box.append(&var_btn);
             }
 
@@ -478,13 +475,63 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     .borrow_mut()
                     .push((default_tool, inline_rev));
             } else {
+                selector_box.set_halign(gtk4::Align::Center);
+                selector_box.set_valign(gtk4::Align::Center); // Prevent vertical stretching
+                // Reserve 18px of empty space below the buttons.
+                // The overlay scrollbar will float over this gap instead of the buttons!
+                selector_box.set_margin_bottom(18);
+
+                let viewport = gtk4::Viewport::builder()
+                    .scroll_to_focus(false)
+                    .child(&selector_box)
+                    .build();
+
                 let selector_view = gtk4::ScrolledWindow::builder()
                     .hscrollbar_policy(gtk4::PolicyType::Automatic)
                     .vscrollbar_policy(gtk4::PolicyType::Never)
+                    // Must be TRUE so GTK doesn't steal layout height from the Viewport
+                    .overlay_scrolling(true)
+                    .propagate_natural_height(true)
+                    .min_content_width(1)
+                    .propagate_natural_width(false)
                     .hexpand(true)
-                    .child(&selector_box)
+                    .child(&viewport)
                     .build();
-                selector_box.set_halign(gtk4::Align::Center);
+
+                let strip_scroll = gtk4::EventControllerScroll::new(
+                    gtk4::EventControllerScrollFlags::VERTICAL
+                        | gtk4::EventControllerScrollFlags::HORIZONTAL,
+                );
+
+                let hadj = selector_view.hadjustment();
+                strip_scroll.connect_scroll(move |ctrl, dx, dy| {
+                    if ctrl
+                        .current_event_state()
+                        .intersects(gtk4::gdk::ModifierType::CONTROL_MASK)
+                    {
+                        return glib::Propagation::Proceed;
+                    }
+
+                    // Let ScrolledWindow handle native horizontal swipes / tilt wheels
+                    if dx.abs() > 0.0 {
+                        return glib::Propagation::Proceed;
+                    }
+
+                    // Differentiate smooth touch movements from physical mouse wheel notches
+                    let delta = match ctrl.unit() {
+                        // Touchpad / smooth scrolling: deltas are already pixel distances (1:1)
+                        gtk4::gdk::ScrollUnit::Surface => dy,
+                        // Discrete mouse wheel click: advance ~1 button width (36px) per notch
+                        gtk4::gdk::ScrollUnit::Wheel => dy * 36.0,
+                        _ => dy * 36.0,
+                    };
+
+                    let max_val = (hadj.upper() - hadj.page_size()).max(0.0);
+                    hadj.set_value((hadj.value() + delta).clamp(0.0, max_val));
+                    glib::Propagation::Stop
+                });
+                selector_view.add_controller(strip_scroll);
+
                 bottom_stack.add_named(&selector_view, Some(&stack_page_name));
             }
         }
@@ -689,6 +736,56 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     *ctx_holder.borrow_mut() = Some(ctx.clone());
 
+    // Dynamically collapse tool button labels into icon-only mode when the
+    // available width is too narrow to fit the left controls, full tool bar,
+    // and Undo/Redo buttons without overflowing.
+    {
+        let tool_labels = ctx.tool_labels.clone();
+        let left_box = left_box.clone();
+        let history_box = history_buttons.widget().clone();
+        let tool_bar_row = tool_bar_row.clone();
+        let top_bar_clone = top_bar.clone();
+        let last_expanded_tools_width = Rc::new(Cell::new(0));
+        let labels_visible = Rc::new(Cell::new(true));
+
+        top_bar.add_tick_callback(move |bar, _| {
+            let allocated = bar.width();
+            if allocated <= 0 {
+                return glib::ControlFlow::Continue;
+            }
+
+            let (_, left_nat, _, _) = left_box.measure(gtk4::Orientation::Horizontal, -1);
+            let (_, right_nat, _, _) = history_box.measure(gtk4::Orientation::Horizontal, -1);
+            let (_, tools_nat, _, _) = tool_bar_row.measure(gtk4::Orientation::Horizontal, -1);
+
+            if labels_visible.get() {
+                last_expanded_tools_width.set(tools_nat);
+            }
+
+            // CenterBox centers the middle widget, so both side slots effectively
+            // reserve `2 * max(left, right)` plus spacing, or at minimum `left + right`.
+            let side_reserve = left_nat.max(right_nat) * 2 + 32;
+            let needed_expanded = last_expanded_tools_width.get().max(tools_nat) + side_reserve;
+
+            // Hysteresis buffer (16px) prevents rapid toggling on the boundary
+            let should_show = if labels_visible.get() {
+                allocated >= needed_expanded
+            } else {
+                allocated >= needed_expanded + 16
+            };
+
+            if should_show != labels_visible.get() {
+                labels_visible.set(should_show);
+                for (_, lbl) in tool_labels.iter() {
+                    lbl.set_visible(should_show);
+                }
+                top_bar_clone.queue_resize();
+            }
+
+            glib::ControlFlow::Continue
+        });
+    }
+
     let ctx_btn = ctx.clone();
     lang_btn.connect_clicked(move |_| {
         let ctx_idle = ctx_btn.clone();
@@ -763,20 +860,55 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let scroll_ctrl = gtk4::EventControllerScroll::new(gtk4::EventControllerScrollFlags::VERTICAL);
     scroll_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
     let ctx_scroll = ctx.clone();
+    let touchpad_accum = std::rc::Rc::new(std::cell::Cell::new(0.0f64));
+
+    // Uses opinionated, inverted axis relative to GTK, so Up = Next, Down = Prev
     scroll_ctrl.connect_scroll(move |ctrl, _dx, dy| {
-        if ctrl
+        if !ctrl
             .current_event_state()
             .intersects(gtk4::gdk::ModifierType::CONTROL_MASK)
         {
-            let action = if dy > 0.0 {
-                Action::PrevVariant
-            } else {
-                Action::NextVariant
-            };
-            run_action(&ctx_scroll, action);
-            return glib::Propagation::Stop;
+            touchpad_accum.set(0.0);
+            return glib::Propagation::Proceed;
         }
-        glib::Propagation::Proceed
+
+        match ctrl.unit() {
+            // Touchpad / smooth scrolling: accumulate distance before triggering a step
+            gtk4::gdk::ScrollUnit::Surface => {
+                const STEP_THRESHOLD_PX: f64 = 40.0;
+                let mut accum = touchpad_accum.get();
+
+                // Reset accumulator immediately if swipe direction reverses
+                if (accum > 0.0 && dy > 0.0) || (accum < 0.0 && dy < 0.0) {
+                    accum = 0.0;
+                }
+
+                accum -= dy;
+
+                while accum >= STEP_THRESHOLD_PX {
+                    run_action(&ctx_scroll, Action::PrevVariant);
+                    accum -= STEP_THRESHOLD_PX;
+                }
+                while accum <= -STEP_THRESHOLD_PX {
+                    run_action(&ctx_scroll, Action::NextVariant);
+                    accum += STEP_THRESHOLD_PX;
+                }
+
+                touchpad_accum.set(accum);
+            }
+            // Discrete mouse wheel click: trigger immediately per physical notch
+            _ => {
+                touchpad_accum.set(0.0);
+                let action = if dy > 0.0 {
+                    Action::PrevVariant
+                } else {
+                    Action::NextVariant
+                };
+                run_action(&ctx_scroll, action);
+            }
+        }
+
+        glib::Propagation::Stop
     });
     window.add_controller(scroll_ctrl);
 
@@ -792,8 +924,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let ctx_btn = ctx.clone();
     button_ctrl.connect_pressed(move |gesture, _n_press, _x, _y| {
         let button = gesture.current_button();
-        let mods =
-            gesture.current_event_state() & gtk4::accelerator_get_default_mod_mask();
+        let mods = gesture.current_event_state() & gtk4::accelerator_get_default_mod_mask();
         if let Some(action) = ctx_btn.shortcuts.mouse_action(button, mods)
             && !ctx_btn.shortcuts.should_defer(action, &ctx_btn.window)
         {
@@ -861,7 +992,32 @@ fn cycle_tool_variant(ctx: &AppContext, forward: bool) {
             .find(|(t, _)| *t == next_variant)
     {
         btn.set_active(true);
+        scroll_variant_into_view(btn);
     }
+}
+
+fn scroll_variant_into_view(btn: &gtk4::ToggleButton) {
+    let Some(scrolled) = btn
+        .ancestor(gtk4::ScrolledWindow::static_type())
+        .and_then(|w| w.downcast::<gtk4::ScrolledWindow>().ok())
+    else {
+        return;
+    };
+    let Some(parent) = btn.parent() else {
+        return;
+    };
+    let Some(bounds) = btn.compute_bounds(&parent) else {
+        return;
+    };
+
+    let hadj = scrolled.hadjustment();
+    let btn_center = bounds.x() as f64 + (bounds.width() as f64 / 2.0);
+    let page = hadj.page_size();
+    let max_val = (hadj.upper() - page).max(0.0);
+
+    // Center the button in the middle of the visible viewport
+    let target = btn_center - (page / 2.0);
+    hadj.set_value(target.clamp(0.0, max_val));
 }
 
 pub fn build_flag_widget(lang: Rc<Cell<Language>>) -> gtk4::DrawingArea {
