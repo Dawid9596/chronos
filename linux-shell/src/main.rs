@@ -12,6 +12,39 @@ use gtk4::prelude::*;
 const APP_ID: &str = "org.conservation.Editor";
 
 fn main() -> gtk4::glib::ExitCode {
+    /// Detach and quit the terminal in release build
+    #[cfg(all(not(debug_assertions), target_os = "linux"))]
+    {
+        use std::process;
+        // SAFETY: fork before any GTK/GLib state is created.
+        let pid = unsafe { libc::fork() };
+        if pid < 0 {
+            // Fork failed; continue in the foreground.
+        } else if pid > 0 {
+            // Parent: hand off to the child and exit.
+            process::exit(0);
+        } else {
+            // Child: become a session leader and detach from the controlling
+            // terminal, then drop the inherited standard streams.
+            unsafe {
+                libc::setsid();
+            }
+            if let Ok(devnull) = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open("/dev/null")
+            {
+                use std::os::unix::io::AsRawFd;
+                let fd = devnull.as_raw_fd();
+                unsafe {
+                    libc::dup2(fd, 0);
+                    libc::dup2(fd, 1);
+                    libc::dup2(fd, 2);
+                }
+            }
+        }
+    }
+
     #[cfg(windows)]
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {

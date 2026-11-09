@@ -1842,6 +1842,7 @@ dependencies = [
  "crux_core",
  "dirs",
  "gtk4",
+ "libc",
  "open",
  "resvg",
  "serde",
