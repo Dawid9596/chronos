@@ -53,8 +53,8 @@ fn pct_to_x(pct: f32, w: f64) -> f64 {
 /// position beyond the bar maps to the bar edge.
 #[must_use]
 fn x_to_pct(x: f64, w: f64) -> f32 {
-    (x / w * f64::from(Slot::PCT_MAX))
-        .clamp(f64::from(Slot::PCT_MIN), f64::from(Slot::PCT_MAX)) as f32
+    (x / w * f64::from(Slot::PCT_MAX)).clamp(f64::from(Slot::PCT_MIN), f64::from(Slot::PCT_MAX))
+        as f32
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -130,6 +130,74 @@ impl BarPattern {
         Self::Mortar,
         Self::GoldPowder,
     ];
+
+    #[must_use]
+    pub fn display_name(self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Bolus => "Bolus",
+                Self::Brick => "Brick",
+                Self::Ceramics => "Ceramics",
+                Self::Wood => "Wood",
+                Self::Textile => "Textile",
+                Self::MetalFoil => "Metal foil",
+                Self::Embroidery => "Embroidery",
+                Self::Stone => "Stone",
+                Self::Glue => "Glue",
+                Self::Bone => "Bone",
+                Self::SprayVarnish => "Spray varnish",
+                Self::Painting => "Painting",
+                Self::Metal => "Metal",
+                Self::Paper => "Paper",
+                Self::Patina => "Patina",
+                Self::Parchment => "Parchment",
+                Self::Whitewash => "Whitewash",
+                Self::Leather => "Leather",
+                Self::Stucco => "Stucco",
+                Self::Glaze => "Glaze",
+                Self::Plasterwork => "Plasterwork",
+                Self::Cardboard => "Cardboard",
+                Self::Plastic => "Plastic",
+                Self::MixedThread => "Mixed thread",
+                Self::Varnish => "Varnish",
+                Self::Wax => "Wax",
+                Self::Nonwoven => "Nonwoven",
+                Self::Mortar => "Mortar",
+                Self::GoldPowder => "Gold powder",
+            },
+            Language::Polish => match self {
+                Self::Bolus => "Bolus",
+                Self::Brick => "Cegła",
+                Self::Ceramics => "Ceramika",
+                Self::Wood => "Drewno",
+                Self::Textile => "Tkanina",
+                Self::MetalFoil => "Folie metalowe",
+                Self::Embroidery => "Haft",
+                Self::Stone => "Kamień",
+                Self::Glue => "Klej",
+                Self::Bone => "Kość",
+                Self::SprayVarnish => "Laserunek",
+                Self::Painting => "Malowidło",
+                Self::Metal => "Metal",
+                Self::Paper => "Papier",
+                Self::Patina => "Patyna",
+                Self::Parchment => "Pergamin",
+                Self::Whitewash => "Pobiała",
+                Self::Leather => "Skóra",
+                Self::Stucco => "Stiuk",
+                Self::Glaze => "Szkliwo",
+                Self::Plasterwork => "Sztukateria",
+                Self::Cardboard => "Tektura",
+                Self::Plastic => "Tworzywo sztuczne",
+                Self::MixedThread => "Wątek mieszany",
+                Self::Varnish => "Werniks",
+                Self::Wax => "Wosk",
+                Self::Nonwoven => "Włóknina",
+                Self::Mortar => "Zaprawa",
+                Self::GoldPowder => "Złoto w proszku",
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -248,6 +316,19 @@ mod tests {
     fn all_lists_every_variant_in_declaration_order() {
         for (i, pattern) in BarPattern::ALL.iter().enumerate() {
             assert_eq!(*pattern as usize, i);
+        }
+    }
+
+    /// Every variant has a tooltip name in every interface language.
+    #[test]
+    fn display_name_covers_every_variant_and_language() {
+        for pattern in BarPattern::ALL {
+            for lang in [
+                crate::i18n::Language::English,
+                crate::i18n::Language::Polish,
+            ] {
+                assert!(!pattern.display_name(lang).is_empty(), "{pattern:?}");
+            }
         }
     }
 

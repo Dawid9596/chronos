@@ -1,4 +1,5 @@
 use crate::context::AppContext;
+use crate::tool::Tool;
 use chronos::bridge::{Effect, Event, ExportPdfResponse};
 use chronos::bridge::{FilePickerRequest, FilePickerResponse};
 use chronos::storage::StatusMessage;
@@ -70,6 +71,12 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 if ctx.current_lang.get() != t.language {
                     ctx.current_lang.set(t.language);
                     ctx.persist_settings();
+                }
+
+                for (tool_variant, btn) in ctx.variant_buttons.borrow().iter() {
+                    if let Tool::Paint(pattern) = tool_variant {
+                        btn.set_tooltip_text(Some(pattern.display_name(t.language)));
+                    }
                 }
                 ctx.settings_label.set_markup(&t.settings_tooltip);
                 ctx.menu_labels.update(t);

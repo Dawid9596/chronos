@@ -424,6 +424,10 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     .can_focus(false)
                     .build();
 
+                if let Tool::Paint(pattern) = variant {
+                    var_btn.set_tooltip_text(Some(pattern.display_name(t.language)));
+                }
+
                 if let Some(ref leader) = first_var_btn {
                     var_btn.set_group(Some(leader));
                 } else {
