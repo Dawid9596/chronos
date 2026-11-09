@@ -71,7 +71,6 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ctx.current_lang.set(t.language);
                     ctx.persist_settings();
                 }
-                ctx.flag_area.queue_draw();
                 ctx.settings_label.set_markup(&t.settings_tooltip);
                 ctx.menu_labels.update(t);
                 ctx.shortcuts.update_translations(t);

@@ -4,7 +4,6 @@ use crate::shortcuts::{Action, ShortcutRegistry};
 use crate::tool::Tool;
 use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
-use chronos::i18n::Language;
 use crux_core::Core;
 use gtk4::prelude::*;
 use gtk4::{Align, glib};
@@ -338,16 +337,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
 
     let current_lang = Rc::new(Cell::new(t.language));
-    let flag_area = build_flag_widget(current_lang.clone());
-
-    let lang_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .spacing(6)
-        .build();
-    let lang_icon = gtk4::Image::from_icon_name("preferences-desktop-locale-symbolic");
-    lang_box.append(&lang_icon);
-    lang_box.append(&flag_area);
-    let lang_btn = gtk4::Button::builder().child(&lang_box).build();
 
     let tool_section = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Vertical)
@@ -570,7 +559,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
     left_box.set_halign(Align::End);
     left_box.set_valign(Align::Start);
-    left_box.append(&lang_btn);
     left_box.append(&settings_btn);
     left_box.append(&export_btn);
 
@@ -719,7 +707,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         export_btn: export_btn.clone(),
         settings_label: settings_label.clone(),
         current_lang,
-        flag_area,
         tool_labels: Rc::new(tool_labels),
         tool_buttons: Rc::new(tool_buttons),
         variant_buttons,
@@ -785,15 +772,6 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             glib::ControlFlow::Continue
         });
     }
-
-    let ctx_btn = ctx.clone();
-    lang_btn.connect_clicked(move |_| {
-        let ctx_idle = ctx_btn.clone();
-        glib::idle_add_local_once(move || {
-            let effects = ctx_idle.core.process_event(Event::ToggleLanguage);
-            crate::effects::process_effects(&ctx_idle, effects);
-        });
-    });
 
     let initial_view = core.view();
     crate::ui::table::sync_document_table(&initial_view, &ctx);
@@ -1020,88 +998,3 @@ fn scroll_variant_into_view(btn: &gtk4::ToggleButton) {
     hadj.set_value(target.clamp(0.0, max_val));
 }
 
-pub fn build_flag_widget(lang: Rc<Cell<Language>>) -> gtk4::DrawingArea {
-    let area = gtk4::DrawingArea::builder()
-        .width_request(22)
-        .height_request(15)
-        .valign(gtk4::Align::Center)
-        .build();
-
-    area.set_draw_func(move |_area, cr, width, height| {
-        let w = width as f64;
-        let h = height as f64;
-        if w <= 0.0 || h <= 0.0 {
-            return;
-        }
-
-        match lang.get() {
-            Language::Polish => {
-                // Top half: White
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                cr.rectangle(0.0, 0.0, w, h / 2.0);
-                let _ = cr.fill();
-
-                // Bottom half: Crimson (#DC143C)
-                cr.set_source_rgb(0.863, 0.078, 0.235);
-                cr.rectangle(0.0, h / 2.0, w, h / 2.0);
-                let _ = cr.fill();
-            }
-            Language::English => {
-                // Clip all diagonals and crosses to the flag bounds
-                cr.rectangle(0.0, 0.0, w, h);
-                cr.clip();
-
-                // 1. Navy blue background (#012169)
-                cr.set_source_rgb(0.004, 0.129, 0.412);
-                cr.rectangle(0.0, 0.0, w, h);
-                let _ = cr.fill();
-
-                // 2. White diagonal cross
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                cr.set_line_width(2.8);
-                cr.move_to(0.0, 0.0);
-                cr.line_to(w, h);
-                cr.move_to(w, 0.0);
-                cr.line_to(0.0, h);
-                let _ = cr.stroke();
-
-                // 3. Red diagonal cross (#C8102E)
-                cr.set_source_rgb(0.784, 0.063, 0.180);
-                cr.set_line_width(1.3);
-                cr.move_to(0.0, 0.0);
-                cr.line_to(w, h);
-                cr.move_to(w, 0.0);
-                cr.line_to(0.0, h);
-                let _ = cr.stroke();
-
-                // 4. White central cross
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                cr.set_line_width(4.6);
-                cr.move_to(w / 2.0, 0.0);
-                cr.line_to(w / 2.0, h);
-                cr.move_to(0.0, h / 2.0);
-                cr.line_to(w, h / 2.0);
-                let _ = cr.stroke();
-
-                // 5. Red central cross (#C8102E)
-                cr.set_source_rgb(0.784, 0.063, 0.180);
-                cr.set_line_width(2.6);
-                cr.move_to(w / 2.0, 0.0);
-                cr.line_to(w / 2.0, h);
-                cr.move_to(0.0, h / 2.0);
-                cr.line_to(w, h / 2.0);
-                let _ = cr.stroke();
-
-                cr.reset_clip();
-            }
-        }
-
-        // Subtle 1px outer frame so the white edges stay defined against light/dark themes
-        cr.set_source_rgba(0.0, 0.0, 0.0, 0.25);
-        cr.set_line_width(1.0);
-        cr.rectangle(0.5, 0.5, w - 1.0, h - 1.0);
-        let _ = cr.stroke();
-    });
-
-    area
-}

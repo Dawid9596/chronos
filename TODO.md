@@ -7,10 +7,6 @@ A single source of truth for project's version
 
 Rename linux-shell and make releases screen guide the users as to which version goes with which OS.
 
-fix: scroll obfuscates Paint mode variants
-
-Remove legacy buttons
-
 "Flag, settings, export pdf should have margin right"
 
 .chr.json extension support

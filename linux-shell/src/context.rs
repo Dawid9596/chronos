@@ -8,7 +8,7 @@ use chronos::project::ExportSettings;
 use crux_core::Core;
 use gtk4::glib;
 use gtk4::prelude::*;
-use gtk4::{ApplicationWindow, Button, DrawingArea, Label, ScrolledWindow, ToggleButton};
+use gtk4::{ApplicationWindow, Button, Label, ScrolledWindow, ToggleButton};
 use chronos::context::COLUMN_COUNT;
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
@@ -75,7 +75,6 @@ pub struct AppContext {
     pub status: Label,
     pub export_btn: Button,
     pub current_lang: Rc<Cell<Language>>,
-    pub flag_area: DrawingArea,
     pub settings_label: Label,
     pub tool_labels: Rc<Vec<(Tool, Label)>>,
     /// One toggle per toolbar tool family; used by the tool shortcuts so the
