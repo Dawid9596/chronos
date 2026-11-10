@@ -143,3 +143,36 @@ jobs:
             dist/*.deb
             dist/*.AppImage
             dist/*.tar.gz
+
+  release-notes:
+    name: Release notes (install instructions)
+    needs: [windows, linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write install instructions
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > release-notes.md <<EOF
+          ## Installation
+
+          | Platform | File | How to install |
+          |----------|------|----------------|
+          | Windows | \`chronos-windows_${VERSION}_x64_en-US.msi\` | Run the installer |
+          | Ubuntu / Debian | \`chronos-linux_${VERSION}_amd64.deb\` | \`sudo apt install ./chronos-linux_${VERSION}_amd64.deb\` |
+          | Other Linux | \`chronos-linux_${VERSION}_x86_64.AppImage\` | \`chmod +x chronos-linux_${VERSION}_x86_64.AppImage && ./chronos-linux_${VERSION}_x86_64.AppImage\` |
+          | Portable Linux | \`chronos-linux-x64.tar.gz\` | Unpack and run the contained binary |
+
+          Notes:
+
+          - The .deb targets Ubuntu 24.04 / Debian 13 or newer.
+          - AppImages need FUSE (\`libfuse2\`); on systems without it, run the
+            AppImage with \`--appimage-extract-and-run\` instead.
+          - The portable archive contains only the binary and expects the GTK 4
+            runtime to be installed through your distribution.
+          EOF
+
+      - name: Set release body
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
