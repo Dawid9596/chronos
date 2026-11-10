@@ -8,6 +8,8 @@ mod tool;
 mod ui;
 
 use gtk4::prelude::*;
+use std::cell::Cell;
+use std::rc::Rc;
 
 const APP_ID: &str = "org.conservation.Editor";
 
@@ -147,10 +149,29 @@ fn main() -> gtk4::glib::ExitCode {
         );
     });
 
-    app.connect_activate(|app| {
+    // GTK single-instance registration means a second launch with the same
+    // APP_ID silently hands its windows over to the already-running primary
+    // (an old build, an unreaped AppImage, another checkout) and exits 0.
+    // Track activation so that handoff can at least be reported to whoever
+    // is watching the terminal — otherwise an outdated instance keeps
+    // running looks like a no-op launch.
+    let activated = Rc::new(Cell::new(false));
+    let app_activated = activated.clone();
+    app.connect_activate(move |app| {
+        app_activated.set(true);
         let (window, _ctx) = crate::ui::window::build_main_window(app);
         window.present();
     });
 
-    app.run()
+    let exit = app.run();
+
+    if !activated.get() {
+        eprintln!(
+            "chronos: window forwarded to an already-running instance \
+             with the same application id ({APP_ID}), which is probably \
+             an older build; kill it to run this build in the foreground."
+        );
+    }
+
+    exit
 }

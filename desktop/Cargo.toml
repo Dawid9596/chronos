@@ -39,8 +39,14 @@ identifier = "com.chronos.app"
 copyright = "Copyright (c) Dawid Pawelec (GPL-3.0); pattern artwork (c) kationart (CC BY-SA 4.0)"
 homepage = "https://github.com/Dawid9596/chronos"
 long_description = "Stratigraphic layer and condition documentation tool for conservation projects."
-icons = ["../icons/bitmap.png"]
+icons = ["../icons/bitmap.png", "../icons/chronos-256.png"]
 out_dir = "../target/release/packager"
+
+[package.metadata.packager.appimage]
+# linuxdeploy's bundled (old) strip chokes on .relr.dyn sections present in
+# modern system libs. Skipped instead in the release workflow via the
+# `NO_STRIP=true` env var (see release.yml), which linuxdeploy honors; every
+# lib then ships unstripped, keeping the exclusion list empty.
 
 [package.metadata.packager.deb]
 # Dependency names for Ubuntu 24.04 (noble) where libgtk-4 got the time64 ABI

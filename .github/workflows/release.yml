@@ -106,19 +106,26 @@ jobs:
       # desktop/Cargo.toml. NB: without --config, cargo-packager needs
       # `--release` to look for the binary in target/release; it does not
       # build anything itself.
-      - name: Package deb
-        run: cargo packager --release -p desktop --formats deb --verbose
+      #
+      # NO_STRIP=true skips the old `strip` bundled inside linuxdeploy, which
+      # cannot handle modern .relr.dyn sections in system libs and aborts the
+      # AppImage build (linuxdeploy issue #272); the libs then ship unstripped.
+      - name: Package deb and AppImage
+        env:
+          NO_STRIP: "true"
+        run: cargo packager --release -p desktop --formats deb,appimage --verbose
 
       # Same dual-location staging as the Windows job: the deb lands in
       # target/release/packager/ (the config's out_dir), but verify loudly.
       - name: Stage artifacts
         run: |
           mkdir -p dist
-          cp target/release/packager/*.deb dist/ 2>/dev/null \
-            || cp target/release/*.deb dist/
+          cp target/release/packager/*.deb target/release/packager/*.AppImage dist/ 2>/dev/null \
+            || cp target/release/*.deb target/release/*.AppImage dist/ 2>/dev/null
           # cargo-packager derives the file name from the (OS-neutral) binary
           # name; stamp the releases with the target OS instead.
-          for f in dist/chronos_*.deb; do
+          for f in dist/chronos_*.deb dist/chronos_*.AppImage; do
+            [ -e "$f" ] || continue
             mv "$f" "${f/chronos_/chronos-linux_}"
           done
           test -n "$(ls dist)"
@@ -134,4 +141,5 @@ jobs:
         with:
           files: |
             dist/*.deb
+            dist/*.AppImage
             dist/*.tar.gz
