@@ -6,11 +6,15 @@ members = [
 
 [workspace.package]
 version = "0.2.0"
+authors = ["Dawid Pawelec <uliat@protonmail.com>"]
+description = "Conservation Editor"
 
 
 [package]
 name = "chronos"
 version = { workspace = true }
+authors = { workspace = true }
+description = { workspace = true }
 edition = "2024"
 repository = "https://github.com/Dawid9596/chronos"
 license = "GPL-3.0-only"
@@ -36,11 +40,14 @@ chrono = "0.4"
 comemo = "0.4"
 serde_json = "1.0.151"
 
-# Windows packager
+# Windows packager. The MSI consumes: product_name, version (auto from the
+# manifest), identifier, publisher, icons, binaries, resources. Other config
+# fields (copyright, homepage, description, authors) are not used for an MSI;
+# the deb-specific metadata lives in desktop/Cargo.toml.
 [package.metadata.packager]
 product_name = "Chronos"
 identifier = "com.chronos.app"
-homepage = "https://github.com/Dawid9596/chronos"
+publisher = "Dawid Pawelec"
 formats = ["wix"]
 icons = ["icons/icon.ico"]
 

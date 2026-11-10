@@ -1,10 +1,8 @@
 [package]
 name = "desktop"
 version = { workspace = true }
-# Single source of truth for the author contact: the deb control's Maintainer
-# (cargo-packager auto-fills it from this field in the metadata flow) and the
-# About page (rendered via `env!("CARGO_PKG_AUTHORS")`).
-authors = ["Dawid Pawelec <uliat@protonmail.com>"]
+authors = { workspace = true }
+description = { workspace = true }
 edition = "2024"
 build = "build.rs"
 
@@ -38,17 +36,11 @@ panic = "abort"
 [package.metadata.packager]
 product_name = "Chronos"
 identifier = "com.chronos.app"
-publisher = "Dawid Pawelec"
 copyright = "Copyright (c) Dawid Pawelec (GPL-3.0); pattern artwork (c) kationart (CC BY-SA 4.0)"
 homepage = "https://github.com/Dawid9596/chronos"
-description = "Conservation Editor"
 long_description = "Stratigraphic layer and condition documentation tool for conservation projects."
 icons = ["../icons/bitmap.png"]
 out_dir = "../target/release/packager"
-
-binaries = [
-  { path = "chronos", main = true },
-]
 
 [package.metadata.packager.deb]
 # Dependency names for Ubuntu 24.04 (noble) where libgtk-4 got the time64 ABI
