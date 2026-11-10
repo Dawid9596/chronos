@@ -64,8 +64,9 @@ cp /ucrt64/share/icons/hicolor/index.theme "$STAGE_DIR/hicolor/" 2>/dev/null || 
 cp icons/bitmap.png "$STAGE_DIR/hicolor/256x256/apps/chronos.png"
 
 echo "==> 5. Running cargo-packager from native C: drive..."
+
 pushd "$PKG_WORK_DIR" > /dev/null
-cargo packager --release -v
+cargo packager --release -p chronos -v
 popd > /dev/null
 
 echo "==> Done! Installer is ready in ${CARGO_TARGET_DIR}/release/"

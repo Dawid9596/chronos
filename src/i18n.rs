@@ -256,11 +256,13 @@ impl Translations {
                 doc_about_title: "About Chronos".into(),
                 doc_help_title: "Chronos Help".into(),
                 // `{version}` is replaced with the program version on display;
-                // the `{#anchor}` markers must stay stable, they are link targets.
+                // `{authors}` with the author line (from the desktop crate's
+                // `[package] authors`); the `{#anchor}` markers must stay
+                // stable, they are link targets.
                 about_markdown: r#"# Conservation Editor (Chronos)
 
 **Version:** {version}
-**Author:** Dawid Pawelec — uliat@protonmail.com
+**Author:** {authors}
 
 ---
 
@@ -438,7 +440,7 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 about_markdown: r#"# Conservation Editor (Chronos)
 
 **Wersja:** {version}
-**Autor:** Dawid Pawelec — uliat@protonmail.com
+**Autor:** {authors}
 
 ---
 

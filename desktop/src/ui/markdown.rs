@@ -6,6 +6,16 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const APP_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+
+fn author_line() -> String {
+    match APP_AUTHORS.split_once(" <") {
+        Some((name, email)) if email.ends_with('>') => {
+            format!("{name} — {}", &email[..email.len() - 1])
+        }
+        _ => APP_AUTHORS.to_string(),
+    }
+}
 
 const ABOUT_PAGE: &str = "about";
 const HELP_PAGE: &str = "help";
@@ -52,7 +62,9 @@ pub fn show_markdown_window(
     let mut pages: HashMap<String, (String, String)> = HashMap::new();
     pages.insert(
         ABOUT_PAGE.to_string(),
-        (t.doc_about_title.clone(), t.about_markdown.replace("{version}", APP_VERSION)),
+        (t.doc_about_title.clone(), t.about_markdown
+            .replace("{version}", APP_VERSION)
+            .replace("{authors}", &author_line())),
     );
     pages.insert(
         HELP_PAGE.to_string(),

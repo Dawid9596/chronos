@@ -102,16 +102,15 @@ jobs:
       - name: Build binary
         run: cargo build --release -p desktop
 
-      # The dedicated Linux config keeps the Windows metadata in Cargo.toml
-      # clean: the packager paths differ per platform, and the deb dependency
-      # list is Ubuntu 24.04-specific. NB: `--release` is ignored when
-      # --config is passed; the config's binaries_dir points at target/release
-      # regardless.
+      # Packaging is driven by [package.metadata.packager] in
+      # desktop/Cargo.toml. NB: without --config, cargo-packager needs
+      # `--release` to look for the binary in target/release; it does not
+      # build anything itself.
       - name: Package deb
-        run: cargo packager --formats deb --verbose --config Packager.linux.toml
+        run: cargo packager --release -p desktop --formats deb --verbose
 
       # Same dual-location staging as the Windows job: the deb lands in
-      # target/release/packager/ on current cargo-packager, but verify loudly.
+      # target/release/packager/ (the config's out_dir), but verify loudly.
       - name: Stage artifacts
         run: |
           mkdir -p dist
