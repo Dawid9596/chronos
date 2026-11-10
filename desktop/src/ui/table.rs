@@ -8,7 +8,7 @@ use chronos::i18n::Language;
 use chronos::view::AppViewModel;
 use gtk4::glib;
 use gtk4::prelude::*;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 // ---------------------------------------------------------------------------
@@ -154,6 +154,83 @@ type RowAnchors = Rc<RefCell<Vec<Vec<glib::WeakRef<gtk4::Widget>>>>>;
 
 fn weak_widget<W: IsA<gtk4::Widget>>(w: &W) -> glib::WeakRef<gtk4::Widget> {
     w.upcast_ref::<gtk4::Widget>().downgrade()
+}
+
+// ---------------------------------------------------------------------------
+// Two-step column header collapse
+//
+// Full titles while the whole table fits the window,
+// shortened titles when full titles would stretch
+// the table's minimum usable width, and ellipsized short titles
+// (GTK's own ellipsize mode supplies the "...") as the last resort.
+// ---------------------------------------------------------------------------
+
+struct HeaderTitles {
+    label: gtk4::Label,
+    title: String,
+    full: String,
+    short: String,
+}
+
+fn measured_grid_width(
+    grid: &gtk4::Grid,
+    labels: &[HeaderTitles],
+    pick: impl Fn(&HeaderTitles) -> &str,
+) -> i32 {
+    for header in labels {
+        header.label.set_markup(pick(header));
+    }
+    let (_, natural, _, _) = grid.measure(gtk4::Orientation::Horizontal, -1);
+    natural
+}
+
+fn attach_header_collapse(grid: &gtk4::Grid, header_candidates: Vec<HeaderTitles>) {
+    let grid = grid.clone();
+    let labels = Rc::new(header_candidates);
+    // Only re-measure when the allocated width actually changed
+    let last_width = Cell::new(0);
+    let applied_stage = Cell::new(255u8);
+
+    grid.add_tick_callback(move |grid, _| {
+        let allocated = grid.width();
+        if allocated <= 0 || allocated == last_width.get() {
+            return glib::ControlFlow::Continue;
+        }
+        last_width.set(allocated);
+
+        let w_full = measured_grid_width(&grid, &labels, |h| &h.full);
+        let w_short = measured_grid_width(&grid, &labels, |h| &h.short);
+
+        let stage = if allocated >= w_full {
+            0u8 // full titles fit
+        } else if allocated >= w_short {
+            1 // shortened titles fit
+        } else {
+            2 // labels must ellipsize
+        };
+
+        for header in labels.iter() {
+            let text = if stage == 0 {
+                &header.full
+            } else {
+                &header.short
+            };
+            header.label.set_markup(text);
+        }
+
+        if applied_stage.get() != stage {
+            applied_stage.set(stage);
+            for header in labels.iter() {
+                if stage == 0 {
+                    header.label.set_tooltip_text(None);
+                } else {
+                    header.label.set_tooltip_text(Some(&header.title));
+                }
+            }
+        }
+
+        glib::ControlFlow::Continue
+    });
 }
 
 fn row_extents(
@@ -352,18 +429,38 @@ fn build_document_table(
 
     let mut total_visible_cols = 0;
     let mut col_idx = 0;
+    let mut header_candidates: Vec<HeaderTitles> = Vec::new();
     for (i, title) in headers.iter().enumerate() {
-        let is_visible = if i == COLUMN_COUNT { true } else { current_vis.flags[i] };
+        let is_visible = if i == COLUMN_COUNT {
+            true
+        } else {
+            current_vis.flags[i]
+        };
         if is_visible {
+            let full = format!("<b>{title}</b>");
+            let short = if i < COLUMN_COUNT {
+                format!("<b>{}</b>", t.col_short(i))
+            } else {
+                full.clone()
+            };
             let label = gtk4::Label::builder()
                 .use_markup(true)
-                .label(format!("<b>{}</b>", title))
+                .ellipsize(gtk4::pango::EllipsizeMode::End)
                 .build();
+            label.set_markup(&full);
             grid.attach(&label, col_idx, 0, 1, 1);
+            header_candidates.push(HeaderTitles {
+                label,
+                title: title.to_string(),
+                full,
+                short,
+            });
             col_idx += 1;
             total_visible_cols += 1;
         }
     }
+
+    attach_header_collapse(&grid, header_candidates);
 
     let mut current_grid_row = 1;
     grid.attach(

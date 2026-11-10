@@ -75,6 +75,14 @@ pub struct Translations {
     pub col_thickness: String,
     pub col_chrono: String,
     pub col_dating: String,
+    // Shortened (non-destructive) table-column titles
+    pub col_no_short: String,
+    pub col_graphical_short: String,
+    pub col_woven_short: String,
+    pub col_char_short: String,
+    pub col_thickness_short: String,
+    pub col_chrono_short: String,
+    pub col_dating_short: String,
     // Toolbar & Controls
     pub export_pdf: String,
     pub exporting_pdf: String,
@@ -146,6 +154,20 @@ pub struct Translations {
 }
 
 impl Translations {
+    /// The shortened table-column title by column index
+    #[must_use]
+    pub fn col_short(&self, index: usize) -> &str {
+        match index {
+            0 => &self.col_no_short,
+            1 => &self.col_graphical_short,
+            2 => &self.col_woven_short,
+            3 => &self.col_char_short,
+            4 => &self.col_thickness_short,
+            5 => &self.col_chrono_short,
+            _ => &self.col_dating_short,
+        }
+    }
+
     pub fn get(lang: Language) -> Self {
         match lang {
             Language::English => Self {
@@ -170,6 +192,13 @@ impl Translations {
                 col_thickness: "Layer thickness".into(),
                 col_chrono: "Chronological phase".into(),
                 col_dating: "Dating period".into(),
+                col_no_short: "No.".into(),
+                col_graphical_short: "Graphical representation".into(),
+                col_woven_short: "Woven trim".into(),
+                col_char_short: "Characteristics".into(),
+                col_thickness_short: "Thickness".into(),
+                col_chrono_short: "Chronology".into(),
+                col_dating_short: "Dating".into(),
                 export_pdf: "Export PDF".into(),
                 exporting_pdf: "Exporting...".into(),
                 tool_edit: "Edit".into(),
@@ -343,6 +372,13 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 col_thickness: "Grubość warstwy".into(),
                 col_chrono: "Faza\nchronologiczna".into(),
                 col_dating: "Datowanie".into(),
+                col_no_short: "Nr".into(),
+                col_graphical_short: "Oznaczenie graficzne".into(),
+                col_woven_short: "Krajka".into(),
+                col_char_short: "Charakterystyka".into(),
+                col_thickness_short: "Grubość".into(),
+                col_chrono_short: "Faza".into(),
+                col_dating_short: "Datowanie".into(),
                 export_pdf: "Eksportuj PDF".into(),
                 exporting_pdf: "Eksportuję...".into(),
                 tool_edit: "Edytuj".into(),
