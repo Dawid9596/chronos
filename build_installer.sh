@@ -61,7 +61,7 @@ cp -r /ucrt64/share/icons/Adwaita/symbolic "$STAGE_DIR/Adwaita/"
 
 mkdir -p "$STAGE_DIR/hicolor/256x256/apps"
 cp /ucrt64/share/icons/hicolor/index.theme "$STAGE_DIR/hicolor/" 2>/dev/null || true
-cp icons/bitmap.png "$STAGE_DIR/hicolor/256x256/apps/chronos.png"
+cp icons/chronos-256.png "$STAGE_DIR/hicolor/256x256/apps/chronos.png"
 
 echo "==> 5. Running cargo-packager from native C: drive..."
 
