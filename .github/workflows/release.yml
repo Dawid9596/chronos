@@ -17,13 +17,18 @@ on:
   # The "Upload release assets" steps only run on tag pushes, so manual runs
   # are pure build verification (no release/debris gets created).
   workflow_dispatch:
-
+    inputs:
+      run_windows:
+        description: "Run the Windows (msi) job"
+        type: boolean
+        default: true
 permissions:
   contents: write
 
 jobs:
   windows:
     name: Windows (msi)
+    if: github.event_name != 'workflow_dispatch' || inputs.run_windows
     runs-on: windows-latest
     defaults:
       run:
