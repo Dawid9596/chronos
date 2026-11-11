@@ -1,4 +1,4 @@
-use crate::context::{CanvasParams, COLUMN_COUNT};
+use crate::context::{COLUMN_COUNT, CanvasParams};
 use crate::i18n::Translations;
 use crate::pdf_attachment;
 use crate::project::{ExportSettings, ProjectFile};
@@ -101,10 +101,7 @@ pub enum MergeDirection {
 /// Cycle order is [`BarPattern::ALL`], the canonical enumeration.
 fn cycled_pattern(current: &BarPattern, direction: CycleDirection) -> BarPattern {
     let all = BarPattern::ALL;
-    let idx = all
-        .iter()
-        .position(|p| p == current)
-        .unwrap_or(0);
+    let idx = all.iter().position(|p| p == current).unwrap_or(0);
     let next = match direction {
         CycleDirection::Forward => (idx + 1) % all.len(),
         CycleDirection::Backward => (idx + all.len() - 1) % all.len(),
@@ -359,9 +356,8 @@ impl App for ConservationApp {
                 caps.render.render();
 
                 let t = Translations::get(model.language);
-                let project_json = embed_project_data.then(|| {
-                    ProjectFile::new(model.document.clone(), settings.clone()).to_json()
-                });
+                let project_json = embed_project_data
+                    .then(|| ProjectFile::new(model.document.clone(), settings.clone()).to_json());
                 let display_name = if model.document.project_name.is_empty() {
                     &t.project_untitled
                 } else {
@@ -715,13 +711,13 @@ impl App for ConservationApp {
                         BarType::GraphicalRepresentation => &mut entry.graphical_representation,
                         BarType::WovenTrim => &mut entry.woven_trim,
                     };
-                    let clashes = bar.slots.iter().any(|s| {
-                        at_pct >= s.start_pct - MIN_GAP_PCT && at_pct <= s.end_pct + MIN_GAP_PCT
-                    });
-                    if !clashes {
+                    // The click may sit within MIN_GAP_PCT of a slot edge;
+                    // snap it to the nearest free position beside that slot.
+                    let target = crate::storage::snap_add_position(&bar.slots, at_pct);
+                    if let Some(target) = target {
                         bar.slots.push(Slot {
-                            start_pct: at_pct,
-                            end_pct: at_pct,
+                            start_pct: target,
+                            end_pct: target,
                         });
                         bar.slots
                             .sort_by(|a, b| a.start_pct.total_cmp(&b.start_pct));
@@ -757,26 +753,28 @@ impl App for ConservationApp {
                         BarType::GraphicalRepresentation => &mut entry.graphical_representation,
                         BarType::WovenTrim => &mut entry.woven_trim,
                     };
-                    let prev_end = if slot_index > 0 {
-                        bar.slots[slot_index - 1].end_pct
+                    // The gap is only owed to a *neighbouring* slot; at the
+                    // bar's own boundaries an edge may reach PCT_MIN/PCT_MAX,
+                    // otherwise dragging an outer edge to the end of the bar
+                    // would visibly snap back by MIN_GAP_PCT.
+                    let min_start = if slot_index > 0 {
+                        bar.slots[slot_index - 1].end_pct + MIN_GAP_PCT
                     } else {
                         Slot::PCT_MIN
                     };
-                    let next_start = bar
+                    let max_end = bar
                         .slots
                         .get(slot_index + 1)
-                        .map(|s| s.start_pct)
+                        .map(|s| s.start_pct - MIN_GAP_PCT)
                         .unwrap_or(Slot::PCT_MAX);
 
                     if let Some(slot) = bar.slots.get_mut(slot_index) {
                         match edge {
                             SlotEdge::Start => {
-                                slot.start_pct =
-                                    new_pct.clamp(prev_end + MIN_GAP_PCT, slot.end_pct);
+                                slot.start_pct = new_pct.clamp(min_start, slot.end_pct);
                             }
                             SlotEdge::End => {
-                                slot.end_pct =
-                                    new_pct.clamp(slot.start_pct, next_start - MIN_GAP_PCT);
+                                slot.end_pct = new_pct.clamp(slot.start_pct, max_end);
                             }
                         }
                     }
@@ -863,7 +861,8 @@ impl App for ConservationApp {
                                 model.history.clear();
                                 // Opened from a PDF there is nothing to save back to: Save
                                 // must ask for a new JSON file, not overwrite the PDF.
-                                model.current_file_path = (!is_pdf_path(&path)).then(|| path.clone());
+                                model.current_file_path =
+                                    (!is_pdf_path(&path)).then(|| path.clone());
                                 model.last_error = Some(StatusMessage::Info(format!(
                                     "{}{}",
                                     t.status_loaded_prefix, path
@@ -928,9 +927,11 @@ impl App for ConservationApp {
     fn view(&self, model: &Self::Model) -> Self::ViewModel {
         let t = Translations::get(model.language);
         AppViewModel {
-            document: model
-                .document
-                .to_view_model(t.clone(), [true; COLUMN_COUNT], CanvasParams::default()),
+            document: model.document.to_view_model(
+                t.clone(),
+                [true; COLUMN_COUNT],
+                CanvasParams::default(),
+            ),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
             translations: t,
@@ -1249,6 +1250,110 @@ mod tests {
         assert!(!core.view().can_undo);
     }
 
+    fn start_pct(core: &Core<ConservationApp>) -> f32 {
+        core.view().document.rows[0].graphical_representation.slots[0].start_pct
+    }
+
+    fn drag_start_edge(core: &Core<ConservationApp>, pct: f32) {
+        let _ = core.process_event(Event::UpdateSlotEdge {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            slot_index: 0,
+            edge: SlotEdge::Start,
+            new_pct: pct,
+        });
+    }
+
+    #[test]
+    fn outer_slot_edges_reach_the_bar_boundaries() {
+        let core = core_with_sample_document();
+        // Row 1 has a single slot spanning 0..75%. Its outer edges may be
+        // dragged fully to the bar's boundaries: the MIN_GAP_PCT separation
+        // is only owed to a *neighbouring* slot, of which there is none.
+        drag_end_edge(&core, 100.0);
+        assert_eq!(end_pct(&core), 100.0);
+        drag_start_edge(&core, 0.0);
+        assert_eq!(start_pct(&core), 0.0);
+    }
+
+    #[test]
+    fn inner_edges_still_keep_the_min_gap() {
+        let core = core_with_sample_document();
+        // Add a second (zero-width) slot at 90%, past the first one.
+        let _ = core.process_event(Event::AddSlot {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            at_pct: 90.0,
+        });
+        // Slot 1's start edge is clamped to slot 0's end + MIN_GAP_PCT ...
+        let _ = core.process_event(Event::UpdateSlotEdge {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            slot_index: 1,
+            edge: SlotEdge::Start,
+            new_pct: 20.0,
+        });
+        let slots = &core.view().document.rows[0].graphical_representation.slots;
+        assert_eq!(slots[1].start_pct, 77.0);
+        // ... and slot 0's end edge to slot 1's start - MIN_GAP_PCT
+        // (slot 1's start now sits at 77%, so 77 - 2 = 75).
+        let _ = core.process_event(Event::UpdateSlotEdge {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            slot_index: 0,
+            edge: SlotEdge::End,
+            new_pct: 100.0,
+        });
+        let slots = &core.view().document.rows[0].graphical_representation.slots;
+        assert_eq!(slots[0].end_pct, 75.0);
+    }
+
+    #[test]
+    fn add_slot_snaps_to_the_margin_beside_a_slot() {
+        let core = core_with_sample_document();
+        // Row 1 has a single slot spanning 0..75%. A click in its right
+        // margin zone snaps to the margin instead of being dropped.
+        let _ = core.process_event(Event::AddSlot {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            at_pct: 76.0,
+        });
+        let slots = &core.view().document.rows[0].graphical_representation.slots;
+        assert_eq!(slots.len(), 2);
+        assert_eq!(slots[1].start_pct, 77.0);
+
+        // Pull the second slot's start edge onto that margin, leaving a gap
+        // of exactly MIN_GAP_PCT: no free position remains between the two
+        // slots, so a click inside the gap must not create a third slot.
+        let _ = core.process_event(Event::UpdateSlotEdge {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            slot_index: 1,
+            edge: SlotEdge::Start,
+            new_pct: 76.0,
+        });
+        assert_eq!(
+            core.view().document.rows[0].graphical_representation.slots[1].start_pct,
+            77.0
+        );
+        let before = core.view().document.rows[0]
+            .graphical_representation
+            .slots
+            .len();
+        let _ = core.process_event(Event::AddSlot {
+            id: 1,
+            bar_type: BarType::GraphicalRepresentation,
+            at_pct: 76.0,
+        });
+        assert_eq!(
+            core.view().document.rows[0]
+                .graphical_representation
+                .slots
+                .len(),
+            before
+        );
+    }
+
     #[test]
     fn undo_never_reuses_layer_ids() {
         let core = core_with_sample_document();
@@ -1397,7 +1502,8 @@ mod tests {
     #[test]
     fn open_offers_pdf_files_too() {
         let core = Core::<ConservationApp>::default();
-        let FilePickerRequest::OpenFile { filter_name, .. } = save_request(&core, Event::RequestOpen)
+        let FilePickerRequest::OpenFile { filter_name, .. } =
+            save_request(&core, Event::RequestOpen)
         else {
             panic!("expected OpenFile");
         };

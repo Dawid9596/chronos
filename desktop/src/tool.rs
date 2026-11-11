@@ -1,6 +1,6 @@
 use chronos::bridge::{BarType, CycleDirection, EditableField, Event, MergeDirection, SlotEdge};
 use chronos::i18n::Translations;
-use chronos::storage::{BarPattern, Slot, MIN_GAP_PCT};
+use chronos::storage::{BarPattern, MIN_GAP_PCT, Slot, pct_to_x, snap_add_position};
 use gtk4::cairo;
 use gtk4::prelude::*;
 
@@ -15,15 +15,16 @@ pub enum Tool {
     Merge(MergeDirection),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum DragTarget {
     #[default]
     None,
-    Edge { slot_index: usize, edge: SlotEdge },
+    Edge {
+        slot_index: usize,
+        edge: SlotEdge,
+    },
     Slot(usize),
 }
-
 
 #[derive(Default)]
 pub struct BarInteractionState {
@@ -79,10 +80,7 @@ impl Tool {
         if variants.is_empty() {
             return None;
         }
-        let idx = variants
-            .iter()
-            .position(|&v| v == self)
-            .unwrap_or(0);
+        let idx = variants.iter().position(|&v| v == self).unwrap_or(0);
         let next_idx = if forward {
             (idx + 1) % variants.len()
         } else {
@@ -172,13 +170,12 @@ impl Tool {
                     cr.stroke().expect("stroke preview");
                 }
             }
-            Tool::Paint(_)
-                if state.paint_hover => {
-                    cr.set_source_rgba(0.2, 0.5, 0.9, 0.8);
-                    cr.set_line_width(2.0);
-                    cr.rectangle(1.0, 1.0, (w - 2.0).max(0.0), (h - 2.0).max(0.0));
-                    cr.stroke().expect("stroke paint hover border");
-                }
+            Tool::Paint(_) if state.paint_hover => {
+                cr.set_source_rgba(0.2, 0.5, 0.9, 0.8);
+                cr.set_line_width(2.0);
+                cr.rectangle(1.0, 1.0, (w - 2.0).max(0.0), (h - 2.0).max(0.0));
+                cr.stroke().expect("stroke paint hover border");
+            }
             _ => {}
         }
     }
@@ -211,8 +208,10 @@ impl Tool {
                 }
             }
             Tool::Create => {
-                if state.create_preview != Some(x) {
-                    state.create_preview = Some(x);
+                let preview =
+                    snap_add_position(slots, Slot::pct_at(x, w)).map(|pct| pct_to_x(pct, w));
+                if state.create_preview != preview {
+                    state.create_preview = preview;
                     return true;
                 }
             }
@@ -439,13 +438,14 @@ impl Tool {
 
     pub fn on_group_merge_click(self, member_ids: Vec<u32>, field: EditableField) -> Option<Event> {
         if let Tool::Merge(direction) = self
-            && !member_ids.is_empty() {
-                return Some(Event::MergeGroupCell {
-                    member_ids,
-                    field,
-                    direction,
-                });
-            }
+            && !member_ids.is_empty()
+        {
+            return Some(Event::MergeGroupCell {
+                member_ids,
+                field,
+                direction,
+            });
+        }
         None
     }
 }

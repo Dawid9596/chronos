@@ -19,8 +19,8 @@
 //!   whole file.
 
 use crate::context::{
-    clamp_finite_range, sanitize_paper_size, CanvasParams, COLUMN_COUNT, COLUMN_RATIO_RANGE,
-    PAGE_MARGIN_MM_RANGE, PADDING_MM_RANGE, ZERO_WIDTH_LINE_PT_RANGE,
+    COLUMN_COUNT, COLUMN_RATIO_RANGE, CanvasParams, PADDING_MM_RANGE, PAGE_MARGIN_MM_RANGE,
+    ZERO_WIDTH_LINE_PT_RANGE, clamp_finite_range, sanitize_paper_size,
 };
 use crate::storage::ConservationDocument;
 use serde::{Deserialize, Serialize};
@@ -182,8 +182,8 @@ mod tests {
     #[test]
     fn unknown_fields_are_ignored() {
         let doc = sample_document();
-        let mut v = serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default()))
-            .unwrap();
+        let mut v =
+            serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default())).unwrap();
         v["something_from_the_future"] = serde_json::json!({ "a": 1 });
         v["export_settings"]["canvas"]["future_option"] = serde_json::json!(true);
         let project = ProjectFile::parse(&v.to_string()).unwrap();
@@ -194,8 +194,8 @@ mod tests {
     #[test]
     fn damaged_settings_do_not_block_the_document() {
         let doc = sample_document();
-        let mut v = serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default()))
-            .unwrap();
+        let mut v =
+            serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default())).unwrap();
         v["export_settings"] = serde_json::json!({ "visible_columns": "nope" });
         let project = ProjectFile::parse(&v.to_string()).unwrap();
         assert_eq!(project.document, doc);
@@ -207,7 +207,12 @@ mod tests {
         let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v.as_object_mut().unwrap().remove("export_settings");
-        assert!(ProjectFile::parse(&v.to_string()).unwrap().export_settings.is_none());
+        assert!(
+            ProjectFile::parse(&v.to_string())
+                .unwrap()
+                .export_settings
+                .is_none()
+        );
     }
 
     #[test]
@@ -219,8 +224,12 @@ mod tests {
         v["export_settings"]["canvas"]["bar_padding_mm"] = serde_json::json!(-5);
         v["export_settings"]["canvas"]["zero_width_line_pt"] = serde_json::json!(99);
         v["export_settings"]["canvas"]["paper_size"] = serde_json::json!("tabloid");
-        v["export_settings"]["canvas"]["column_ratios"] = serde_json::json!([0, 200, 5, 5, 5, 5, 5]);
-        let s = ProjectFile::parse(&v.to_string()).unwrap().export_settings.unwrap();
+        v["export_settings"]["canvas"]["column_ratios"] =
+            serde_json::json!([0, 200, 5, 5, 5, 5, 5]);
+        let s = ProjectFile::parse(&v.to_string())
+            .unwrap()
+            .export_settings
+            .unwrap();
         assert_eq!(s.canvas.page_margin_mm, 50.0);
         assert_eq!(s.canvas.cell_padding_mm, 0.0);
         assert_eq!(s.canvas.bar_padding_mm, 0.0);

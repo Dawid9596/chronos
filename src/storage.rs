@@ -45,8 +45,54 @@ impl Slot {
 /// Converts a slot-domain percentage (see [`Slot::PCT_MIN`]) into an absolute
 /// x coordinate across a bar of width `w`.
 #[must_use]
-fn pct_to_x(pct: f32, w: f64) -> f64 {
+pub fn pct_to_x(pct: f32, w: f64) -> f64 {
     w * (f64::from(pct) / f64::from(Slot::PCT_MAX))
+}
+
+/// Resolves where a Create-tool click at `at_pct` inserts a new slot into
+/// `slots` (sorted by start edge), or `None` when there is no free position.
+///
+/// A click in open space inserts exactly at `at_pct`. A click within the
+/// `MIN_GAP_PCT` margin beside a slot's edge snaps to that margin — but only
+/// if the snapped position also keeps the margin to the slot on the other
+/// side of the gap; in a gap narrower than `2 * MIN_GAP_PCT` (or in the
+/// middle of a slot) there is no free position and the click is ignored.
+#[must_use]
+pub fn snap_add_position(slots: &[Slot], at_pct: f32) -> Option<f32> {
+    let idx = match slots
+        .iter()
+        .position(|s| at_pct >= s.start_pct - MIN_GAP_PCT && at_pct <= s.end_pct + MIN_GAP_PCT)
+    {
+        Some(idx) => idx,
+        // Open space: insert exactly where clicked.
+        None => return Some(at_pct),
+    };
+    let s = slots[idx];
+
+    if at_pct > s.end_pct {
+        // Just right of `s`: snap to its end + margin, provided the slot
+        // after it leaves room for the snapped position.
+        let candidate = s.end_pct + MIN_GAP_PCT;
+        let room = slots
+            .get(idx + 1)
+            .map_or(candidate <= Slot::PCT_MAX, |next| {
+                candidate <= next.start_pct - MIN_GAP_PCT
+            });
+        room.then_some(candidate)
+    } else if at_pct < s.start_pct {
+        // Just left of `s`: snap to its start - margin, provided the slot
+        // before it leaves room for the snapped position.
+        let candidate = s.start_pct - MIN_GAP_PCT;
+        let room = idx
+            .checked_sub(1)
+            .map_or(candidate >= Slot::PCT_MIN, |prev| {
+                candidate >= slots[prev].end_pct + MIN_GAP_PCT
+            });
+        room.then_some(candidate)
+    } else {
+        // Strictly inside a slot: no free position nearby.
+        None
+    }
 }
 
 /// Inverse of [`pct_to_x`], clamped into the slot domain so a pointer
@@ -326,7 +372,59 @@ pub struct ConservationEntry {
 
 #[cfg(test)]
 mod tests {
-    use super::{BarPattern, Slot};
+    use super::{BarPattern, Slot, snap_add_position};
+
+    fn mk(v: &[(f32, f32)]) -> Vec<Slot> {
+        v.iter()
+            .map(|&(start_pct, end_pct)| Slot { start_pct, end_pct })
+            .collect()
+    }
+
+    /// A click in open space inserts exactly where it lands.
+    #[test]
+    fn open_space_inserts_where_clicked() {
+        let slots = mk(&[(0.0, 40.0), (60.0, 100.0)]);
+        assert_eq!(snap_add_position(&slots, 50.0), Some(50.0));
+    }
+
+    /// A click inside a slot's margin zone snaps to that margin, on either
+    /// side, as long as the snapped position keeps the margin to the slot
+    /// on the other side of the gap.
+    #[test]
+    fn margin_clicks_snap_to_the_nearest_free_position() {
+        let slots = mk(&[(0.0, 40.0), (60.0, 100.0)]);
+        // Just after A (A ends at 40): snaps to 42, clear of B at 60.
+        assert_eq!(snap_add_position(&slots, 41.0), Some(42.0));
+        // Just before B (B starts at 60): snaps to 58, clear of A at 40.
+        assert_eq!(snap_add_position(&slots, 59.0), Some(58.0));
+
+        // A tight gap (A ends at 40, B starts at 42) has no free position:
+        // A's margin (42) collides with B's margin (40).
+        let tight = mk(&[(0.0, 40.0), (42.0, 100.0)]);
+        assert_eq!(snap_add_position(&tight, 41.0), None);
+    }
+
+    /// Clicks with no free position nearby are ignored: inside a slot, or
+    /// past a bar boundary that cannot honour the margin.
+    #[test]
+    fn impossible_clicks_are_ignored() {
+        let slots = mk(&[(0.0, 40.0), (60.0, 100.0)]);
+        // In the middle of a slot.
+        assert_eq!(snap_add_position(&slots, 20.0), None);
+        assert_eq!(snap_add_position(&slots, 80.0), None);
+
+        // The last slot ends at 99; its margin would need 101%.
+        let near_end = mk(&[(0.0, 99.0)]);
+        assert_eq!(snap_add_position(&near_end, 99.5), None);
+        // ... but ending at 98 leaves exactly room for a 100% slot.
+        assert_eq!(snap_add_position(&mk(&[(0.0, 98.0)]), 99.0), Some(100.0));
+
+        // The first slot starts at 1; its margin would need -1%.
+        let near_start = mk(&[(1.0, 40.0)]);
+        assert_eq!(snap_add_position(&near_start, 0.5), None);
+        // ... but starting at 2 leaves exactly room for a 0% slot.
+        assert_eq!(snap_add_position(&mk(&[(2.0, 40.0)]), 1.0), Some(0.0));
+    }
 
     /// `BarPattern::ALL` stands for the whole enum: entry `i` must be the
     /// `i`-th declared variant. Catches a re-ordered or duplicated list;

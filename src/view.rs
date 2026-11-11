@@ -1,7 +1,5 @@
 use crate::{
-    context::{
-        CanvasParams, COLUMN_COUNT,
-    },
+    context::{COLUMN_COUNT, CanvasParams},
     i18n::Translations,
     storage::{ConditionBar, ConservationDocument, StatusMessage},
 };

@@ -29,7 +29,7 @@ pub fn typst_compile_to_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::{CanvasParams, COLUMN_COUNT};
+    use crate::context::{COLUMN_COUNT, CanvasParams};
     use crate::i18n::{Language, Translations};
     use crate::pdf_attachment::{PdfProjectError, extract_project_json};
     use crate::project::{ExportSettings, ProjectFile};

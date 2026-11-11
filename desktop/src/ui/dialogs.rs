@@ -1,11 +1,11 @@
 use crate::context::AppContext;
 use crate::context::CanvasParams;
-use crate::tool::Tool;
 use crate::shortcuts::{Action, AssignError};
+use crate::tool::Tool;
 use crate::ui::project_io::{project_file_filters, read_project_text};
 use chronos::bridge::Event;
 use chronos::context::{
-    COLUMN_COUNT, COLUMN_RATIO_RANGE, PAGE_MARGIN_MM_RANGE, PAPER_SIZES, PADDING_MM_RANGE,
+    COLUMN_COUNT, COLUMN_RATIO_RANGE, PADDING_MM_RANGE, PAGE_MARGIN_MM_RANGE, PAPER_SIZES,
     ZERO_WIDTH_LINE_PT_RANGE,
 };
 use chronos::i18n::Language;
@@ -71,11 +71,8 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let margin_spin = gtk4::SpinButton::with_range(
-        PAGE_MARGIN_MM_RANGE.0,
-        PAGE_MARGIN_MM_RANGE.1,
-        1.0,
-    );
+    let margin_spin =
+        gtk4::SpinButton::with_range(PAGE_MARGIN_MM_RANGE.0, PAGE_MARGIN_MM_RANGE.1, 1.0);
     margin_spin.set_value(params.page_margin_mm);
     margin_row.append(&margin_lbl);
     margin_row.append(&margin_spin);
@@ -88,11 +85,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let padding_spin = gtk4::SpinButton::with_range(
-        PADDING_MM_RANGE.0,
-        PADDING_MM_RANGE.1,
-        0.5,
-    );
+    let padding_spin = gtk4::SpinButton::with_range(PADDING_MM_RANGE.0, PADDING_MM_RANGE.1, 0.5);
     padding_spin.set_value(params.cell_padding_mm);
     padding_row.append(&padding_lbl);
     padding_row.append(&padding_spin);
@@ -105,11 +98,8 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let bar_padding_spin = gtk4::SpinButton::with_range(
-        PADDING_MM_RANGE.0,
-        PADDING_MM_RANGE.1,
-        0.5,
-    );
+    let bar_padding_spin =
+        gtk4::SpinButton::with_range(PADDING_MM_RANGE.0, PADDING_MM_RANGE.1, 0.5);
     bar_padding_spin.set_value(params.bar_padding_mm);
     bar_padding_row.append(&bar_padding_lbl);
     bar_padding_row.append(&bar_padding_spin);
@@ -122,11 +112,8 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
-    let zero_spin = gtk4::SpinButton::with_range(
-        ZERO_WIDTH_LINE_PT_RANGE.0,
-        ZERO_WIDTH_LINE_PT_RANGE.1,
-        0.1,
-    );
+    let zero_spin =
+        gtk4::SpinButton::with_range(ZERO_WIDTH_LINE_PT_RANGE.0, ZERO_WIDTH_LINE_PT_RANGE.1, 0.1);
     zero_spin.set_value(params.zero_width_line_pt);
     zero_row.append(&zero_lbl);
     zero_row.append(&zero_spin);
@@ -835,9 +822,7 @@ pub fn show_paint_toolbox_dialog(ctx: &AppContext) {
         .margin_end(16)
         .build();
 
-    let search_entry = gtk4::SearchEntry::builder()
-        .hexpand(true)
-        .build();
+    let search_entry = gtk4::SearchEntry::builder().hexpand(true).build();
     vbox.append(&search_entry);
 
     let list_box = gtk4::Box::builder()

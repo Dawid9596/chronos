@@ -40,8 +40,8 @@ fn tree_for(name: &'static str) -> Option<&'static resvg::usvg::Tree> {
 }
 
 /// Rasterizes tile `idx` at exactly the bar's height into a surface that can
-/// be tiled 1:1 without any pattern matrix. 
-/// 
+/// be tiled 1:1 without any pattern matrix.
+///
 /// Deriving the scales from the unrounded h and rounding
 /// width/height separately can leave the content up to half a pixel short
 /// of the pixmap edge, which repeats as a 1px transparent seam between

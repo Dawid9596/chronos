@@ -3,12 +3,12 @@ use crate::shortcuts::ShortcutRegistry;
 use crate::tool::Tool;
 use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
+use chronos::context::COLUMN_COUNT;
 use chronos::i18n::{Language, Translations};
 use chronos::project::ExportSettings;
 use crux_core::Core;
 use gtk4::glib;
 use gtk4::{ApplicationWindow, Button, Label, ScrolledWindow, ToggleButton};
-use chronos::context::COLUMN_COUNT;
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -22,7 +22,9 @@ pub struct ColumnVisibility {
 
 impl Default for ColumnVisibility {
     fn default() -> Self {
-        Self { flags: [true; COLUMN_COUNT] }
+        Self {
+            flags: [true; COLUMN_COUNT],
+        }
     }
 }
 

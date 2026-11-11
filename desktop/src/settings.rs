@@ -8,8 +8,8 @@
 
 use crate::context::{CanvasParams, ColumnVisibility};
 use chronos::context::{
-    clamp_finite_range, sanitize_paper_size, COLUMN_RATIO_RANGE, PAGE_MARGIN_MM_RANGE,
-    PADDING_MM_RANGE, ZERO_WIDTH_LINE_PT_RANGE,
+    COLUMN_RATIO_RANGE, PADDING_MM_RANGE, PAGE_MARGIN_MM_RANGE, ZERO_WIDTH_LINE_PT_RANGE,
+    clamp_finite_range, sanitize_paper_size,
 };
 use chronos::i18n::Language;
 use serde::{Deserialize, Serialize};
@@ -99,9 +99,12 @@ impl Settings {
 
     fn sanitize(&mut self) {
         self.canvas.paper_size = sanitize_paper_size(&self.canvas.paper_size);
-        self.canvas.page_margin_mm = clamp_finite_range(self.canvas.page_margin_mm, PAGE_MARGIN_MM_RANGE);
-        self.canvas.cell_padding_mm = clamp_finite_range(self.canvas.cell_padding_mm, PADDING_MM_RANGE);
-        self.canvas.bar_padding_mm = clamp_finite_range(self.canvas.bar_padding_mm, PADDING_MM_RANGE);
+        self.canvas.page_margin_mm =
+            clamp_finite_range(self.canvas.page_margin_mm, PAGE_MARGIN_MM_RANGE);
+        self.canvas.cell_padding_mm =
+            clamp_finite_range(self.canvas.cell_padding_mm, PADDING_MM_RANGE);
+        self.canvas.bar_padding_mm =
+            clamp_finite_range(self.canvas.bar_padding_mm, PADDING_MM_RANGE);
         self.canvas.zero_width_line_pt =
             clamp_finite_range(self.canvas.zero_width_line_pt, ZERO_WIDTH_LINE_PT_RANGE);
         for r in self.canvas.column_ratios.iter_mut() {

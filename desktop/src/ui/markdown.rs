@@ -44,14 +44,15 @@ pub fn show_markdown_window(
     // Reuse existing documentation window if one is already open
     let reused = ACTIVE_MD_WIN.with(|slot| {
         if let Some((weak_win, nav_fn)) = slot.borrow().as_ref()
-            && let Some(win) = weak_win.upgrade() {
-                if let Some(ref f) = *nav_fn.borrow() {
-                    f(&format!("doc:{initial_doc_id}"));
-                }
-                win.set_title(Some(page_of(initial_doc_id).1));
-                win.present();
-                return true;
+            && let Some(win) = weak_win.upgrade()
+        {
+            if let Some(ref f) = *nav_fn.borrow() {
+                f(&format!("doc:{initial_doc_id}"));
             }
+            win.set_title(Some(page_of(initial_doc_id).1));
+            win.present();
+            return true;
+        }
         false
     });
     if reused {
@@ -62,9 +63,12 @@ pub fn show_markdown_window(
     let mut pages: HashMap<String, (String, String)> = HashMap::new();
     pages.insert(
         ABOUT_PAGE.to_string(),
-        (t.doc_about_title.clone(), t.about_markdown
-            .replace("{version}", APP_VERSION)
-            .replace("{authors}", &author_line())),
+        (
+            t.doc_about_title.clone(),
+            t.about_markdown
+                .replace("{version}", APP_VERSION)
+                .replace("{authors}", &author_line()),
+        ),
     );
     pages.insert(
         HELP_PAGE.to_string(),
@@ -108,14 +112,15 @@ pub fn show_markdown_window(
         };
 
         if let Some(doc_id) = doc_part
-            && let Some((title, md_source)) = pages_clone.get(doc_id) {
-                if let Some(w) = win_weak.upgrade() {
-                    w.set_title(Some(title));
-                }
-                let content_box = render_markdown(md_source, nav_fn_clone.clone());
-                scrolled_clone.set_child(Some(&content_box));
-                scrolled_clone.vadjustment().set_value(0.0);
+            && let Some((title, md_source)) = pages_clone.get(doc_id)
+        {
+            if let Some(w) = win_weak.upgrade() {
+                w.set_title(Some(title));
             }
+            let content_box = render_markdown(md_source, nav_fn_clone.clone());
+            scrolled_clone.set_child(Some(&content_box));
+            scrolled_clone.vadjustment().set_value(0.0);
+        }
 
         if let Some(anchor_name) = anchor_part {
             let scrolled_page = scrolled_clone.clone();
@@ -127,19 +132,22 @@ pub fn show_markdown_window(
                     return;
                 }
                 if let Some(viewport) = scrolled_page.child()
-                    && let Some(content_box) = viewport.first_child() {
-                        let mut child = content_box.first_child();
-                        while let Some(w) = child {
-                            if w.widget_name().as_str() == format!("anchor-{anchor_owned}") {
-                                let point = gtk4::graphene::Point::new(0.0, 0.0);
+                    && let Some(content_box) = viewport.first_child()
+                {
+                    let mut child = content_box.first_child();
+                    while let Some(w) = child {
+                        if w.widget_name().as_str() == format!("anchor-{anchor_owned}") {
+                            let point = gtk4::graphene::Point::new(0.0, 0.0);
                             if let Some(transformed) = w.compute_point(&content_box, &point) {
-                                scrolled_page.vadjustment().set_value(transformed.y().max(0.0) as f64);
+                                scrolled_page
+                                    .vadjustment()
+                                    .set_value(transformed.y().max(0.0) as f64);
                             }
-                                break;
-                            }
-                            child = w.next_sibling();
+                            break;
                         }
+                        child = w.next_sibling();
                     }
+                }
             });
         }
     };
@@ -265,11 +273,12 @@ fn parse_heading(line: &str) -> Option<(u8, &str)> {
 
 fn extract_anchor(text: &str) -> (&str, Option<String>) {
     if let Some(start) = text.find("{#")
-        && let Some(end) = text[start..].find('}') {
-            let anchor = text[start + 2..start + end].trim().to_string();
-            let clean = text[..start].trim();
-            return (clean, Some(anchor));
-        }
+        && let Some(end) = text[start..].find('}')
+    {
+        let anchor = text[start + 2..start + end].trim().to_string();
+        let clean = text[..start].trim();
+        return (clean, Some(anchor));
+    }
     (text.trim(), None)
 }
 
@@ -289,10 +298,7 @@ fn slugify(text: &str) -> String {
 
 /// Converts inline markdown (`**bold**`, `*italic*`, `` `code` ``, `[label](href)`) into Pango markup
 /// and connects `activate-link` for internal navigation.
-fn build_rich_label(
-    markdown_inline: &str,
-    nav_fn: &NavFn,
-) -> gtk4::Label {
+fn build_rich_label(markdown_inline: &str, nav_fn: &NavFn) -> gtk4::Label {
     let markup = inline_markdown_to_pango(markdown_inline);
     let label = gtk4::Label::builder()
         .label(&markup)
@@ -322,52 +328,59 @@ fn inline_markdown_to_pango(input: &str) -> String {
     while i < chars.len() {
         // Link: [text](url)
         if chars[i] == '['
-            && let Some(close_bracket) = chars[i + 1..].iter().position(|&c| c == ']') {
-                let close_idx = i + 1 + close_bracket;
-                if close_idx + 1 < chars.len() && chars[close_idx + 1] == '('
-                    && let Some(close_paren) = chars[close_idx + 2..].iter().position(|&c| c == ')')
-                    {
-                        let end_paren = close_idx + 2 + close_paren;
-                        let link_text: String = chars[i + 1..close_idx].iter().collect();
-                        let link_url: String = chars[close_idx + 2..end_paren].iter().collect();
-                        out.push_str(&format!(
-                            "<a href=\"{}\">{}</a>",
-                            glib::markup_escape_text(&link_url),
-                            glib::markup_escape_text(&link_text)
-                        ));
-                        i = end_paren + 1;
-                        continue;
-                    }
-            }
-
-        // Bold: **text**
-        if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*'
-            && let Some(end) = find_double_delim(&chars, i + 2, '*') {
-                let inner: String = chars[i + 2..end].iter().collect();
-                out.push_str(&format!("<b>{}</b>", glib::markup_escape_text(&inner)));
-                i = end + 2;
+            && let Some(close_bracket) = chars[i + 1..].iter().position(|&c| c == ']')
+        {
+            let close_idx = i + 1 + close_bracket;
+            if close_idx + 1 < chars.len()
+                && chars[close_idx + 1] == '('
+                && let Some(close_paren) = chars[close_idx + 2..].iter().position(|&c| c == ')')
+            {
+                let end_paren = close_idx + 2 + close_paren;
+                let link_text: String = chars[i + 1..close_idx].iter().collect();
+                let link_url: String = chars[close_idx + 2..end_paren].iter().collect();
+                out.push_str(&format!(
+                    "<a href=\"{}\">{}</a>",
+                    glib::markup_escape_text(&link_url),
+                    glib::markup_escape_text(&link_text)
+                ));
+                i = end_paren + 1;
                 continue;
             }
+        }
+
+        // Bold: **text**
+        if i + 1 < chars.len()
+            && chars[i] == '*'
+            && chars[i + 1] == '*'
+            && let Some(end) = find_double_delim(&chars, i + 2, '*')
+        {
+            let inner: String = chars[i + 2..end].iter().collect();
+            out.push_str(&format!("<b>{}</b>", glib::markup_escape_text(&inner)));
+            i = end + 2;
+            continue;
+        }
 
         // Inline code: `code`
         if chars[i] == '`'
-            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '`') {
-                let end = i + 1 + rel_end;
-                let inner: String = chars[i + 1..end].iter().collect();
-                out.push_str(&format!("<tt>{}</tt>", glib::markup_escape_text(&inner)));
-                i = end + 1;
-                continue;
-            }
+            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '`')
+        {
+            let end = i + 1 + rel_end;
+            let inner: String = chars[i + 1..end].iter().collect();
+            out.push_str(&format!("<tt>{}</tt>", glib::markup_escape_text(&inner)));
+            i = end + 1;
+            continue;
+        }
 
         // Italic: *text*
         if chars[i] == '*'
-            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '*') {
-                let end = i + 1 + rel_end;
-                let inner: String = chars[i + 1..end].iter().collect();
-                out.push_str(&format!("<i>{}</i>", glib::markup_escape_text(&inner)));
-                i = end + 1;
-                continue;
-            }
+            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '*')
+        {
+            let end = i + 1 + rel_end;
+            let inner: String = chars[i + 1..end].iter().collect();
+            out.push_str(&format!("<i>{}</i>", glib::markup_escape_text(&inner)));
+            i = end + 1;
+            continue;
+        }
 
         // Escape single character for Pango
         let ch_str = chars[i].to_string();

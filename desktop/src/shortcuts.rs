@@ -56,8 +56,10 @@ impl Action {
     pub const VARIANTS: [Action; 2] = [Action::NextVariant, Action::PrevVariant];
 
     /// (File, Edit, Tools, Variants).
-    pub const ALL: [Action; Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()] = {
-        let mut out = [Action::Open; Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()];
+    pub const ALL: [Action;
+        Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()] = {
+        let mut out = [Action::Open;
+            Self::FILE.len() + Self::EDIT.len() + Self::TOOLS.len() + Self::VARIANTS.len()];
         let mut i = 0;
         let mut src = 0;
         while src < Self::FILE.len() {
@@ -261,7 +263,8 @@ pub fn parse_mouse_accel(accel: &str) -> Option<MouseBinding> {
         rest = inner.1;
     }
     let button = rest.strip_prefix("mouse")?.parse::<u32>().ok()?;
-    (MOUSE_BUTTON_MIN..=MOUSE_BUTTON_MAX).contains(&button)
+    (MOUSE_BUTTON_MIN..=MOUSE_BUTTON_MAX)
+        .contains(&button)
         .then_some(MouseBinding { button, mods })
 }
 
@@ -330,8 +333,7 @@ fn build_trigger(accel: &str) -> Option<gtk4::ShortcutTrigger> {
 /// Whether the window's focus sits on a text entry (the inline editing of
 /// cell text and the project name are `gtk4::Editable` widgets).
 fn window_has_text_focus(window: &gtk4::ApplicationWindow) -> bool {
-    gtk4::prelude::GtkWindowExt::focus(window)
-        .is_some_and(|focused| focused.is::<gtk4::Editable>())
+    gtk4::prelude::GtkWindowExt::focus(window).is_some_and(|focused| focused.is::<gtk4::Editable>())
 }
 
 fn text_input_has_focus(window: &glib::WeakRef<gtk4::ApplicationWindow>) -> bool {
@@ -349,9 +351,7 @@ fn conflicts_with_text_edit(action: Action, accel: &str) -> bool {
     if parse_mouse_accel(accel).is_some() {
         action.defers_to_text_input()
     } else {
-        action.tool().is_some()
-            || !has_command_modifier(accel)
-            || action.defers_to_text_input()
+        action.tool().is_some() || !has_command_modifier(accel) || action.defers_to_text_input()
     }
 }
 
@@ -440,9 +440,7 @@ impl ShortcutRegistry {
     /// pseudo-accelerators can match this form.
     pub fn mouse_action(&self, button: u32, mods: gdk::ModifierType) -> Option<Action> {
         let accel = mouse_string(button, mods);
-        Action::ALL
-            .into_iter()
-            .find(|&a| self.accel(a) == accel)
+        Action::ALL.into_iter().find(|&a| self.accel(a) == accel)
     }
 
     /// Whether `action` must let the focused text entry handle the event
@@ -525,7 +523,9 @@ impl ShortcutRegistry {
         let widget = widget.upcast_ref::<gtk4::Widget>().clone();
         let text = self.format_tooltip(action, include_name);
         widget.set_tooltip_text(Some(&text));
-        self.tooltips.borrow_mut().push((action, widget, include_name));
+        self.tooltips
+            .borrow_mut()
+            .push((action, widget, include_name));
     }
 
     fn sync_translation_cache(&self, t: &Translations) {
@@ -708,16 +708,9 @@ mod tests {
         // Every default must normalize: a raw unparsable string (e.g. "]")
         // gets no keyboard trigger and can never be reset.
         for a in Action::ALL {
-            assert!(
-                normalize(a.default_accel()).is_some(),
-                "{}",
-                a.id()
-            );
+            assert!(normalize(a.default_accel()).is_some(), "{}", a.id());
         }
-        assert_eq!(
-            normalize("bracketright"),
-            Some("bracketright".to_string())
-        );
+        assert_eq!(normalize("bracketright"), Some("bracketright".to_string()));
         reg.reset(Action::NextVariant).unwrap();
         reg.reset(Action::PrevVariant).unwrap();
 
@@ -741,19 +734,28 @@ mod tests {
         // Bare and modifier forms parse, with the canonical spelling idempotent.
         assert_eq!(
             parse_mouse_accel("mouse4"),
-            Some(MouseBinding { button: 4, mods: none })
+            Some(MouseBinding {
+                button: 4,
+                mods: none
+            })
         );
         for spelling in ["<Control>mouse4", "<ctrl>mouse4", "<Ctrl><Control>mouse4"] {
             assert_eq!(
                 parse_mouse_accel(spelling),
-                Some(MouseBinding { button: 4, mods: ctrl })
+                Some(MouseBinding {
+                    button: 4,
+                    mods: ctrl
+                })
             );
             assert_eq!(normalize(spelling), Some("<Control>mouse4".to_string()));
         }
         // Round-trips.
         let b = parse_mouse_accel("<Control>mouse5").unwrap();
         assert_eq!(normalize("mouse5"), Some("mouse5".to_string()));
-        assert_eq!(normalize(&mouse_string(b.button, b.mods)), Some("<Control>mouse5".into()));
+        assert_eq!(
+            normalize(&mouse_string(b.button, b.mods)),
+            Some("<Control>mouse5".into())
+        );
 
         // Labels.
         assert_eq!(accel_label("mouse4"), "Mouse 4");
@@ -772,6 +774,9 @@ mod tests {
 
         // Keyboard accelerators must look up by key spelling, never as buttons;
         // buttons match only via the registry's button lookup.
-        assert_ne!(parse_mouse_accel("bracketright"), parse_mouse_accel("mouse4"));
+        assert_ne!(
+            parse_mouse_accel("bracketright"),
+            parse_mouse_accel("mouse4")
+        );
     }
 }
