@@ -64,7 +64,12 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     *ctx.last_message.borrow_mut() = None;
                     ctx.status.set_text(&format!(
                         "{}{}",
-                        t.project_prefix, view.document.project_name
+                        t.project_prefix,
+                        if view.document.project_name.is_empty() {
+                            &t.project_untitled
+                        } else {
+                            &view.document.project_name
+                        }
                     ));
                 }
 

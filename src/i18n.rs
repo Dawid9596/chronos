@@ -99,6 +99,7 @@ pub struct Translations {
     pub artwork_attribution: String,
     pub status_ready: String,
     pub project_prefix: String,
+    pub project_untitled: String,
     // Settings Popover
     /// Legacy, Noto font is not bundled
     pub settings_tooltip: String,
@@ -223,6 +224,7 @@ impl Translations {
                 artwork_attribution: "Pattern artwork: @kationart, CC BY-SA 4.0".into(),
                 status_ready: "Ready".into(),
                 project_prefix: "Project: ".into(),
+                project_untitled: "Untitled".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
                 delete_label: "Delete".into(),
                 dialog_open_title: "Open File".into(),
@@ -412,6 +414,7 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 artwork_attribution: "Grafika wzorów: @kationart, CC BY-SA 4.0".into(),
                 status_ready: "Gotowy".into(),
                 project_prefix: "Projekt: ".into(),
+                project_untitled: "Bez nazwy".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
                 delete_label: "Usuń".into(),
                 dialog_open_title: "Otwórz plik".into(),

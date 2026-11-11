@@ -137,7 +137,11 @@ impl ProjectFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::AppState;
+    use crate::storage::ConservationDocument;
+
+    fn sample_document() -> ConservationDocument {
+        ConservationDocument::sample()
+    }
 
     fn sample_settings() -> ExportSettings {
         let mut s = ExportSettings::default();
@@ -149,7 +153,7 @@ mod tests {
 
     #[test]
     fn round_trips() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let project = ProjectFile::new(doc, sample_settings());
         let back = ProjectFile::parse(&project.to_json()).unwrap();
         assert_eq!(back, project);
@@ -158,7 +162,7 @@ mod tests {
 
     #[test]
     fn legacy_bare_document_still_opens() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let legacy = serde_json::to_string(&doc).unwrap();
         let project = ProjectFile::parse(&legacy).unwrap();
         assert_eq!(project.document, doc);
@@ -168,7 +172,7 @@ mod tests {
 
     #[test]
     fn newer_format_is_refused_with_a_clear_message() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v["version"] = serde_json::json!(PROJECT_FORMAT_VERSION + 1);
         let err = ProjectFile::parse(&v.to_string()).unwrap_err();
@@ -177,7 +181,7 @@ mod tests {
 
     #[test]
     fn unknown_fields_are_ignored() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default()))
             .unwrap();
         v["something_from_the_future"] = serde_json::json!({ "a": 1 });
@@ -189,7 +193,7 @@ mod tests {
 
     #[test]
     fn damaged_settings_do_not_block_the_document() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default()))
             .unwrap();
         v["export_settings"] = serde_json::json!({ "visible_columns": "nope" });
@@ -200,7 +204,7 @@ mod tests {
 
     #[test]
     fn missing_settings_are_none() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v.as_object_mut().unwrap().remove("export_settings");
         assert!(ProjectFile::parse(&v.to_string()).unwrap().export_settings.is_none());
@@ -208,7 +212,7 @@ mod tests {
 
     #[test]
     fn imported_settings_are_clamped() {
-        let doc = AppState::default().document;
+        let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v["export_settings"]["canvas"]["page_margin_mm"] = serde_json::json!(9999);
         v["export_settings"]["canvas"]["cell_padding_mm"] = serde_json::json!(-5);

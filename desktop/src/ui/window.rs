@@ -291,14 +291,15 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         }
     });
 
-    let (help_check_item, help_check_lbl) = build_menu_row(&t.menu_check_updates, None, &help_popover, {
-        let holder = ctx_holder.clone();
-        move || {
-            if let Some(ctx) = holder.borrow().as_ref() {
-                crate::update::check_now(ctx);
+    let (help_check_item, help_check_lbl) =
+        build_menu_row(&t.menu_check_updates, None, &help_popover, {
+            let holder = ctx_holder.clone();
+            move || {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    crate::update::check_now(ctx);
+                }
             }
-        }
-    });
+        });
 
     help_vbox.append(&help_help_item);
     help_vbox.append(&help_about_item);
@@ -394,8 +395,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let mut first_btn: Option<gtk4::ToggleButton> = None;
     let inline_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
         Rc::new(RefCell::new(Vec::new()));
-    let top_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
-        Rc::new(RefCell::new(Vec::new()));
+    let top_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> = Rc::new(RefCell::new(Vec::new()));
 
     for (tool_idx, default_tool) in Tool::TOOLBAR_DEFAULTS.into_iter().enumerate() {
         let remembered_variant = Rc::new(Cell::new(default_tool));
@@ -649,11 +649,16 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     status_stack.set_transition_type(gtk4::StackTransitionType::None);
     status_stack.set_halign(gtk4::Align::Center);
 
+    let current_project_name = core.view().document.project_name.clone();
     let status_label = gtk4::Label::builder()
         .label(format!(
             "{}{}",
             t.project_prefix,
-            core.view().document.project_name
+            if current_project_name.is_empty() {
+                &t.project_untitled
+            } else {
+                &current_project_name
+            }
         ))
         .halign(gtk4::Align::Center)
         .tooltip_text("Double-click project name to edit")
@@ -1069,4 +1074,3 @@ pub fn scroll_variant_into_view(btn: &gtk4::ToggleButton) {
     let target = btn_center - (page / 2.0);
     hadj.set_value(target.clamp(0.0, max_val));
 }
-

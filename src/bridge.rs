@@ -322,13 +322,17 @@ impl App for ConservationApp {
                 let project_json = embed_project_data.then(|| {
                     ProjectFile::new(model.document.clone(), settings.clone()).to_json()
                 });
-                let view_model =
-                    model
-                        .document
-                        .to_view_model(t, settings.visible_columns, settings.canvas);
-                let safe_stem: String = model
-                    .document
-                    .project_name
+                let display_name = if model.document.project_name.is_empty() {
+                    &t.project_untitled
+                } else {
+                    &model.document.project_name
+                };
+                let view_model = model.document.to_view_model(
+                    t.clone(),
+                    settings.visible_columns,
+                    settings.canvas,
+                );
+                let safe_stem: String = display_name
                     .chars()
                     .map(|c| {
                         if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
@@ -878,12 +882,25 @@ impl App for ConservationApp {
 mod tests {
     use super::*;
     use crate::i18n::{Language, Translations};
+    use crate::storage::ConservationDocument;
     use crux_core::Core;
+
+    /// A core seeded with the representative two-row sample document, for
+    /// tests that exercise document operations (the shipped default is empty).
+    fn core_with_sample_document() -> Core<ConservationApp> {
+        let core = Core::<ConservationApp>::default();
+        let content = serde_json::to_string(&ConservationDocument::sample()).unwrap();
+        let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+            path: "sample.json".into(),
+            content,
+        }));
+        core
+    }
 
     #[test]
     fn split_and_edit_group_preserves_boundary() {
-        let core = Core::<ConservationApp>::default();
-        // Default state has rows 1 and 2 merged under "Iron Age" (chrono_group = 0)
+        let core = core_with_sample_document();
+        // Sample rows 1 and 2 are merged under "Iron Age" (chrono_group = 0)
         let vm = core.view();
         assert_eq!(
             vm.document.rows[0]
@@ -951,7 +968,7 @@ mod tests {
 
     #[test]
     fn merge_only_affects_contiguous_neighbor() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         // Insert a 3rd row at the bottom and set its phase to "Iron Age" (chrono_group = 0)
         let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
         let _ = core.process_event(Event::UpdateGroupText {
@@ -1011,7 +1028,7 @@ mod tests {
 
     #[test]
     fn undo_redo_round_trip() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let original = core.view().document;
         assert!(!core.view().can_undo);
 
@@ -1040,7 +1057,7 @@ mod tests {
 
     #[test]
     fn no_op_and_non_document_events_are_not_recorded() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let _ = core.process_event(Event::ToggleLanguage);
         let _ = core.process_event(Event::ClearStatus);
         // `UpdateText` ignores group fields, so this changes nothing.
@@ -1065,7 +1082,7 @@ mod tests {
 
     #[test]
     fn each_slot_drag_is_its_own_undo_step() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         assert_eq!(end_pct(&core), 75.0);
 
         // The bar reports once per completed drag, so two drags of the same
@@ -1083,7 +1100,7 @@ mod tests {
 
     #[test]
     fn undo_never_reuses_layer_ids() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
         assert_eq!(core.view().document.rows[2].id, 3);
         let _ = core.process_event(Event::Undo);
@@ -1093,11 +1110,11 @@ mod tests {
 
     #[test]
     fn opening_a_file_clears_history() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let _ = core.process_event(Event::DeleteLayer(1));
         assert!(core.view().can_undo);
 
-        let content = serde_json::to_string(&AppState::default().document).unwrap();
+        let content = serde_json::to_string(&ConservationDocument::sample()).unwrap();
         let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
             path: "other.json".into(),
             content,
@@ -1145,12 +1162,15 @@ mod tests {
 
     #[test]
     fn export_embeds_document_and_settings_when_enabled() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let settings = settings_with(31.0, 2);
         let request = pdf_export_request(&core, settings.clone(), true);
 
         let project = ProjectFile::parse(&request.project_json.expect("embedded")).unwrap();
-        assert_eq!(project.document.project_name, "Sample Conservation Project");
+        assert_eq!(
+            project.document.project_name,
+            ConservationDocument::sample().project_name
+        );
         assert_eq!(project.document.entries.len(), 2);
         assert_eq!(project.export_settings, Some(settings));
         assert_eq!(project.version, crate::project::PROJECT_FORMAT_VERSION);
@@ -1173,7 +1193,7 @@ mod tests {
 
     #[test]
     fn save_writes_the_envelope_with_the_current_settings() {
-        let core = Core::<ConservationApp>::default();
+        let core = core_with_sample_document();
         let settings = settings_with(28.0, 1);
         let FilePickerRequest::SaveFile { content, .. } =
             save_request(&core, Event::RequestSaveAs(settings.clone()))
@@ -1190,7 +1210,7 @@ mod tests {
         // A file with different export settings changes the document, and the
         // core has nowhere to put the settings: they stay with the caller.
         let core = Core::<ConservationApp>::default();
-        let mut doc = AppState::default().document;
+        let mut doc = ConservationDocument::sample();
         doc.project_name = "From file".into();
         let content = ProjectFile::new(doc, settings_with(45.0, 0)).to_json();
         let _ = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
@@ -1202,8 +1222,8 @@ mod tests {
 
     #[test]
     fn opened_json_becomes_the_save_target_but_a_pdf_never_does() {
-        let content = ProjectFile::new(AppState::default().document, ExportSettings::default())
-            .to_json();
+        let content =
+            ProjectFile::new(ConservationDocument::sample(), ExportSettings::default()).to_json();
         for (path, expected) in [
             ("/tmp/project.json", Some("/tmp/project.json")),
             ("/tmp/report.pdf", None),
@@ -1237,7 +1257,7 @@ mod tests {
     fn newer_project_format_is_reported_not_loaded() {
         let core = Core::<ConservationApp>::default();
         let mut v = serde_json::to_value(ProjectFile::new(
-            AppState::default().document,
+            ConservationDocument::sample(),
             ExportSettings::default(),
         ))
         .unwrap();

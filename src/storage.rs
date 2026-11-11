@@ -217,67 +217,87 @@ pub struct AppState {
     pub history: History<ConservationDocument>,
 }
 
+impl Default for ConservationDocument {
+    fn default() -> Self {
+        Self {
+            project_name: String::new(),
+            date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
+            entries: vec![],
+        }
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            document: ConservationDocument {
-                project_name: "Sample Conservation Project".to_string(),
-                date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
-                entries: vec![
-                    ConservationEntry {
-                        id: 1,
-                        graphical_representation: ConditionBar {
-                            pattern: BarPattern::Bolus,
-                            slots: vec![Slot {
-                                start_pct: 0.0,
-                                end_pct: 75.0,
-                            }],
-                        },
-                        woven_trim: ConditionBar {
-                            pattern: BarPattern::Bolus,
-                            slots: vec![Slot {
-                                start_pct: 0.0,
-                                end_pct: 75.0,
-                            }],
-                        },
-                        layer_characteristics: "Compact clay".to_string(),
-                        layer_thickness: "12 cm".to_string(),
-                        chronological_phase: "Iron Age".to_string(),
-                        dating_period: "500 BC".to_string(),
-                        chrono_group: 0,
-                        dating_group: 0,
-                    },
-                    ConservationEntry {
-                        id: 2,
-                        graphical_representation: ConditionBar {
-                            pattern: BarPattern::Bolus,
-                            slots: vec![Slot {
-                                start_pct: 0.0,
-                                end_pct: 30.0,
-                            }],
-                        },
-                        woven_trim: ConditionBar {
-                            pattern: BarPattern::Bolus,
-                            slots: vec![Slot {
-                                start_pct: 0.0,
-                                end_pct: 10.0,
-                            }],
-                        },
-                        layer_characteristics: "Ash layer".to_string(),
-                        layer_thickness: "5 cm".to_string(),
-                        chronological_phase: "Iron Age".to_string(),
-                        dating_period: "400 BC".to_string(),
-                        chrono_group: 0,
-                        dating_group: 0,
-                    },
-                ],
-            },
-            next_id: 3,
+            document: ConservationDocument::default(),
+            next_id: 1,
             last_error: None,
             is_exporting: false,
             language: Language::English,
             current_file_path: None,
             history: History::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl ConservationDocument {
+    /// A representative two-row document for tests (the shipped default is
+    /// empty); the two rows share `chrono_group = 0`, i.e. a merged
+    /// "Iron Age" group, so group split/merge behaviour can be exercised.
+    pub(crate) fn sample() -> Self {
+        Self {
+            project_name: "Sample Project".to_string(),
+            date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
+            entries: vec![
+                ConservationEntry {
+                    id: 1,
+                    graphical_representation: ConditionBar {
+                        pattern: BarPattern::Bolus,
+                        slots: vec![Slot {
+                            start_pct: 0.0,
+                            end_pct: 75.0,
+                        }],
+                    },
+                    woven_trim: ConditionBar {
+                        pattern: BarPattern::Bolus,
+                        slots: vec![Slot {
+                            start_pct: 0.0,
+                            end_pct: 75.0,
+                        }],
+                    },
+                    layer_characteristics: "Compact clay".to_string(),
+                    layer_thickness: "12 cm".to_string(),
+                    chronological_phase: "Iron Age".to_string(),
+                    dating_period: "500 BC".to_string(),
+                    chrono_group: 0,
+                    dating_group: 0,
+                },
+                ConservationEntry {
+                    id: 2,
+                    graphical_representation: ConditionBar {
+                        pattern: BarPattern::Bolus,
+                        slots: vec![Slot {
+                            start_pct: 0.0,
+                            end_pct: 30.0,
+                        }],
+                    },
+                    woven_trim: ConditionBar {
+                        pattern: BarPattern::Bolus,
+                        slots: vec![Slot {
+                            start_pct: 0.0,
+                            end_pct: 10.0,
+                        }],
+                    },
+                    layer_characteristics: "Ash layer".to_string(),
+                    layer_thickness: "5 cm".to_string(),
+                    chronological_phase: "Iron Age".to_string(),
+                    dating_period: "400 BC".to_string(),
+                    chrono_group: 0,
+                    dating_group: 0,
+                },
+            ],
         }
     }
 }

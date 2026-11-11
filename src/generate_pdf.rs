@@ -33,33 +33,32 @@ mod tests {
     use crate::i18n::{Language, Translations};
     use crate::pdf_attachment::{PdfProjectError, extract_project_json};
     use crate::project::{ExportSettings, ProjectFile};
-    use crate::storage::AppState;
+    use crate::storage::ConservationDocument;
 
     fn sample_view_model() -> DocumentViewModel {
-        AppState::default().document.to_view_model(
+        ConservationDocument::sample().to_view_model(
             Translations::get(Language::English),
             [true; COLUMN_COUNT],
             CanvasParams::default(),
         )
     }
 
-    /// The default document must compile end to end, including the embedded
+    /// The sample document must compile end to end, including the embedded
     /// artwork attribution on the last page (guards `template.typ` changes).
     #[test]
-    fn default_document_compiles_to_pdf_with_attribution() {
-        let state = AppState::default();
-        let view_model = state.document.to_view_model(
-            Translations::get(state.language),
+    fn sample_document_compiles_to_pdf_with_attribution() {
+        let document = ConservationDocument::sample();
+        let view_model = document.to_view_model(
+            Translations::get(Language::English),
             [true; COLUMN_COUNT],
             CanvasParams::default(),
         );
 
-        let bytes =
-            typst_compile_to_bytes(&view_model, None).expect("default document compiles");
+        let bytes = typst_compile_to_bytes(&view_model, None).expect("sample document compiles");
         assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
 
         // Same for the Polish attribution text.
-        let polish = state.document.to_view_model(
+        let polish = document.to_view_model(
             Translations::get(Language::Polish),
             [true; COLUMN_COUNT],
             CanvasParams::default(),
@@ -67,9 +66,22 @@ mod tests {
         typst_compile_to_bytes(&polish, None).expect("Polish document compiles");
     }
 
+    /// Fresh documents start empty; exporting one must still produce a valid
+    /// (single-page, no-project-data) PDF.
+    #[test]
+    fn empty_document_compiles_to_pdf() {
+        let view_model = ConservationDocument::default().to_view_model(
+            Translations::get(Language::English),
+            [true; COLUMN_COUNT],
+            CanvasParams::default(),
+        );
+        let bytes = typst_compile_to_bytes(&view_model, None).expect("empty document compiles");
+        assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
+    }
+
     #[test]
     fn exported_pdf_carries_the_project_and_reopens_it() {
-        let document = AppState::default().document;
+        let document = ConservationDocument::sample();
         let mut settings = ExportSettings::default();
         settings.visible_columns[4] = false;
         settings.canvas.page_margin_mm = 27.0;
