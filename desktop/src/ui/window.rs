@@ -371,6 +371,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let mut first_btn: Option<gtk4::ToggleButton> = None;
     let inline_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
         Rc::new(RefCell::new(Vec::new()));
+    let top_revealers: Rc<RefCell<Vec<(Tool, gtk4::Revealer)>>> =
+        Rc::new(RefCell::new(Vec::new()));
 
     for (tool_idx, default_tool) in Tool::TOOLBAR_DEFAULTS.into_iter().enumerate() {
         let remembered_variant = Rc::new(Cell::new(default_tool));
@@ -380,6 +382,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             .active(default_tool == Tool::Edit)
             .focus_on_click(false)
             .can_focus(false)
+            .valign(gtk4::Align::End)
             .build();
 
         let btn_box = gtk4::Box::builder()
@@ -402,7 +405,42 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             first_btn = Some(btn.clone());
         }
 
-        tool_bar_row.append(&btn);
+        if matches!(default_tool, Tool::Paint(_)) {
+            let paint_col = gtk4::Box::builder()
+                .orientation(gtk4::Orientation::Vertical)
+                .spacing(0)
+                .valign(gtk4::Align::End)
+                .build();
+
+            let toolbox_btn = gtk4::Button::builder()
+                .icon_name("system-search-symbolic")
+                .focus_on_click(false)
+                .can_focus(false)
+                .halign(gtk4::Align::Fill)
+                .margin_bottom(2)
+                .build();
+
+            let holder = ctx_holder.clone();
+            toolbox_btn.connect_clicked(move |_| {
+                if let Some(ctx) = holder.borrow().as_ref() {
+                    crate::ui::dialogs::show_paint_toolbox_dialog(ctx);
+                }
+            });
+
+            let top_rev = gtk4::Revealer::builder()
+                .transition_type(gtk4::RevealerTransitionType::SlideDown)
+                .reveal_child(false)
+                .child(&toolbox_btn)
+                .build();
+
+            paint_col.append(&top_rev);
+            paint_col.append(&btn);
+            tool_bar_row.append(&paint_col);
+            top_revealers.borrow_mut().push((default_tool, top_rev));
+        } else {
+            tool_bar_row.append(&btn);
+        }
+
         tool_labels.push((default_tool, text_label));
         shortcuts.bind_named_tooltip(Action::for_tool(default_tool), &btn, t);
         tool_buttons.push((default_tool, btn.clone()));
@@ -461,6 +499,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 let inline_rev = gtk4::Revealer::builder()
                     .transition_type(gtk4::RevealerTransitionType::SlideRight)
                     .reveal_child(default_tool == Tool::Edit)
+                    .valign(gtk4::Align::End)
                     .child(&selector_box)
                     .build();
                 tool_bar_row.append(&inline_rev);
@@ -533,6 +572,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         let overlays = split_overlays.clone();
         let remembered = remembered_variant.clone();
         let inline_revs = inline_revealers.clone();
+        let top_revs = top_revealers.clone();
         let bottom_rev = bottom_revealer.clone();
         let b_stack = bottom_stack.clone();
         let variant_count = variants.len();
@@ -543,6 +583,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 tool_cell.set(active_tool);
                 crate::ui::table::update_split_overlays(&overlays, active_tool);
                 for (kind, rev) in inline_revs.borrow().iter() {
+                    rev.set_reveal_child(kind.same_kind(active_tool));
+                }
+                for (kind, rev) in top_revs.borrow().iter() {
                     rev.set_reveal_child(kind.same_kind(active_tool));
                 }
                 if variant_count > 3 {
@@ -978,7 +1021,7 @@ fn cycle_tool_variant(ctx: &AppContext, forward: bool) {
     }
 }
 
-fn scroll_variant_into_view(btn: &gtk4::ToggleButton) {
+pub fn scroll_variant_into_view(btn: &gtk4::ToggleButton) {
     let Some(scrolled) = btn
         .ancestor(gtk4::ScrolledWindow::static_type())
         .and_then(|w| w.downcast::<gtk4::ScrolledWindow>().ok())

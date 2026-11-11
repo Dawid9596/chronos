@@ -1,5 +1,6 @@
 use crate::context::AppContext;
 use crate::context::CanvasParams;
+use crate::tool::Tool;
 use crate::shortcuts::{Action, AssignError};
 use crate::ui::project_io::{project_file_filters, read_project_text};
 use chronos::bridge::Event;
@@ -810,4 +811,155 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
     state.refresh(ctx);
     win.set_child(Some(&vbox));
     win.present();
+}
+
+pub fn show_paint_toolbox_dialog(ctx: &AppContext) {
+    let view = ctx.core.view();
+    let t = &view.translations;
+    let lang = t.language;
+
+    let win = gtk4::Window::builder()
+        .transient_for(&ctx.window)
+        .modal(true)
+        .title(&t.tool_paint)
+        .default_width(360)
+        .default_height(480)
+        .build();
+
+    let vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(10)
+        .margin_top(16)
+        .margin_bottom(16)
+        .margin_start(16)
+        .margin_end(16)
+        .build();
+
+    let search_entry = gtk4::SearchEntry::builder()
+        .hexpand(true)
+        .build();
+    vbox.append(&search_entry);
+
+    let list_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(4)
+        .build();
+
+    let scroller = gtk4::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk4::PolicyType::Never)
+        .vexpand(true)
+        .hexpand(true)
+        .child(&list_box)
+        .build();
+    vbox.append(&scroller);
+
+    let current_tool = ctx.tool.get();
+    let mut rows: Vec<(Tool, String, gtk4::Button)> =
+        Vec::with_capacity(Tool::PAINT_VARIANTS.len());
+
+    for &variant in &Tool::PAINT_VARIANTS {
+        let Tool::Paint(pattern) = variant else {
+            continue;
+        };
+        let name = pattern.display_name(lang);
+
+        let row_box = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Horizontal)
+            .spacing(12)
+            .margin_top(4)
+            .margin_bottom(4)
+            .margin_start(6)
+            .margin_end(6)
+            .build();
+
+        let swatch = crate::ui::widgets::bar::build_pattern_swatch(pattern, 48, 24);
+        let lbl = gtk4::Label::builder()
+            .label(name)
+            .halign(gtk4::Align::Start)
+            .hexpand(true)
+            .xalign(0.0)
+            .build();
+
+        row_box.append(&swatch);
+        row_box.append(&lbl);
+
+        let btn = gtk4::Button::builder()
+            .child(&row_box)
+            .has_frame(variant == current_tool)
+            .hexpand(true)
+            .build();
+        if variant != current_tool {
+            btn.add_css_class("flat");
+        }
+
+        let ctx_click = ctx.clone();
+        let win_click = win.clone();
+        btn.connect_clicked(move |_| {
+            activate_paint_variant(&ctx_click, variant);
+            win_click.close();
+        });
+
+        list_box.append(&btn);
+        rows.push((variant, name.to_lowercase(), btn));
+    }
+
+    let rows = Rc::new(rows);
+
+    {
+        let rows = rows.clone();
+        search_entry.connect_search_changed(move |entry| {
+            let query = entry.text().trim().to_lowercase();
+            for (_, name_lower, btn) in rows.iter() {
+                btn.set_visible(query.is_empty() || name_lower.contains(&query));
+            }
+        });
+    }
+
+    {
+        let rows = rows.clone();
+        let ctx_act = ctx.clone();
+        let win_act = win.clone();
+        search_entry.connect_activate(move |_| {
+            if let Some((variant, _, _)) = rows.iter().find(|(_, _, btn)| btn.is_visible()) {
+                activate_paint_variant(&ctx_act, *variant);
+                win_act.close();
+            }
+        });
+    }
+
+    let key_ctrl = gtk4::EventControllerKey::new();
+    let win_esc = win.clone();
+    key_ctrl.connect_key_pressed(move |_, key, _, _| {
+        if key == gtk4::gdk::Key::Escape {
+            win_esc.close();
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    win.add_controller(key_ctrl);
+
+    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    close_btn.set_halign(gtk4::Align::End);
+    let win_close = win.clone();
+    close_btn.connect_clicked(move |_| {
+        win_close.close();
+    });
+    vbox.append(&close_btn);
+
+    win.set_child(Some(&vbox));
+    win.present();
+    search_entry.grab_focus();
+}
+
+pub fn activate_paint_variant(ctx: &AppContext, variant: Tool) {
+    if let Some((_, btn)) = ctx
+        .variant_buttons
+        .borrow()
+        .iter()
+        .find(|(t, _)| *t == variant)
+    {
+        btn.set_active(true);
+        crate::ui::window::scroll_variant_into_view(btn);
+    }
 }
