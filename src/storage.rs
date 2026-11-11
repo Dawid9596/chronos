@@ -267,6 +267,7 @@ impl Default for ConservationDocument {
     fn default() -> Self {
         Self {
             project_name: String::new(),
+            subtitle: String::new(),
             date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
             entries: vec![],
         }
@@ -295,6 +296,7 @@ impl ConservationDocument {
     pub(crate) fn sample() -> Self {
         Self {
             project_name: "Sample Project".to_string(),
+            subtitle: String::new(),
             date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
             entries: vec![
                 ConservationEntry {
@@ -351,6 +353,8 @@ impl ConservationDocument {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ConservationDocument {
     pub project_name: String,
+    #[serde(default)]
+    pub subtitle: String,
     pub date: String,
     pub entries: Vec<ConservationEntry>,
 }
@@ -372,7 +376,7 @@ pub struct ConservationEntry {
 
 #[cfg(test)]
 mod tests {
-    use super::{BarPattern, Slot, snap_add_position};
+    use super::{BarPattern, ConservationDocument, Slot, snap_add_position};
 
     fn mk(v: &[(f32, f32)]) -> Vec<Slot> {
         v.iter()
@@ -448,6 +452,16 @@ mod tests {
                 assert!(!pattern.display_name(lang).is_empty(), "{pattern:?}");
             }
         }
+    }
+
+    /// Documents saved before the subtitle existed must still open; the
+    /// missing field defaults to empty (no subtitle line in the PDF).
+    #[test]
+    fn documents_without_a_subtitle_still_parse() {
+        let old = r#"{"project_name":"Old","date":"2024-01-01","entries":[]}"#;
+        let doc: ConservationDocument = serde_json::from_str(old).unwrap();
+        assert_eq!(doc.subtitle, "");
+        assert_eq!(doc.project_name, "Old");
     }
 
     #[test]

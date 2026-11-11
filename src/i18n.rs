@@ -100,6 +100,9 @@ pub struct Translations {
     pub status_ready: String,
     pub project_prefix: String,
     pub project_untitled: String,
+    /// Shown in the header as a click-to-edit hint while the report
+    /// subtitle is empty.
+    pub subtitle_placeholder: String,
     // Settings Popover
     /// Legacy, Noto font is not bundled
     pub settings_tooltip: String,
@@ -227,6 +230,7 @@ impl Translations {
                 status_ready: "Ready".into(),
                 project_prefix: "Project: ".into(),
                 project_untitled: "Untitled".into(),
+                subtitle_placeholder: "Add subtitle…".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
                 delete_label: "Delete".into(),
                 dialog_open_title: "Open File".into(),
@@ -418,6 +422,7 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 status_ready: "Gotowy".into(),
                 project_prefix: "Projekt: ".into(),
                 project_untitled: "Bez nazwy".into(),
+                subtitle_placeholder: "Dodaj podtytuł…".into(),
                 settings_tooltip: "<span font_family='Noto Color Emoji'>⚙️</span>".into(),
                 delete_label: "Usuń".into(),
                 dialog_open_title: "Otwórz plik".into(),

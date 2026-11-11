@@ -73,6 +73,17 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ));
                 }
 
+                let subtitle = view.document.subtitle.trim();
+                if subtitle.is_empty() {
+                    let escaped = glib::markup_escape_text(&t.subtitle_placeholder);
+                    ctx.subtitle.set_markup(&format!(
+                        "<span foreground='gray' style='italic'>{}</span>",
+                        escaped
+                    ));
+                } else {
+                    ctx.subtitle.set_text(subtitle);
+                }
+
                 if ctx.current_lang.get() != t.language {
                     ctx.current_lang.set(t.language);
                     ctx.persist_settings();

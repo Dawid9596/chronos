@@ -215,6 +215,7 @@ pub enum Event {
         target_index: usize,
     },
     UpdateProjectName(String),
+    UpdateSubtitle(String),
     UpdateText {
         id: u32,
         field: EditableField,
@@ -286,6 +287,7 @@ impl Event {
             | Event::InsertLayerAfter(_)
             | Event::MoveLayer { .. }
             | Event::UpdateProjectName(_)
+            | Event::UpdateSubtitle(_)
             | Event::UpdateText { .. }
             | Event::UpdateGroupText { .. }
             | Event::CyclePattern { .. }
@@ -462,6 +464,10 @@ impl App for ConservationApp {
                 if !trimmed.is_empty() {
                     model.document.project_name = trimmed.to_string();
                 }
+                caps.render.render();
+            }
+            Event::UpdateSubtitle(new_subtitle) => {
+                model.document.subtitle = new_subtitle.trim().to_string();
                 caps.render.render();
             }
             Event::UpdateText {
@@ -971,6 +977,24 @@ mod tests {
     }
 
     // ---- autosave ----------------------------------------------------
+
+    #[test]
+    fn subtitle_edits_are_undoable_and_clearable() {
+        let core = Core::<ConservationApp>::default();
+
+        let _ = core.process_event(Event::UpdateSubtitle("Excavation 2024".into()));
+        assert_eq!(core.view().document.subtitle, "Excavation 2024");
+
+        // Unlike the project name, an empty value is accepted: it clears.
+        let _ = core.process_event(Event::UpdateSubtitle("  ".into()));
+        assert_eq!(core.view().document.subtitle, "");
+
+        // Both edits are their own undo steps.
+        let _ = core.process_event(Event::Undo);
+        assert_eq!(core.view().document.subtitle, "Excavation 2024");
+        let _ = core.process_event(Event::Undo);
+        assert_eq!(core.view().document.subtitle, "");
+    }
 
     #[test]
     fn autosave_follows_document_changes() {

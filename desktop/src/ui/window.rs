@@ -10,6 +10,93 @@ use gtk4::{Align, glib};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+fn editable_label_stack(
+    initial_text: &str,
+    tooltip: &str,
+    width_chars: i32,
+    current: impl Fn() -> String + 'static,
+    commit: impl Fn(String) + 'static,
+) -> (gtk4::Stack, gtk4::Label) {
+    let label = gtk4::Label::builder()
+        .label(initial_text)
+        .halign(Align::Center)
+        .tooltip_text(tooltip)
+        .build();
+    let pointer_cursor = gtk4::gdk::Cursor::from_name("pointer", None);
+    label.set_cursor(pointer_cursor.as_ref());
+
+    let entry = gtk4::Entry::builder()
+        .halign(Align::Center)
+        .width_chars(width_chars)
+        .build();
+
+    let stack = gtk4::Stack::builder()
+        .transition_type(gtk4::StackTransitionType::None)
+        .halign(Align::Center)
+        .build();
+    stack.add_named(&label, Some("label"));
+    stack.add_named(&entry, Some("entry"));
+    stack.set_visible_child_name("label");
+
+    let click = gtk4::GestureClick::new();
+    click.set_button(1);
+    {
+        let stack = stack.clone();
+        let entry = entry.clone();
+        click.connect_pressed(move |_gesture, n_press, _x, _y| {
+            if n_press == 2 {
+                entry.set_text(&current());
+                stack.set_visible_child_name("entry");
+                entry.grab_focus();
+                entry.select_region(0, -1);
+            }
+        });
+    }
+    label.add_controller(click);
+
+    let commit = Rc::new(commit);
+    let commit_row = {
+        let stack = stack.clone();
+        let entry = entry.clone();
+        let commit = commit.clone();
+        move || {
+            if stack.visible_child_name().as_deref() == Some("entry") {
+                if let Some(root) = entry.root() {
+                    root.set_focus(None::<&gtk4::Widget>);
+                }
+                let new_text = entry.text().to_string();
+                stack.set_visible_child_name("label");
+                commit(new_text);
+            }
+        }
+    };
+
+    {
+        let commit_row = commit_row.clone();
+        entry.connect_activate(move |_| commit_row());
+    }
+
+    let key_controller = gtk4::EventControllerKey::new();
+    {
+        let stack = stack.clone();
+        key_controller.connect_key_pressed(move |_controller, key, _keycode, _state| {
+            if key == gtk4::gdk::Key::Escape {
+                stack.set_visible_child_name("label");
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+    }
+    entry.add_controller(key_controller);
+
+    let focus_controller = gtk4::EventControllerFocus::new();
+    focus_controller.connect_leave(move |_| commit_row());
+    entry.add_controller(focus_controller);
+
+    (stack, label)
+}
+
 fn build_menu_row(
     text: &str,
     shortcut: Option<(&ShortcutRegistry, Action)>,
@@ -645,13 +732,9 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     ));
     top_bar.set_end_widget(Some(history_buttons.widget()));
 
-    let status_stack = gtk4::Stack::new();
-    status_stack.set_transition_type(gtk4::StackTransitionType::None);
-    status_stack.set_halign(gtk4::Align::Center);
-
     let current_project_name = core.view().document.project_name.clone();
-    let status_label = gtk4::Label::builder()
-        .label(format!(
+    let (status_stack, status_label) = editable_label_stack(
+        &format!(
             "{}{}",
             t.project_prefix,
             if current_project_name.is_empty() {
@@ -659,50 +742,16 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             } else {
                 &current_project_name
             }
-        ))
-        .halign(gtk4::Align::Center)
-        .tooltip_text("Double-click project name to edit")
-        .build();
-
-    let pointer_cursor = gtk4::gdk::Cursor::from_name("pointer", None);
-    status_label.set_cursor(pointer_cursor.as_ref());
-
-    let status_entry = gtk4::Entry::builder()
-        .halign(gtk4::Align::Center)
-        .width_chars(25)
-        .build();
-
-    status_stack.add_named(&status_label, Some("label"));
-    status_stack.add_named(&status_entry, Some("entry"));
-    status_stack.set_visible_child_name("label");
-
-    let click_gesture = gtk4::GestureClick::new();
-    click_gesture.set_button(1);
-    let status_stack_click = status_stack.clone();
-    let status_entry_click = status_entry.clone();
-    let core_click = core.clone();
-    click_gesture.connect_pressed(move |_gesture, n_press, _x, _y| {
-        if n_press == 2 {
-            let current_project = core_click.view().document.project_name;
-            status_entry_click.set_text(&current_project);
-            status_stack_click.set_visible_child_name("entry");
-            status_entry_click.grab_focus();
-            status_entry_click.select_region(0, -1);
-        }
-    });
-    status_label.add_controller(click_gesture);
-
-    let commit_project_name = {
-        let status_stack = status_stack.clone();
-        let status_entry = status_entry.clone();
-        let ctx_holder = ctx_holder.clone();
-        move || {
-            if status_stack.visible_child_name().as_deref() == Some("entry") {
-                if let Some(root) = status_entry.root() {
-                    root.set_focus(None::<&gtk4::Widget>);
-                }
-                let new_name = status_entry.text().to_string();
-                status_stack.set_visible_child_name("label");
+        ),
+        "Double-click project name to edit",
+        25,
+        {
+            let core = core.clone();
+            move || core.view().document.project_name
+        },
+        {
+            let ctx_holder = ctx_holder.clone();
+            move |new_name: String| {
                 if !new_name.trim().is_empty()
                     && let Some(ctx) = ctx_holder.borrow().as_ref()
                 {
@@ -715,32 +764,37 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                     });
                 }
             }
-        }
-    };
+        },
+    );
 
-    let commit_activate = commit_project_name.clone();
-    status_entry.connect_activate(move |_| {
-        commit_activate();
-    });
-
-    let key_controller = gtk4::EventControllerKey::new();
-    let status_stack_key = status_stack.clone();
-    key_controller.connect_key_pressed(move |_controller, key, _keycode, _state| {
-        if key == gtk4::gdk::Key::Escape {
-            status_stack_key.set_visible_child_name("label");
-            glib::Propagation::Stop
+    let current_subtitle = core.view().document.subtitle.clone();
+    let (subtitle_stack, subtitle_label) = editable_label_stack(
+        &if current_subtitle.is_empty() {
+            t.subtitle_placeholder.clone()
         } else {
-            glib::Propagation::Proceed
-        }
-    });
-    status_entry.add_controller(key_controller);
-
-    let focus_controller = gtk4::EventControllerFocus::new();
-    let commit_focus = commit_project_name;
-    focus_controller.connect_leave(move |_controller| {
-        commit_focus();
-    });
-    status_entry.add_controller(focus_controller);
+            current_subtitle
+        },
+        "Double-click to edit the subtitle shown in the exported PDF",
+        40,
+        {
+            let core = core.clone();
+            move || core.view().document.subtitle
+        },
+        {
+            let ctx_holder = ctx_holder.clone();
+            move |new_subtitle: String| {
+                if let Some(ctx) = ctx_holder.borrow().as_ref() {
+                    let ctx_idle = ctx.clone();
+                    glib::idle_add_local_once(move || {
+                        let effects = ctx_idle
+                            .core
+                            .process_event(Event::UpdateSubtitle(new_subtitle));
+                        crate::effects::process_effects(&ctx_idle, effects);
+                    });
+                }
+            }
+        },
+    );
 
     let container = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Vertical)
@@ -756,6 +810,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     // span the full window width — the toolbar no longer constrains it.
     container.append(&bottom_revealer);
     container.append(&status_stack);
+    container.append(&subtitle_stack);
 
     let scrolled_window = gtk4::ScrolledWindow::builder()
         .hexpand(true)
@@ -779,6 +834,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         embed_project_data: Rc::new(Cell::new(settings.embed_project_data.unwrap_or(true))),
         tool: tool.clone(),
         status: status_label.clone(),
+        subtitle: subtitle_label.clone(),
         export_btn: export_btn.clone(),
         settings_label: settings_label.clone(),
         current_lang,

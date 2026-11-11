@@ -78,6 +78,7 @@ pub struct AppContext {
     pub embed_project_data: Rc<Cell<bool>>,
     pub tool: Rc<Cell<Tool>>,
     pub status: Label,
+    pub subtitle: Label,
     pub export_btn: Button,
     pub current_lang: Rc<Cell<Language>>,
     pub settings_label: Label,

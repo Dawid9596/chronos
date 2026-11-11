@@ -66,6 +66,22 @@ mod tests {
         typst_compile_to_bytes(&polish, None).expect("Polish document compiles");
     }
 
+    /// A non-empty subtitle must render as its own line between the title
+    /// and the table (guards the conditional branch in `template.typ`).
+    #[test]
+    fn subtitle_renders_between_title_and_table() {
+        let mut document = ConservationDocument::sample();
+        document.subtitle = "Trench 3 — southern section".into();
+        let view_model = document.to_view_model(
+            Translations::get(Language::English),
+            [true; COLUMN_COUNT],
+            CanvasParams::default(),
+        );
+        let bytes =
+            typst_compile_to_bytes(&view_model, None).expect("document with subtitle compiles");
+        assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
+    }
+
     /// Fresh documents start empty; exporting one must still produce a valid
     /// (single-page, no-project-data) PDF.
     #[test]

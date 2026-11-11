@@ -104,9 +104,12 @@
   let bar-inset-val = params.at("bar_padding_mm", default: params.cell_padding_mm) * 1mm
   set text(font: "Linux Libertine", size: 10pt)
   align(center)[
-    #text(size: 16pt, weight: "bold")[#data.project_name] \
-    #v(0.5em)
-    #text(size: 11pt, style: "italic")[Conservation Status Report]
+    #text(size: 16pt, weight: "bold")[#data.project_name]
+    #if data.subtitle != "" [
+      \
+      #v(0.5em)
+      #text(size: 11pt, style: "italic")[#data.subtitle]
+    ]
   ]
   v(2em)
 

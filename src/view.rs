@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct DocumentViewModel {
     pub project_name: String,
+    pub subtitle: String,
     pub rows: Vec<RowViewModel>,
     pub translations: Translations,
     pub visible_columns: [bool; COLUMN_COUNT],
@@ -46,6 +47,7 @@ impl ConservationDocument {
         if len == 0 {
             return DocumentViewModel {
                 project_name: self.project_name.clone(),
+                subtitle: self.subtitle.clone(),
                 rows,
                 translations,
                 visible_columns,
@@ -123,6 +125,7 @@ impl ConservationDocument {
 
         DocumentViewModel {
             project_name: self.project_name.clone(),
+            subtitle: self.subtitle.clone(),
             rows,
             translations,
             visible_columns,
