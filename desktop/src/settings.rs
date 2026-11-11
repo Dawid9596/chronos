@@ -30,6 +30,12 @@ pub struct Settings {
     /// Attach the project to exported PDFs so they can be opened for editing.
     /// `None` means the default, which is on.
     pub embed_project_data: Option<bool>,
+    /// Unix day number (days since the epoch) of the last automatic update
+    /// check; `None` means never checked.
+    pub last_update_check_day: Option<u64>,
+    /// Release version the user chose to skip in the update dialog; the
+    /// automatic check never reminds about it again.
+    pub skipped_version: Option<String>,
 }
 
 pub fn settings_path() -> Option<PathBuf> {

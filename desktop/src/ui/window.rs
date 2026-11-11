@@ -260,48 +260,71 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
     edit_menu_btn.add_css_class("flat");
 
-    // About Menu Button
-    let about_menu_btn = gtk4::Button::builder()
-        .label(&t.menu_about)
-        .has_frame(false)
+    // Help Menu (Help, About, Check for Updates)
+    let help_popover = gtk4::Popover::builder().has_arrow(false).build();
+    let help_vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(2)
+        .margin_top(4)
+        .margin_bottom(4)
+        .margin_start(4)
+        .margin_end(4)
         .build();
-    about_menu_btn.add_css_class("flat");
-    {
-        let holder = ctx_holder.clone();
-        about_menu_btn.connect_clicked(move |_| {
-            if let Some(ctx) = holder.borrow().as_ref() {
-                let view = ctx.core.view();
-                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "about");
-            }
-        });
-    }
 
-    // Help Menu Button
-    let help_menu_btn = gtk4::Button::builder()
-        .label(&t.menu_help)
-        .has_frame(false)
-        .build();
-    help_menu_btn.add_css_class("flat");
-    {
+    let (help_help_item, help_help_lbl) = build_menu_row(&t.menu_help, None, &help_popover, {
         let holder = ctx_holder.clone();
-        help_menu_btn.connect_clicked(move |_| {
+        move || {
             if let Some(ctx) = holder.borrow().as_ref() {
                 let view = ctx.core.view();
                 crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "help");
             }
-        });
-    }
+        }
+    });
+
+    let (help_about_item, help_about_lbl) = build_menu_row(&t.menu_about, None, &help_popover, {
+        let holder = ctx_holder.clone();
+        move || {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                let view = ctx.core.view();
+                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "about");
+            }
+        }
+    });
+
+    let (help_check_item, help_check_lbl) = build_menu_row(&t.menu_check_updates, None, &help_popover, {
+        let holder = ctx_holder.clone();
+        move || {
+            if let Some(ctx) = holder.borrow().as_ref() {
+                crate::update::check_now(ctx);
+            }
+        }
+    });
+
+    help_vbox.append(&help_help_item);
+    help_vbox.append(&help_about_item);
+    help_vbox.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
+    help_vbox.append(&help_check_item);
+    help_popover.set_child(Some(&help_vbox));
+
+    let help_btn_label = gtk4::Label::new(Some(&t.menu_help));
+    let help_menu_btn = gtk4::MenuButton::builder()
+        .child(&help_btn_label)
+        .popover(&help_popover)
+        .has_frame(false)
+        .build();
+    help_menu_btn.add_css_class("flat");
 
     menu_bar.append(&file_menu_btn);
     menu_bar.append(&edit_menu_btn);
-    menu_bar.append(&about_menu_btn);
     menu_bar.append(&help_menu_btn);
 
     let menu_labels = Rc::new(MenuLabels {
         file_btn: file_btn_label,
         edit_btn: edit_btn_label,
-        about_btn: about_menu_btn,
-        help_btn: help_menu_btn,
+        help_btn: help_btn_label,
+        help_help: help_help_lbl,
+        help_about: help_about_lbl,
+        help_check: help_check_lbl,
         file_open: file_open_lbl,
         file_save: file_save_lbl,
         file_save_as: file_save_as_lbl,
@@ -766,6 +789,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         last_message: Rc::new(RefCell::new(None)),
         status_timer: Rc::new(RefCell::new(None)),
         settings_timer: Rc::new(RefCell::new(None)),
+        last_update_check_day: Rc::new(Cell::new(settings.last_update_check_day)),
+        skipped_version: Rc::new(RefCell::new(settings.skipped_version.clone())),
     };
 
     *ctx_holder.borrow_mut() = Some(ctx.clone());

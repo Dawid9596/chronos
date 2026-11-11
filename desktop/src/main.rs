@@ -6,6 +6,7 @@ mod settings;
 mod shortcuts;
 mod tool;
 mod ui;
+mod update;
 
 use gtk4::prelude::*;
 use std::cell::Cell;
@@ -159,8 +160,9 @@ fn main() -> gtk4::glib::ExitCode {
     let app_activated = activated.clone();
     app.connect_activate(move |app| {
         app_activated.set(true);
-        let (window, _ctx) = crate::ui::window::build_main_window(app);
+        let (window, ctx) = crate::ui::window::build_main_window(app);
         window.present();
+        crate::update::schedule_update_check(&ctx);
     });
 
     let exit = app.run();

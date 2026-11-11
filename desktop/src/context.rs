@@ -7,7 +7,6 @@ use chronos::i18n::{Language, Translations};
 use chronos::project::ExportSettings;
 use crux_core::Core;
 use gtk4::glib;
-use gtk4::prelude::*;
 use gtk4::{ApplicationWindow, Button, Label, ScrolledWindow, ToggleButton};
 use chronos::context::COLUMN_COUNT;
 use serde::{Deserialize, Serialize};
@@ -32,8 +31,10 @@ pub use chronos::context::CanvasParams;
 pub struct MenuLabels {
     pub file_btn: Label,
     pub edit_btn: Label,
-    pub about_btn: Button,
-    pub help_btn: Button,
+    pub help_btn: Label,
+    pub help_help: Label,
+    pub help_about: Label,
+    pub help_check: Label,
     pub file_open: Label,
     pub file_save: Label,
     pub file_save_as: Label,
@@ -49,8 +50,10 @@ impl MenuLabels {
     pub fn update(&self, t: &Translations) {
         self.file_btn.set_text(&t.menu_file);
         self.edit_btn.set_text(&t.menu_edit);
-        self.about_btn.set_label(&t.menu_about);
-        self.help_btn.set_label(&t.menu_help);
+        self.help_btn.set_text(&t.menu_about);
+        self.help_help.set_text(&t.menu_help);
+        self.help_about.set_text(&t.menu_about);
+        self.help_check.set_text(&t.menu_check_updates);
         self.file_open.set_text(&t.menu_open);
         self.file_save.set_text(&t.menu_save);
         self.file_save_as.set_text(&t.menu_save_as);
@@ -101,6 +104,10 @@ pub struct AppContext {
     pub status_timer: Rc<RefCell<Option<glib::SourceId>>>,
     /// Pending debounce timer for saving settings to disk.
     pub settings_timer: Rc<RefCell<Option<glib::SourceId>>>,
+    /// Unix day number of the last automatic update check (see `Settings`).
+    pub last_update_check_day: Rc<Cell<Option<u64>>>,
+    /// Release version the user chose to skip (see `Settings`).
+    pub skipped_version: Rc<RefCell<Option<String>>>,
 }
 
 impl AppContext {
@@ -129,6 +136,8 @@ impl AppContext {
             columns: self.vis.borrow().clone(),
             canvas: self.canvas_params.borrow().clone(),
             embed_project_data: Some(self.embed_project_data.get()),
+            last_update_check_day: self.last_update_check_day.get(),
+            skipped_version: self.skipped_version.borrow().clone(),
         };
         if let Err(e) = settings.save() {
             eprintln!("settings: could not save: {e}");
