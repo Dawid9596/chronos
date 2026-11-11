@@ -108,6 +108,8 @@ pub struct AppContext {
     pub last_update_check_day: Rc<Cell<Option<u64>>>,
     /// Release version the user chose to skip (see `Settings`).
     pub skipped_version: Rc<RefCell<Option<String>>>,
+    /// Crash-recovery autosave state (see `crate::autosave`).
+    pub autosave: Rc<RefCell<crate::autosave::AutosaveState>>,
 }
 
 impl AppContext {

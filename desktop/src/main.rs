@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autosave;
 mod context;
 mod effects;
 mod settings;
@@ -162,6 +163,13 @@ fn main() -> gtk4::glib::ExitCode {
         app_activated.set(true);
         let (window, ctx) = crate::ui::window::build_main_window(app);
         window.present();
+        // Recover on the next idle, after the deferred language switch
+        // (queued while the window was built) has run, so the recovery
+        // note is shown in the user's language.
+        let ctx_recover = ctx.clone();
+        gtk4::glib::idle_add_local_once(move || {
+            crate::autosave::try_recover(&ctx_recover);
+        });
         crate::update::schedule_update_check(&ctx);
     });
 

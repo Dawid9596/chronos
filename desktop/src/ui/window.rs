@@ -796,6 +796,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         settings_timer: Rc::new(RefCell::new(None)),
         last_update_check_day: Rc::new(Cell::new(settings.last_update_check_day)),
         skipped_version: Rc::new(RefCell::new(settings.skipped_version.clone())),
+        autosave: crate::autosave::new_state(),
     };
 
     *ctx_holder.borrow_mut() = Some(ctx.clone());
@@ -1000,6 +1001,8 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let ctx_close = ctx.clone();
     window.connect_close_request(move |_| {
         ctx_close.flush_pending_settings();
+        // A normal exit must never leave a recoverable autosave behind.
+        crate::autosave::on_exit(&ctx_close);
         glib::Propagation::Proceed
     });
     (window, ctx)

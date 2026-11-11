@@ -3,7 +3,9 @@ use crate::i18n::Translations;
 use crate::pdf_attachment;
 use crate::project::{ExportSettings, ProjectFile};
 use crate::storage::StatusMessage;
-use crate::storage::{AppState, BarPattern, ConditionBar, ConservationEntry, Slot, MIN_GAP_PCT};
+use crate::storage::{
+    AppState, BarPattern, ConditionBar, ConservationDocument, ConservationEntry, MIN_GAP_PCT, Slot,
+};
 use crate::view::AppViewModel;
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
@@ -164,9 +166,45 @@ where
     }
 }
 
+/// Payload handed to the shell whenever the document changes: the shell
+/// persists it off the UI thread so it can be restored after a crash.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct AutosaveOperation {
+    pub document: ConservationDocument,
+}
+
+impl Operation for AutosaveOperation {
+    type Output = ();
+}
+
+/// Fire-and-forget capability, like `Render`: the shell never resolves it.
+#[derive(Capability)]
+pub struct Autosave<Ev> {
+    context: CapabilityContext<AutosaveOperation, Ev>,
+}
+
+impl<Ev> Autosave<Ev>
+where
+    Ev: 'static,
+{
+    pub fn new(context: CapabilityContext<AutosaveOperation, Ev>) -> Self {
+        Self { context }
+    }
+
+    pub fn save(&self, document: ConservationDocument) {
+        let context = self.context.clone();
+        self.context.spawn(async move {
+            context.notify_shell(AutosaveOperation { document }).await;
+        });
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Event {
     Init,
+    RestoreDocument {
+        document: ConservationDocument,
+    },
     RequestPdfExport {
         settings: ExportSettings,
         embed_project_data: bool,
@@ -261,6 +299,7 @@ impl Event {
             | Event::DeleteSlot { .. }
             | Event::UpdateSlotEdge { .. } => true,
             Event::Init
+            | Event::RestoreDocument { .. }
             | Event::RequestPdfExport { .. }
             | Event::PdfExportFinished(_)
             | Event::ToggleLanguage
@@ -288,6 +327,7 @@ pub struct Capabilities {
     pub render: Render<Event>,
     pub export_pdf: ExportPdf<Event>,
     pub file_picker: FilePicker<Event>,
+    pub autosave: Autosave<Event>,
 }
 
 impl App for ConservationApp {
@@ -744,16 +784,34 @@ impl App for ConservationApp {
                 caps.render.render();
             }
             Event::Undo => {
-                model.history.undo(&mut model.document);
+                if model.history.undo(&mut model.document) {
+                    caps.autosave.save(model.document.clone());
+                }
                 caps.render.render();
             }
             Event::Redo => {
-                model.history.redo(&mut model.document);
+                if model.history.redo(&mut model.document) {
+                    caps.autosave.save(model.document.clone());
+                }
                 caps.render.render();
             }
             Event::ToggleLanguage => {
                 model.language = model.language.next();
                 caps.render.render();
+            }
+            Event::RestoreDocument { document } => {
+                let t = Translations::get(model.language);
+                model.next_id = document.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
+                model.document = document;
+                model.history.clear();
+                // The recovered work belongs to no file: the first Save after
+                // recovery must ask for one, never overwrite the autosave.
+                model.current_file_path = None;
+                model.last_error = Some(StatusMessage::Info(t.status_recovered.clone()));
+                caps.render.render();
+                // The restored work is unsaved and fileless; keep the crash
+                // net alive until the user saves or exits cleanly.
+                caps.autosave.save(model.document.clone());
             }
             Event::RequestOpen => {
                 let t = Translations::get(model.language);
@@ -858,7 +916,11 @@ impl App for ConservationApp {
         }
 
         if let Some(before) = before {
+            let changed = before != model.document;
             model.history.record(before, &model.document, None);
+            if changed {
+                caps.autosave.save(model.document.clone());
+            }
         }
         Command::done()
     }
@@ -895,6 +957,95 @@ mod tests {
             content,
         }));
         core
+    }
+
+    fn autosaved_documents(effects: &[Effect]) -> Vec<ConservationDocument> {
+        effects
+            .iter()
+            .filter_map(|effect| match effect {
+                Effect::Autosave(request) => Some(request.operation.document.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    // ---- autosave ----------------------------------------------------
+
+    #[test]
+    fn autosave_follows_document_changes() {
+        let core = Core::<ConservationApp>::default();
+
+        // Non-document events never autosave.
+        let effects = core.process_event(Event::ToggleLanguage);
+        assert!(autosaved_documents(&effects).is_empty());
+        let effects = core.process_event(Event::ClearStatus);
+        assert!(autosaved_documents(&effects).is_empty());
+        // Opening a file does not either: its content lives on disk already.
+        let effects = core.process_event(Event::FileOpenResponse(FilePickerResponse::Opened {
+            path: "sample.json".into(),
+            content: serde_json::to_string(&ConservationDocument::sample()).unwrap(),
+        }));
+        assert!(autosaved_documents(&effects).is_empty());
+
+        // An undoable edit does.
+        let effects = core.process_event(Event::UpdateProjectName("A".into()));
+        assert_eq!(autosaved_documents(&effects).len(), 1);
+
+        // A no-op edit does not.
+        let effects = core.process_event(Event::UpdateProjectName("A".into()));
+        assert!(autosaved_documents(&effects).is_empty());
+    }
+
+    #[test]
+    fn undo_and_redo_request_autosave_only_when_they_change_something() {
+        let core = Core::<ConservationApp>::default();
+        let _ = core.process_event(Event::UpdateProjectName("A".into()));
+
+        let effects = core.process_event(Event::Undo);
+        assert_eq!(autosaved_documents(&effects).len(), 1);
+        // Undo at the bottom of history is a no-op.
+        let effects = core.process_event(Event::Undo);
+        assert!(autosaved_documents(&effects).is_empty());
+
+        let effects = core.process_event(Event::Redo);
+        assert_eq!(autosaved_documents(&effects).len(), 1);
+        // Redo with an empty redo stack is a no-op.
+        let effects = core.process_event(Event::Redo);
+        assert!(autosaved_documents(&effects).is_empty());
+    }
+
+    #[test]
+    fn restore_document_recovers_a_crashed_session() {
+        let core = core_with_sample_document();
+        let _ = core.process_event(Event::DeleteLayer(1));
+
+        let effects = core.process_event(Event::RestoreDocument {
+            document: ConservationDocument::sample(),
+        });
+
+        // The restored work is unsaved and fileless: keep the net alive.
+        assert_eq!(autosaved_documents(&effects).len(), 1);
+
+        let vm = core.view();
+        assert_eq!(vm.document.rows.len(), 2);
+        assert!(!vm.can_undo);
+        assert!(!vm.can_redo);
+        assert!(matches!(
+            vm.last_error,
+            Some(StatusMessage::Info(ref m)) if *m == Translations::get(Language::English).status_recovered
+        ));
+
+        // The recovered work belongs to no file: Save must ask for one.
+        let FilePickerRequest::SaveFile { path, .. } =
+            save_request(&core, Event::RequestSave(ExportSettings::default()))
+        else {
+            panic!("expected SaveFile");
+        };
+        assert_eq!(path, None);
+
+        // Inserted ids continue after the restored rows.
+        let _ = core.process_event(Event::InsertLayerAfter(Some(2)));
+        assert_eq!(core.view().document.rows[2].id, 3);
     }
 
     #[test]

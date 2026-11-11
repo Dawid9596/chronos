@@ -94,6 +94,9 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
 
                 crate::ui::table::sync_document_table(&view, ctx);
             }
+            Effect::Autosave(request) => {
+                crate::autosave::note_document(ctx, request.operation.document);
+            }
             Effect::ExportPdf(mut request) => {
                 let ctx = ctx.clone();
                 glib::spawn_future_local(async move {
@@ -214,6 +217,15 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                             }
                         }
                     };
+
+                    // The work is now fully persisted (saved) or replaced
+                    // (opened): the crash-recovery autosave is stale.
+                    if matches!(
+                        response,
+                        FilePickerResponse::Saved { .. } | FilePickerResponse::Opened { .. }
+                    ) {
+                        crate::autosave::clear(&ctx);
+                    }
 
                     let next_effects = ctx.core.resolve(&mut request, response).expect("resolve");
                     process_effects(&ctx, next_effects);

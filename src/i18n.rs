@@ -153,6 +153,8 @@ pub struct Translations {
     // Status & Error Prefixes
     pub status_loaded_prefix: String,
     pub status_saved_prefix: String,
+    /// Shown after silently restoring crash-recovery autosave on startup.
+    pub status_recovered: String,
     pub error_parse_prefix: String,
     pub error_open_prefix: String,
     pub error_save_prefix: String,
@@ -268,6 +270,7 @@ impl Translations {
                 shortcuts_err_conflict_prefix: "Already used by ".into(),
                 status_loaded_prefix: "Loaded: ".into(),
                 status_saved_prefix: "Saved: ".into(),
+                status_recovered: "Recovered unsaved changes.".into(),
                 error_parse_prefix: "Error parsing file: ".into(),
                 error_open_prefix: "Error opening file: ".into(),
                 error_save_prefix: "Error saving file: ".into(),
@@ -458,6 +461,7 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 shortcuts_err_conflict_prefix: "Już używane przez ".into(),
                 status_loaded_prefix: "Wczytano: ".into(),
                 status_saved_prefix: "Zapisano: ".into(),
+                status_recovered: "Przywrócono niezapisane zmiany.".into(),
                 error_parse_prefix: "Błąd parsowania pliku: ".into(),
                 error_open_prefix: "Błąd otwierania pliku: ".into(),
                 error_save_prefix: "Błąd zapisywania pliku: ".into(),
