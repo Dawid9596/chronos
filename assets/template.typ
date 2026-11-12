@@ -1,6 +1,11 @@
 #let data = json.decode(sys.inputs.json_data)
 #let params = data.canvas_params
 
+// Rich text arrives from the Rust side as a string containing Typst
+// markup (see `richtext::to_typst`); a raw string embedded into markup
+// renders as-is, so it must be parsed into content first.
+#let rich(s) = eval(s, mode: "markup")
+
 // ---------------------------------------------------------
 // Define Patterns for the Condition Bars
 // ---------------------------------------------------------
@@ -104,11 +109,11 @@
   let bar-inset-val = params.at("bar_padding_mm", default: params.cell_padding_mm) * 1mm
   set text(font: "Linux Libertine", size: 10pt)
   align(center)[
-    #text(size: 16pt, weight: "bold")[#data.project_name]
+    #text(size: 16pt, weight: "bold")[#rich(data.project_name)]
     #if data.subtitle != "" [
       \
       #v(0.5em)
-      #text(size: 11pt, style: "italic")[#data.subtitle]
+      #text(size: 11pt, style: "italic")[#rich(data.subtitle)]
     ]
   ]
   v(2em)
@@ -148,20 +153,20 @@
       cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.graphical_representation)])
     }
     if data.visible_columns.at(2) { cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.woven_trim)]) }
-    if data.visible_columns.at(3) { cells.push(row.layer_characteristics) }
-    if data.visible_columns.at(4) { cells.push(row.layer_thickness) }
+    if data.visible_columns.at(3) { cells.push(rich(row.layer_characteristics)) }
+    if data.visible_columns.at(4) { cells.push(rich(row.layer_thickness)) }
 
     if data.visible_columns.at(5) {
       let chrono = row.at("chronological_phase", default: none)
       if chrono != none {
-        cells.push(table.cell(rowspan: chrono.span, align: center + horizon)[#chrono.value])
+        cells.push(table.cell(rowspan: chrono.span, align: center + horizon)[#rich(chrono.value)])
       }
     }
 
     if data.visible_columns.at(6) {
       let dating = row.at("dating_period", default: none)
       if dating != none {
-        cells.push(table.cell(rowspan: dating.span, align: center + horizon)[#dating.value])
+        cells.push(table.cell(rowspan: dating.span, align: center + horizon)[#rich(dating.value)])
       }
     }
   }
@@ -181,8 +186,8 @@
         if vis.at(0) { probe.push(str(row.row_number)) }
         if vis.at(1) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
         if vis.at(2) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
-        if vis.at(3) { probe.push(row.layer_characteristics) }
-        if vis.at(4) { probe.push(row.layer_thickness) }
+        if vis.at(3) { probe.push(rich(row.layer_characteristics)) }
+        if vis.at(4) { probe.push(rich(row.layer_thickness)) }
         if vis.at(5) { probe.push([]) }
         if vis.at(6) { probe.push([]) }
         measure(grid(
@@ -200,7 +205,7 @@
           let group = if vis.at(col) { row.at(key, default: none) } else { none }
           if group != none {
             let inner = col-w.at(active-index(col)) - 2 * cell-inset-val
-            let need = measure(block(width: inner, group.value)).height + 2 * cell-inset-val
+            let need = measure(block(width: inner, rich(group.value))).height + 2 * cell-inset-val
             let have = heights.slice(i, i + group.span).sum()
             if need > have {
               for j in range(i, i + group.span) {
