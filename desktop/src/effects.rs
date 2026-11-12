@@ -2,6 +2,7 @@ use crate::context::AppContext;
 use crate::tool::Tool;
 use chronos::bridge::{Effect, Event, ExportPdfResponse};
 use chronos::bridge::{FilePickerRequest, FilePickerResponse};
+use chronos::i18n::Translations;
 use chronos::storage::StatusMessage;
 use glib::source::timeout_add_local_once;
 use gtk4::glib;
@@ -23,6 +24,17 @@ fn schedule_status_restore(ctx: &AppContext) {
         process_effects(&ctx_idle, effects);
     });
     *ctx.status_timer.borrow_mut() = Some(restore_id);
+}
+
+pub fn subtitle_markup(subtitle: &str, t: &Translations) -> String {
+    if subtitle.is_empty() {
+        format!(
+            "<span foreground='gray' style='italic'>{}</span>",
+            glib::markup_escape_text(&t.subtitle_placeholder)
+        )
+    } else {
+        chronos::richtext::to_pango(subtitle)
+    }
 }
 
 pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
@@ -73,16 +85,8 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     ));
                 }
 
-                let subtitle = view.document.subtitle.trim();
-                if subtitle.is_empty() {
-                    let escaped = glib::markup_escape_text(&t.subtitle_placeholder);
-                    ctx.subtitle.set_markup(&format!(
-                        "<span foreground='gray' style='italic'>{}</span>",
-                        escaped
-                    ));
-                } else {
-                    ctx.subtitle.set_text(subtitle);
-                }
+                ctx.subtitle
+                    .set_markup(&subtitle_markup(&view.document.subtitle, t));
 
                 if ctx.current_lang.get() != t.language {
                     ctx.current_lang.set(t.language);

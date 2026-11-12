@@ -1,4 +1,5 @@
 use crate::pdf_attachment::attach_project_json;
+use crate::richtext::{to_typst, typst_escape};
 use crate::view::DocumentViewModel;
 use crate::view_model::ConservationWorld;
 
@@ -6,8 +7,22 @@ pub fn typst_compile_to_bytes(
     view_model: &DocumentViewModel,
     project_json: Option<&str>,
 ) -> Result<Vec<u8>, String> {
-    let json_data = serde_json::to_string(view_model)
-        .map_err(|e| format!("JSON serialization failed: {}", e))?;
+    let json_data = {
+        let mut markup = view_model.clone();
+        markup.project_name = typst_escape(&markup.project_name);
+        markup.subtitle = to_typst(&markup.subtitle);
+        for row in &mut markup.rows {
+            row.layer_characteristics = to_typst(&row.layer_characteristics);
+            row.layer_thickness = to_typst(&row.layer_thickness);
+            if let Some(chrono) = &mut row.chronological_phase {
+                chrono.value = to_typst(&chrono.value);
+            }
+            if let Some(dating) = &mut row.dating_period {
+                dating.value = to_typst(&dating.value);
+            }
+        }
+        serde_json::to_string(&markup).map_err(|e| format!("JSON serialization failed: {}", e))?
+    };
 
     let template_source = include_str!("../assets/template.typ").to_string();
     let world = ConservationWorld::new(template_source, json_data);
@@ -64,6 +79,26 @@ mod tests {
             CanvasParams::default(),
         );
         typst_compile_to_bytes(&polish, None).expect("Polish document compiles");
+    }
+
+    /// Rich-text markup must survive the Typst conversion: styles render
+    /// and hostile characters (which would be code injection if passed
+    /// through raw) must be escaped, not break the compilation.
+    #[test]
+    fn markup_and_hostile_characters_compile_to_pdf() {
+        let mut document = ConservationDocument::sample();
+        document.subtitle = "*Report* #2 $test_ <section> @ref \\ [x]".to_string();
+        let entry = document.entries.first_mut().unwrap();
+        entry.layer_characteristics = "**Bold** *italic* ^14^C m~3~ & 3 * 4 * 5".into();
+        entry.chronological_phase = "Iron Age #1".into();
+
+        let view_model = document.to_view_model(
+            Translations::get(Language::English),
+            [true; COLUMN_COUNT],
+            CanvasParams::default(),
+        );
+        let bytes = typst_compile_to_bytes(&view_model, None).expect("markup document compiles");
+        assert!(bytes.starts_with(b"%PDF"), "output is a PDF");
     }
 
     /// A non-empty subtitle must render as its own line between the title

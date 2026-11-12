@@ -1,4 +1,5 @@
 use crate::context::{AppContext, MenuLabels};
+use crate::effects::subtitle_markup;
 use crate::settings::Settings;
 use crate::shortcuts::{Action, ShortcutRegistry};
 use crate::tool::Tool;
@@ -14,11 +15,13 @@ fn editable_label_stack(
     initial_text: &str,
     tooltip: &str,
     width_chars: i32,
+    use_markup: bool,
     current: impl Fn() -> String + 'static,
     commit: impl Fn(String) + 'static,
 ) -> (gtk4::Stack, gtk4::Label) {
     let label = gtk4::Label::builder()
         .label(initial_text)
+        .use_markup(use_markup)
         .halign(Align::Center)
         .tooltip_text(tooltip)
         .build();
@@ -745,6 +748,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         ),
         "Double-click project name to edit",
         25,
+        false,
         {
             let core = core.clone();
             move || core.view().document.project_name
@@ -769,13 +773,10 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let current_subtitle = core.view().document.subtitle.clone();
     let (subtitle_stack, subtitle_label) = editable_label_stack(
-        &if current_subtitle.is_empty() {
-            t.subtitle_placeholder.clone()
-        } else {
-            current_subtitle
-        },
+        &subtitle_markup(&current_subtitle, t),
         "Double-click to edit the subtitle shown in the exported PDF",
         40,
+        true,
         {
             let core = core.clone();
             move || core.view().document.subtitle

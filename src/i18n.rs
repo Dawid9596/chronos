@@ -319,6 +319,7 @@ Welcome to the Conservation Editor documentation. Use the internal links below t
 
 - [Working with Tools](#tools)
 - [Managing Layers & Groups](#layers)
+- [Text Formatting](#formatting)
 - [Saving & Exporting](#files)
 - [Keyboard Shortcuts](#shortcuts)
 - [About Chronos](doc:about)
@@ -329,10 +330,10 @@ Welcome to the Conservation Editor documentation. Use the internal links below t
 
 The top toolbar provides interactive tools for editing condition bars and cells:
 
-- **Edit:** Drag slot edges to resize coverage, or click a bar to cycle through patterns. Right-click cycles backward.
+- **Edit:** You can drag slot edges, or click a bar to cycle through patterns. Right-click cycles backward.
 - **Create:** Click inside a condition bar to insert a new slot at the cursor position.
 - **Delete:** Click an existing slot inside a condition bar to remove it.
-- **Paint:** Select one of the 29 patterns (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) and click any bar to apply it.
+- **Paint:** Select one of the 29 patterns (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) and click any bar to apply it. There is search function available.
 - **Split:** Click the highlighted horizontal divider inside a merged cell to split the group at that boundary.
 - **Duplicate:** Click a row number or condition bar to duplicate the entire stratigraphic layer.
 - **Merge:** Choose **Merge Down** or **Merge Up** and click a Chronological Phase or Dating Period cell to merge it with its neighbor.
@@ -344,6 +345,23 @@ The top toolbar provides interactive tools for editing condition bars and cells:
 - **Insert Layer:** Click the thin gap above, below, or between groups to insert a blank layer.
 - **Reorder Layer:** Double-click and hold a row number in the **No.** column, then drag vertically to reorder.
 - **Edit Text:** Double-click any text cell or the project title to edit inline. Press `Enter` to commit or `Escape` to cancel.
+
+---
+
+## Text Formatting {#formatting}
+
+This editor does not have sophisticated text editing capabilities.
+
+Nonetheless all editable text — the table cells and the report subtitle — accepts a small markup inspired by Markdown. It is typed as-is while editing and rendered as soon as you click away, both on screen and in the exported PDF:
+
+- `**bold**` is **bold**
+- `*italic*` is *italic*
+- `^14^C` is a superscript (^14^C)
+- `m~3~` is a subscript (m~3~)
+
+Markup characters can be printed literally by escaping them with a backslash: `\*`, `\_`, `\^`, `\~`. Styles combine freely, e.g. `**bold *and* italic**`.
+
+The project title is always plain text and stays out of the markup.
 
 ---
 
@@ -374,7 +392,7 @@ M                 Merge Tool
 ]                 Next Variant
 [                 Previous Variant
 ```
-`Ctrl + Mouse wheel` also cycles through the active tool's variants. All of these, as well as extra mouse buttons, can be rebound in the **Keyboard Shortcuts** dialog.
+`Ctrl + Mouse wheel` also cycles through the active tool's variants (up = next, down = previous).
 
 Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
 "#.into(),
@@ -507,6 +525,7 @@ Witaj w dokumentacji Conservation Editor. Odnośniki poniżej prowadzą do kolej
 
 - [Praca z narzędziami](#tools)
 - [Warstwy i grupy](#layers)
+- [Formatowanie tekstu](#formatting)
 - [Zapis i eksport](#files)
 - [Skróty klawiszowe](#shortcuts)
 - [O programie](doc:about)
@@ -517,10 +536,10 @@ Witaj w dokumentacji Conservation Editor. Odnośniki poniżej prowadzą do kolej
 
 Pasek narzędzi na górze okna zawiera narzędzia przeznaczone do edycji pasków stanu zachowania oraz komórek:
 
-- **Edytuj:** Przeciągaj krawędzie slotów, aby zmieniać pokrycie, lub klikaj pasek, aby przechodzić przez wzory; prawy przycisk myszy przechodzi przez nie w drugą stronę.
+- **Edytuj:** Możesz przeciągać krawędzie slotów, lub klikaj pasek, aby przechodzić przez wzory; prawy przycisk myszy przechodzi przez nie od tyłu.
 - **Utwórz:** Kliknięcie wewnątrz paska wstawia nowy slot w miejscu kursora.
 - **Usuń:** Kliknięcie istniejącego slotu wewnątrz paska usuwa go.
-- **Maluj:** Wybierz jeden z 29 wzorów (Bolus, Brick, Ceramics, Wood, Textile, Metal Foil, Embroidery, Stone, Glue, Bone, Spray Varnish, Painting, Metal, Paper, Patina, Parchment, Whitewash, Leather, Stucco, Glaze, Plasterwork, Cardboard, Plastic, Mixed Thread, Varnish, Wax, Nonwoven, Mortar, Gold Powder) i kliknij dowolny pasek, aby go nanieść.
+- **Maluj:** Wybierz jeden z 29 wzorów (Bolus, Cegła, Ceramika, Drewno, Tkanina, Folie metalowe, Haft, Kamień, Klej, Kość, Laserunek, Malowidło, Metal, Papier, Patyna, Pergamin, Pobiała, Skóra, Stiuk, Szkliwo, Sztukateria, Tektura, Tworzywo sztuczne, Wątek mieszany, Werniks, Wosk, Włóknina, Zaprawa, Złoto w proszku) i kliknij dowolny pasek, aby go nanieść. Wyszukiwanie po nazwie jest dostępne.
 - **Dziel:** Kliknij podświetloną poziomą linię podziału w połączonej komórce, aby rozdzielić grupę w tym miejscu.
 - **Duplikuj:** Kliknij numer wiersza albo pasek, aby zduplikować całą warstwę.
 - **Scalaj:** Wybierz **Scal w dół** lub **Scal w górę**, a następnie kliknij komórkę fazy chronologicznej lub okresu datowania, aby połączyć ją z sąsiednią.
@@ -532,6 +551,23 @@ Pasek narzędzi na górze okna zawiera narzędzia przeznaczone do edycji pasków
 - **Wstawianie warstwy:** Kliknij cienką przerwę nad, pod lub między grupami, aby wstawić pustą warstwę.
 - **Zmiana kolejności:** Dwukrotnie kliknij i przytrzymaj numer wiersza w kolumnie **Nr warstwy**, a następnie przeciągnij go pionowo, aby zmienić kolejność.
 - **Edycja tekstu:** Dwukrotne kliknięcie dowolnej komórki tekstowej lub tytułu projektu rozpoczyna edycję w miejscu. `Enter` zatwierdza zmianę, `Escape` ją anuluje.
+
+---
+
+## Formatowanie tekstu {#formatting}
+
+Ten edytor nie posiada zaawansowanych możliwości edycji tekstu.
+
+Niemniej cały edytowalny tekst — komórki tabeli i podtytuł raportu — przyjmuje prostą składnię zainspirowaną Markdownem. Wpisuje się ją dosłownie podczas edycji, a po kliknięciu poza pole jest renderowana — na ekranie i w eksportowanym PDF-ie:
+
+- `**pogrubienie**` to **pogrubienie**
+- `*kursywa*` to *kursywa*
+- `^14^C` to indeks górny (^14^C)
+- `m~3~` to indeks dolny (m~3~)
+
+Znaki składni można wydrukować dosłownie, poprzedzając je ukośnikiem: `\*`, `\_`, `\^`, `\~`. Style można dowolnie łączyć, np. `**pogrubienie *i* kursywa**`.
+
+Tytuł projektu jest zawsze zwykłym tekstem i nie podlega formatowaniu.
 
 ---
 
@@ -562,7 +598,7 @@ M                 narzędzie Scalaj
 ]                 następny wariant
 [                 poprzedni wariant
 ```
-Skrót `Ctrl + kółko myszy` również przechodzi przez warianty aktywnego narzędzia. Wszystkie te skróty, a także dodatkowe przyciski myszy, można zmienić w oknie **Skróty klawiszowe**.
+Skrót `Ctrl + kółko myszy` również przechodzi przez warianty aktywnego narzędzia (w górę = następny, w dół = poprzedni).
 
 Powrót na [początek pomocy](#top) lub odczytaj [informacje o programie](doc:about).
 "#.into(),

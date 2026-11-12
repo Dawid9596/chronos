@@ -6,6 +6,7 @@ pub mod i18n;
 pub mod patterns;
 pub mod pdf_attachment;
 pub mod project;
+pub mod richtext;
 pub mod storage;
 pub mod view;
 pub mod view_model;

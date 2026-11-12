@@ -1,7 +1,9 @@
 use crate::context::AppContext;
 use chronos::bridge::Event;
+use chronos::richtext::to_pango;
 use gtk4::glib;
 use gtk4::prelude::*;
+use std::cell::RefCell;
 
 /// Handle to a live double-click-to-edit cell.
 ///
@@ -13,6 +15,8 @@ pub struct EditableCell {
     stack: gtk4::Stack,
     label: gtk4::Label,
     entry: gtk4::Entry,
+    /// The raw (markup-carrying) text the label currently displays.
+    raw: RefCell<String>,
 }
 
 impl EditableCell {
@@ -27,8 +31,9 @@ impl EditableCell {
     /// cell is *not* being edited, so a re-render triggered by something else
     /// (e.g. the status-message timer) can never clobber what is being typed.
     pub fn set_text(&self, text: &str) {
-        if self.label.text().as_str() != text {
-            self.label.set_text(text);
+        if self.raw.borrow().as_str() != text {
+            self.label.set_markup(&to_pango(text));
+            *self.raw.borrow_mut() = text.to_string();
         }
         let editing = self.stack.visible_child_name().as_deref() == Some("entry");
         if !editing && self.entry.text().as_str() != text {
@@ -50,14 +55,18 @@ pub fn create_editable_cell(
     stack.set_margin_bottom(4);
     stack.set_valign(gtk4::Align::Fill);
 
-    let label = gtk4::Label::new(Some(initial_text));
-    label.set_wrap(true);
-    label.set_max_width_chars(30);
-    label.set_width_chars(5);
-    label.set_halign(gtk4::Align::Fill);
-    label.set_valign(gtk4::Align::Fill);
-    label.set_xalign(0.0);
-    label.set_margin_start(2);
+    let label = gtk4::Label::builder()
+        .label(to_pango(initial_text))
+        .use_markup(true)
+        .wrap(true)
+        .max_width_chars(30)
+        .width_chars(5)
+        .halign(gtk4::Align::Fill)
+        .valign(gtk4::Align::Fill)
+        .xalign(0.0)
+        .margin_start(2)
+        .build();
+    let raw = RefCell::new(initial_text.to_string());
 
     let entry = gtk4::Entry::new();
     entry.set_text(initial_text);
@@ -87,6 +96,7 @@ pub fn create_editable_cell(
         let stack = stack.clone();
         let entry = entry.clone();
         let label = label.clone();
+        let raw = raw.clone();
         let ctx = ctx.clone();
         let on_commit = on_commit.clone();
 
@@ -97,7 +107,8 @@ pub fn create_editable_cell(
                 }
                 let new_text = entry.text().to_string();
                 stack.set_visible_child_name("label");
-                label.set_text(&new_text);
+                label.set_markup(&to_pango(&new_text));
+                *raw.borrow_mut() = new_text.clone();
                 let event = on_commit(new_text);
                 let ctx_idle = ctx.clone();
                 let event_idle = event.clone();
@@ -120,14 +131,15 @@ pub fn create_editable_cell(
     let key_controller = gtk4::EventControllerKey::new();
     let entry_connect = entry.clone();
     let stack_connect = stack.clone();
-    let label_connect = label.clone();
+    let raw_connect = raw.clone();
     key_controller.connect_key_pressed(move |_controller, key, _keycode, _state| {
         if key == gtk4::gdk::Key::Escape {
             if let Some(root) = entry_connect.root() {
                 root.set_focus(None::<&gtk4::Widget>);
             }
             stack_connect.set_visible_child_name("label");
-            entry_connect.set_text(label_connect.text().as_str());
+            // Restore the raw text: the label's own text is markup-stripped.
+            entry_connect.set_text(&raw_connect.borrow());
             glib::Propagation::Stop
         } else {
             glib::Propagation::Proceed
@@ -145,5 +157,6 @@ pub fn create_editable_cell(
         stack,
         label,
         entry,
+        raw,
     }
 }

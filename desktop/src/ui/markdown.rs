@@ -296,10 +296,13 @@ fn slugify(text: &str) -> String {
         .to_string()
 }
 
-/// Converts inline markdown (`**bold**`, `*italic*`, `` `code` ``, `[label](href)`) into Pango markup
-/// and connects `activate-link` for internal navigation.
+/// Converts a paragraph of inline markdown into a rich `GtkLabel` and
+/// connects `activate-link` for internal navigation.
+///
+/// The inline conversion itself (including `**bold**`, `*italic*`, code,
+/// links and escaping) lives in `chronos::richtext`.
 fn build_rich_label(markdown_inline: &str, nav_fn: &NavFn) -> gtk4::Label {
-    let markup = inline_markdown_to_pango(markdown_inline);
+    let markup = chronos::richtext::to_pango(markdown_inline);
     let label = gtk4::Label::builder()
         .label(&markup)
         .use_markup(true)
@@ -318,86 +321,4 @@ fn build_rich_label(markdown_inline: &str, nav_fn: &NavFn) -> gtk4::Label {
     });
 
     label
-}
-
-fn inline_markdown_to_pango(input: &str) -> String {
-    let mut out = String::new();
-    let chars: Vec<char> = input.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        // Link: [text](url)
-        if chars[i] == '['
-            && let Some(close_bracket) = chars[i + 1..].iter().position(|&c| c == ']')
-        {
-            let close_idx = i + 1 + close_bracket;
-            if close_idx + 1 < chars.len()
-                && chars[close_idx + 1] == '('
-                && let Some(close_paren) = chars[close_idx + 2..].iter().position(|&c| c == ')')
-            {
-                let end_paren = close_idx + 2 + close_paren;
-                let link_text: String = chars[i + 1..close_idx].iter().collect();
-                let link_url: String = chars[close_idx + 2..end_paren].iter().collect();
-                out.push_str(&format!(
-                    "<a href=\"{}\">{}</a>",
-                    glib::markup_escape_text(&link_url),
-                    glib::markup_escape_text(&link_text)
-                ));
-                i = end_paren + 1;
-                continue;
-            }
-        }
-
-        // Bold: **text**
-        if i + 1 < chars.len()
-            && chars[i] == '*'
-            && chars[i + 1] == '*'
-            && let Some(end) = find_double_delim(&chars, i + 2, '*')
-        {
-            let inner: String = chars[i + 2..end].iter().collect();
-            out.push_str(&format!("<b>{}</b>", glib::markup_escape_text(&inner)));
-            i = end + 2;
-            continue;
-        }
-
-        // Inline code: `code`
-        if chars[i] == '`'
-            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '`')
-        {
-            let end = i + 1 + rel_end;
-            let inner: String = chars[i + 1..end].iter().collect();
-            out.push_str(&format!("<tt>{}</tt>", glib::markup_escape_text(&inner)));
-            i = end + 1;
-            continue;
-        }
-
-        // Italic: *text*
-        if chars[i] == '*'
-            && let Some(rel_end) = chars[i + 1..].iter().position(|&c| c == '*')
-        {
-            let end = i + 1 + rel_end;
-            let inner: String = chars[i + 1..end].iter().collect();
-            out.push_str(&format!("<i>{}</i>", glib::markup_escape_text(&inner)));
-            i = end + 1;
-            continue;
-        }
-
-        // Escape single character for Pango
-        let ch_str = chars[i].to_string();
-        out.push_str(&glib::markup_escape_text(&ch_str));
-        i += 1;
-    }
-
-    out
-}
-
-fn find_double_delim(chars: &[char], start: usize, delim: char) -> Option<usize> {
-    let mut idx = start;
-    while idx + 1 < chars.len() {
-        if chars[idx] == delim && chars[idx + 1] == delim {
-            return Some(idx);
-        }
-        idx += 1;
-    }
-    None
 }
