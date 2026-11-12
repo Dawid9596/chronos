@@ -33,7 +33,7 @@ codegen-units = 1
 strip = "symbols"
 panic = "abort"
 
-# Linux packager for deb.
+# Linux packager (deb + AppImage).
 [package.metadata.packager]
 product_name = "Chronos"
 identifier = "com.chronos.app"
@@ -48,11 +48,16 @@ out_dir = "../target/release/packager"
 # modern system libs. Skipped instead in the release workflow via the
 # `NO_STRIP=true` env var (see release.yml), which linuxdeploy honors; every
 # lib then ships unstripped, keeping the exclusion list empty.
+#
+# The GTK plugin is vendored in packaging/linuxdeploy-plugin-gtk.sh and put on
+# PATH during packaging (see release.yml); no [linuxdeploy-plugins] table is
+# used, so cargo-packager never downloads an unpinned copy from GitHub.
 
 [package.metadata.packager.deb]
 # Dependency names for Ubuntu 24.04 (noble) where libgtk-4 got the time64 ABI
 # suffix. Adjust if you ever target Debian 12 (libgtk-4-1) there.
 depends = [
-  "libgtk-4-1t64",
+  "libgtk-4-1",
   "librsvg2-common",
+  "adwaita-icon-theme",
 ]

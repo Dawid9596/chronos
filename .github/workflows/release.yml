@@ -94,7 +94,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install GTK dev dependencies
-        run: sudo apt-get update -o Acquire::Retries=5 && sudo apt-get install -y -o Acquire::Retries=5 libgtk-4-dev
+        run: |
+          sudo apt-get update -o Acquire::Retries=5
+          sudo apt-get install -y -o Acquire::Retries=5 \
+            libgtk-4-dev \
+            librsvg2-common \
+            adwaita-icon-theme \
+            desktop-file-utils
+          # Ensure the gtk-4.0 module directory exists on Ubuntu 24.04 even if
+          # optional media/print-backend packages aren't installed, preventing
+          # linuxdeploy-plugin-gtk from aborting on `cp`.
+          sudo mkdir -p /usr/lib/x86_64-linux-gnu/gtk-4.0
 
       - name: Install cargo-packager
         run: cargo install cargo-packager --locked
@@ -115,7 +125,8 @@ jobs:
       - name: Package deb and AppImage
         env:
           NO_STRIP: "true"
-        run: cargo packager --release -p desktop --formats deb,appimage --verbose
+          DEPLOY_GTK_VERSION: "4"
+        run: PATH="$PWD/packaging:$PATH" cargo packager --release -p desktop --formats deb,appimage --verbose
 
       # Same dual-location staging as the Windows job: the deb lands in
       # target/release/packager/ (the config's out_dir), but verify loudly.
