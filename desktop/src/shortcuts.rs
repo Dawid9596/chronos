@@ -497,11 +497,6 @@ impl ShortcutRegistry {
         self.hint_labels.borrow_mut().push((action, label.clone()));
     }
 
-    /// Adds "Shortcut: X" as `widget`'s tooltip and keeps it up to date.
-    pub fn bind_tooltip(&self, action: Action, widget: &impl IsA<gtk4::Widget>, t: &Translations) {
-        self.bind_tooltip_inner(action, widget, t, false);
-    }
-
     /// Adds "<Action Name> (Shortcut: X)" as `widget`'s tooltip and keeps it up to date.
     pub fn bind_named_tooltip(
         &self,

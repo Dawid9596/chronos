@@ -2,13 +2,15 @@ use crate::shortcuts::{Action, ShortcutRegistry};
 use chronos::bridge::Event;
 use chronos::i18n::Translations;
 use gtk4::prelude::*;
-use gtk4::{Align, Box as GtkBox, Button, Orientation};
+use gtk4::{Align, Box as GtkBox, Button, Image, Label, Orientation};
 use std::rc::Rc;
 
 pub struct HistoryButtons {
     root: GtkBox,
     undo: Button,
     redo: Button,
+    undo_label: Label,
+    redo_label: Label,
     menu_undo: Button,
     menu_redo: Button,
 }
@@ -18,18 +20,32 @@ fn make_button(
     t: &Translations,
     action: Action,
     label: &str,
+    icon_name: &str,
     send: &Rc<dyn Fn(Event)>,
     event: Event,
-) -> Button {
-    let button = Button::with_label(label);
-    // Must not steal focus from items when clicked
-    button.set_focus_on_click(false);
+) -> (Button, Label) {
+    let btn_box = GtkBox::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(4)
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .build();
+
+    let icon = Image::from_icon_name(icon_name);
+    let text_label = Label::new(Some(label));
+    btn_box.append(&icon);
+    btn_box.append(&text_label);
+
+    let button = Button::builder()
+        .child(&btn_box)
+        .focus_on_click(false)
+        .build();
 
     let send = send.clone();
     button.connect_clicked(move |_| send(event.clone()));
 
-    shortcuts.bind_tooltip(action, &button, t);
-    button
+    shortcuts.bind_named_tooltip(action, &button, t);
+    (button, text_label)
 }
 
 impl HistoryButtons {
@@ -40,8 +56,24 @@ impl HistoryButtons {
         menu_undo: Button,
         menu_redo: Button,
     ) -> Self {
-        let undo = make_button(shortcuts, t, Action::Undo, &t.menu_undo, &send, Event::Undo);
-        let redo = make_button(shortcuts, t, Action::Redo, &t.menu_redo, &send, Event::Redo);
+        let (undo, undo_label) = make_button(
+            shortcuts,
+            t,
+            Action::Undo,
+            &t.menu_undo,
+            "edit-undo-symbolic",
+            &send,
+            Event::Undo,
+        );
+        let (redo, redo_label) = make_button(
+            shortcuts,
+            t,
+            Action::Redo,
+            &t.menu_redo,
+            "edit-redo-symbolic",
+            &send,
+            Event::Redo,
+        );
 
         let root = GtkBox::new(Orientation::Horizontal, 6);
         // Lives in the CenterBox end slot: hug the right edge, and stay level
@@ -55,10 +87,12 @@ impl HistoryButtons {
             root,
             undo,
             redo,
+            undo_label,
+            redo_label,
             menu_undo,
             menu_redo,
         };
-        // NInitially nothing to undo.
+        // Initially nothing to undo.
         this.sync(false, false);
         this
     }
@@ -75,7 +109,12 @@ impl HistoryButtons {
     }
 
     pub fn update_translations(&self, t: &Translations) {
-        self.undo.set_label(&t.menu_undo);
-        self.redo.set_label(&t.menu_redo);
+        self.undo_label.set_text(&t.menu_undo);
+        self.redo_label.set_text(&t.menu_redo);
+    }
+
+    pub fn set_labels_visible(&self, visible: bool) {
+        self.undo_label.set_visible(visible);
+        self.redo_label.set_visible(visible);
     }
 }

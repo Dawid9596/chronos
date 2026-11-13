@@ -863,11 +863,13 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     // and Undo/Redo buttons without overflowing.
     {
         let tool_labels = ctx.tool_labels.clone();
+        let history_buttons = ctx.history_buttons.clone();
         let left_box = left_box.clone();
         let history_box = history_buttons.widget().clone();
         let tool_bar_row = tool_bar_row.clone();
         let top_bar_clone = top_bar.clone();
         let last_expanded_tools_width = Rc::new(Cell::new(0));
+        let last_expanded_history_width = Rc::new(Cell::new(0));
         let labels_visible = Rc::new(Cell::new(true));
 
         top_bar.add_tick_callback(move |bar, _| {
@@ -882,11 +884,17 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
             if labels_visible.get() {
                 last_expanded_tools_width.set(tools_nat);
+                last_expanded_history_width.set(right_nat);
             }
 
             // CenterBox centers the middle widget, so both side slots effectively
             // reserve `2 * max(left, right)` plus spacing, or at minimum `left + right`.
-            let side_reserve = left_nat.max(right_nat) * 2 + 32;
+            // Use the expanded (labels-visible) history width even while collapsed so
+            // the threshold reflects the worst case.
+            let expanded_right = left_nat.max(
+                last_expanded_history_width.get().max(right_nat),
+            );
+            let side_reserve = expanded_right * 2 + 32;
             let needed_expanded = last_expanded_tools_width.get().max(tools_nat) + side_reserve;
 
             // Hysteresis buffer (16px) prevents rapid toggling on the boundary
@@ -901,6 +909,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
                 for (_, lbl) in tool_labels.iter() {
                     lbl.set_visible(should_show);
                 }
+                history_buttons.set_labels_visible(should_show);
                 top_bar_clone.queue_resize();
             }
 
