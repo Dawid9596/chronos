@@ -3,6 +3,8 @@ Tracking:Track a has_unsaved_changes: bool flag in AppState (set on document-mut
 
 Zero cell inner margin tepmlate quirks
 
+If language not in settings try to get the system language?
+
 Import files by dragging them over
 
 adding new row sometimes has the UI flash changes
@@ -16,4 +18,7 @@ Add option to edit description in output pdf, prune out default template from de
 Animate dragging rows?
 
 Import custom .svg patterns?
+
+## Refactor
+Split bridge.rs at least into bridge.rs and event.rs
 

@@ -40,8 +40,9 @@ pub fn typst_compile_to_bytes(
         .map_err(|err| format!("PDF generation failed: {:?}", err))?;
 
     match project_json {
-        Some(json) => attach_project_json(&pdf_bytes, json)
-            .map_err(|e| format!("Embedding project data failed: {e}")),
+        Some(json) => {
+            attach_project_json(&pdf_bytes, json).map_err(|e| e.describe(translations).into_owned())
+        }
         None => Ok(pdf_bytes),
     }
 }

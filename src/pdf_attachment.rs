@@ -3,8 +3,10 @@
 //! * [`attach_project_json`] adds the JSON to a PDF
 //! * [`extract_project_json`] reads it back
 
+use crate::i18n::Translations;
 use crate::project::EMBEDDED_FILE_NAME;
 use lopdf::{Dictionary, Document, Object, Stream, dictionary};
+use std::borrow::Cow;
 use std::fmt;
 use std::path::Path;
 
@@ -21,16 +23,16 @@ pub enum PdfProjectError {
     NoProjectData,
 }
 
-impl fmt::Display for PdfProjectError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl PdfProjectError {
+    /// User-facing message in the given language. The `Unreadable` detail
+    /// (`why`) stays untranslated, like the library errors it wraps.
+    pub fn describe(&self, t: &Translations) -> Cow<'static, str> {
         match self {
-            Self::Unreadable(why) => write!(f, "cannot read PDF: {why}"),
-            Self::NoProjectData => f.write_str("the PDF contains no project data"),
+            Self::Unreadable(why) => Cow::Owned(format!("{}{why}", t.error_pdf_unreadable_prefix)),
+            Self::NoProjectData => Cow::Borrowed(t.error_no_project_data),
         }
     }
 }
-
-impl std::error::Error for PdfProjectError {}
 
 fn unreadable(e: impl fmt::Display) -> PdfProjectError {
     PdfProjectError::Unreadable(e.to_string())

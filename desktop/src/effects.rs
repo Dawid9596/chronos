@@ -171,9 +171,12 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                                             Ok(content) => {
                                                 FilePickerResponse::Opened { path, content }
                                             }
-                                            Err(e) => FilePickerResponse::Error(e.describe(
-                                                &Translations::get(ctx.core.view().language),
-                                            )),
+                                            Err(e) => FilePickerResponse::Error(
+                                                e.describe(&Translations::get(
+                                                    ctx.core.view().language,
+                                                ))
+                                                .into(),
+                                            ),
                                         }
                                     }
                                     None => FilePickerResponse::Error("Invalid file path".into()),

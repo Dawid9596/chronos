@@ -6,6 +6,7 @@
 use chronos::i18n::Translations;
 use chronos::pdf_attachment::{PdfProjectError, extract_project_json, is_pdf_path};
 use gtk4::gio;
+use std::borrow::Cow;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -15,11 +16,10 @@ pub enum ReadProjectError {
 }
 
 impl ReadProjectError {
-    pub fn describe(&self, t: &Translations) -> String {
+    pub fn describe(&self, t: &Translations) -> Cow<'_, str> {
         match self {
-            Self::Io(e) => e.clone(),
-            Self::Pdf(PdfProjectError::NoProjectData) => t.error_no_project_data.into(),
-            Self::Pdf(other) => other.to_string(),
+            Self::Io(e) => Cow::Borrowed(e),
+            Self::Pdf(e) => e.describe(t),
         }
     }
 }
