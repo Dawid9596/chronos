@@ -63,33 +63,43 @@
 #let bar-stroke = 0.5pt
 
 #let render-bar(condition) = layout(size => {
-  box(width: size.width, height: size.height, inset: bar-stroke / 2, {
-    let bar-h = size.height - bar-stroke
-    box(width: 100%, height: 100%, stroke: bar-stroke + luma(150), {
-      for slot in condition.slots {
-        let span = slot.end_pct - slot.start_pct
-        let x0 = slot.start_pct * 1%
-        if calc.abs(span) < 0.5 {
-          place(
-            left,
-            dx: x0,
-            line(
-              start: (0pt, 0%),
-              end: (0pt, 100%),
-              stroke: (params.zero_width_line_pt * 1pt) + luma(77),
-            ),
-          )
-        } else {
-          let w = span * 1%
-          place(left, dx: x0, box(
-            width: w,
-            height: 100%,
-            fill: bar-fill(condition.pattern, bar-h),
-            stroke: none,
-          ))
+  // The pattern box carries a hairline frame. When the bar cell has no
+  // padding, that frame sits exactly on the cell border and doubles it, so
+  // it is omitted (padding = 0 edge case).
+  let framed = params.at("bar_padding_mm", default: params.cell_padding_mm) * 1mm != 0pt
+  let shave = if framed { bar-stroke } else { 0pt }
+  box(width: size.width, height: size.height, inset: shave / 2, {
+    let bar-h = size.height - shave
+    box(
+      width: 100%,
+      height: 100%,
+      stroke: if framed { bar-stroke + luma(150) } else { none },
+      {
+        for slot in condition.slots {
+          let span = slot.end_pct - slot.start_pct
+          let x0 = slot.start_pct * 1%
+          if calc.abs(span) < 0.5 {
+            place(
+              left,
+              dx: x0,
+              line(
+                start: (0pt, 0%),
+                end: (0pt, 100%),
+                stroke: (params.zero_width_line_pt * 1pt) + luma(77),
+              ),
+            )
+          } else {
+            let w = span * 1%
+            place(left, dx: x0, box(
+              width: w,
+              height: 100%,
+              fill: bar-fill(condition.pattern, bar-h),
+              stroke: none,
+            ))
+          }
         }
-      }
-    })
+      },
+    )
   })
 })
 
@@ -142,35 +152,6 @@
     rotated-header(data.translations.col_dating),
   )
 
-  let cells = ()
-  for (i, is-visible) in data.visible_columns.enumerate() {
-    if is-visible { cells.push(all-headers.at(i)) }
-  }
-
-  for row in data.rows {
-    if data.visible_columns.at(0) { cells.push(str(row.row_number)) }
-    if data.visible_columns.at(1) {
-      cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.graphical_representation)])
-    }
-    if data.visible_columns.at(2) { cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.woven_trim)]) }
-    if data.visible_columns.at(3) { cells.push(rich(row.layer_characteristics)) }
-    if data.visible_columns.at(4) { cells.push(rich(row.layer_thickness)) }
-
-    if data.visible_columns.at(5) {
-      let chrono = row.at("chronological_phase", default: none)
-      if chrono != none {
-        cells.push(table.cell(rowspan: chrono.span, align: center + horizon)[#rich(chrono.value)])
-      }
-    }
-
-    if data.visible_columns.at(6) {
-      let dating = row.at("dating_period", default: none)
-      if dating != none {
-        cells.push(table.cell(rowspan: dating.span, align: center + horizon)[#rich(dating.value)])
-      }
-    }
-  }
-
   if active-ratios.len() > 0 {
     layout(avail => {
       let col-w = active-ratios.map(r => r / total-ratio * avail.width)
@@ -178,16 +159,56 @@
 
       let active-index(col) = vis.slice(0, col).filter(v => v).len()
 
+      let probe-w = 100pt
+      let line-box = measure(block(width: probe-w, [Hello])).height
+      let pitch = measure(block(width: probe-w, [Hello \ Hello])).height - line-box
+      let ink-box = measure(block(width: probe-w, text(top-edge: "ascender", bottom-edge: "descender", [Hello]))).height
+      let ink-lead = calc.max(pitch - ink-box, 0pt)
+      let ink-text(body) = text(
+        top-edge: "ascender",
+        bottom-edge: "descender",
+        par(leading: ink-lead, body),
+      )
+
+      let cells = ()
+      for (i, is-visible) in data.visible_columns.enumerate() {
+        if is-visible { cells.push(all-headers.at(i)) }
+      }
+
+      for row in data.rows {
+        if vis.at(0) { cells.push(ink-text(str(row.row_number))) }
+        if vis.at(1) {
+          cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.graphical_representation)])
+        }
+        if vis.at(2) { cells.push(table.cell(inset: bar-inset-val)[#render-bar(row.woven_trim)]) }
+        if vis.at(3) { cells.push(ink-text(rich(row.layer_characteristics))) }
+        if vis.at(4) { cells.push(ink-text(rich(row.layer_thickness))) }
+
+        if vis.at(5) {
+          let chrono = row.at("chronological_phase", default: none)
+          if chrono != none {
+            cells.push(table.cell(rowspan: chrono.span, align: center + horizon)[#ink-text(rich(chrono.value))])
+          }
+        }
+
+        if vis.at(6) {
+          let dating = row.at("dating_period", default: none)
+          if dating != none {
+            cells.push(table.cell(rowspan: dating.span, align: center + horizon)[#ink-text(rich(dating.value))])
+          }
+        }
+      }
+
       // Row heights: Size each row
       // here, from a one-row copy of the grid (probe) in which the bar cells are a
       // placeholder of the minimum bar height, to then give the table explicit rows.
       let row-height(row) = {
         let probe = ()
-        if vis.at(0) { probe.push(str(row.row_number)) }
+        if vis.at(0) { probe.push(ink-text(str(row.row_number))) }
         if vis.at(1) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
         if vis.at(2) { probe.push(grid.cell(inset: bar-inset-val, box(height: bar-min-height))) }
-        if vis.at(3) { probe.push(rich(row.layer_characteristics)) }
-        if vis.at(4) { probe.push(rich(row.layer_thickness)) }
+        if vis.at(3) { probe.push(ink-text(rich(row.layer_characteristics))) }
+        if vis.at(4) { probe.push(ink-text(rich(row.layer_thickness))) }
         if vis.at(5) { probe.push([]) }
         if vis.at(6) { probe.push([]) }
         measure(grid(
@@ -204,8 +225,13 @@
         for (col, key) in ((5, "chronological_phase"), (6, "dating_period")) {
           let group = if vis.at(col) { row.at(key, default: none) } else { none }
           if group != none {
-            let inner = col-w.at(active-index(col)) - 2 * cell-inset-val
-            let need = measure(block(width: inner, rich(group.value))).height + 2 * cell-inset-val
+            let col = active-index(col)
+            let need = measure(grid(
+              columns: (col-w.at(col),),
+              inset: cell-inset-val,
+              align: center + horizon,
+              grid.cell(ink-text(rich(group.value))),
+            )).height
             let have = heights.slice(i, i + group.span).sum()
             if need > have {
               for j in range(i, i + group.span) {
