@@ -378,7 +378,7 @@ The project title is always plain text and stays out of the markup.
 
 ## Saving & Exporting {#files}
 
-Projects are saved as `.json` files and can be exported directly to `.pdf` from the **File** menu or the toolbar button. Exported PDFs can carry the embedded project, so they can be re-opened for editing; that behaviour can be switched off in the **Output Canvas Parameters** dialog.
+Projects are saved as `.chr` files and can be exported directly to `.pdf` from the **File** menu or the toolbar button. Exported PDFs can carry the embedded project, so they can be re-opened for editing; that behaviour can be switched off in the **Output Canvas Parameters** dialog.
 
 Export settings (column visibility and canvas parameters) are stored in every Save file. To apply settings from another file or from a PDF without opening it as a project, choose **Import from file...** in the output canvas parameters dialog.
 
@@ -387,7 +387,7 @@ Export settings (column visibility and canvas parameters) are stored in every Sa
 ## Keyboard Shortcuts {#shortcuts}
 Defaults are
 ```
-Ctrl + O          Open Project (.json)
+Ctrl + O          Open Project
 Ctrl + S          Save Project
 Ctrl + Shift + S  Save Project As...
 Ctrl + E          Export to PDF
@@ -589,7 +589,7 @@ Tytuł projektu jest zawsze zwykłym tekstem i nie podlega formatowaniu.
 
 ## Zapis i eksport {#files}
 
-Projekty są zapisywane jako pliki `.json`, a eksport bezpośrednio do `.pdf` jest dostępny z menu **Plik** lub przycisku na pasku narzędzi. Eksportowane pliki PDF mogą osadzać dane projektu, dzięki czemu można je ponownie otworzyć do dalszej edycji; to zachowanie można wyłączyć w oknie **Parametry obszaru wyjściowego**.
+Projekty są zapisywane jako pliki `.chr`, a eksport bezpośrednio do `.pdf` jest dostępny z menu **Plik** lub przycisku na pasku narzędzi. Eksportowane pliki PDF mogą osadzać dane projektu, dzięki czemu można je ponownie otworzyć do dalszej edycji; to zachowanie można wyłączyć w oknie **Parametry obszaru wyjściowego**.
 
 Ustawienia eksportu (widoczne kolumny i parametry obszaru wyjściowego) są zapisywane w każdym pliku projektu. Aby przyjąć ustawienia z innego pliku lub pliku PDF bez otwierania go jako projektu, wybierz **Importuj z pliku...** w oknie parametrów obszaru wyjściowego.
 
@@ -598,7 +598,7 @@ Ustawienia eksportu (widoczne kolumny i parametry obszaru wyjściowego) są zapi
 ## Skróty klawiszowe {#shortcuts}
 Domyślne skróty:
 ```
-Ctrl + O          Otwórz projekt (.json)
+Ctrl + O          Otwórz projekt
 Ctrl + S          Zapisz projekt
 Ctrl + Shift + S  Zapisz projekt jako...
 Ctrl + E          Eksport do PDF

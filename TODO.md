@@ -9,7 +9,7 @@ Import files by dragging them over
 
 adding new row sometimes has the UI flash changes
 
-.chr.json extension support
+Warning for overwriting other projects?
 
 Display shortcuts next to respective buttons on editing shortcuts.
 

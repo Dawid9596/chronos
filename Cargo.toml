@@ -55,6 +55,11 @@ binaries = [
   { path = "chronos.exe", main = true }
 ]
 
+file_associations = [
+  # Keep in sync with `PROJECT_FILE_EXTENSION`
+  { extensions = ["chr"], mime_type = "application/vnd.chronos.project+json", name = "ChronosProject", description = "Chronos project file" }
+]
+
 resources = [
   "dll_stage/*.dll",
   { src = "dll_stage/schemas", target = "share/glib-2.0/schemas" },
@@ -62,3 +67,7 @@ resources = [
   { src = "dll_stage/hicolor", target = "share/icons/hicolor" },
   { src = "dll_stage/Adwaita", target = "share/icons/Adwaita" },
 ]
+
+[package.metadata.packager.wix]
+fragment_paths = ["wix/file_association.wxs"]
+component_refs = ["ChronosFileAssociation"]

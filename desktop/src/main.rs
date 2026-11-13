@@ -9,8 +9,11 @@ mod tool;
 mod ui;
 mod update;
 
+use crate::context::AppContext;
+use chronos::bridge::{Event, FilePickerResponse};
+use gtk4::gio::ApplicationFlags;
 use gtk4::prelude::*;
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
 const APP_ID: &str = "org.conservation.Editor";
@@ -60,7 +63,10 @@ fn main() -> gtk4::glib::ExitCode {
         }
     }
 
-    let app = gtk4::Application::builder().application_id(APP_ID).build();
+    let app = gtk4::Application::builder()
+        .application_id(APP_ID)
+        .flags(ApplicationFlags::HANDLES_OPEN)
+        .build();
 
     app.connect_startup(|_| {
         let display = gtk4::gdk::Display::default().expect("Could not connect to a display.");
@@ -158,24 +164,74 @@ fn main() -> gtk4::glib::ExitCode {
     // is watching the terminal — otherwise an outdated instance keeps
     // running looks like a no-op launch.
     let activated = Rc::new(Cell::new(false));
-    let app_activated = activated.clone();
+    let app_ctx: Rc<OnceCell<AppContext>> = Rc::new(OnceCell::new());
+
+    // Shared initialisation: build the main window once and run the
+    // one-shot startup tasks (autosave recovery on blank launch, update check).
+    let get_or_init_ctx = {
+        let activated = activated.clone();
+        let app_ctx = app_ctx.clone();
+        move |app: &gtk4::Application, run_autosave_recovery: bool| -> AppContext {
+            app_ctx
+                .get_or_init(|| {
+                    let (window, ctx) = crate::ui::window::build_main_window(app);
+                    window.present();
+                    activated.set(true);
+                    if run_autosave_recovery {
+                        // Recover on the next idle, after the deferred language switch
+                        // (queued while the window was built) has run, so the recovery
+                        // note is shown in the user's language.
+                        let ctx_recover = ctx.clone();
+                        gtk4::glib::idle_add_local_once(move || {
+                            crate::autosave::try_recover(&ctx_recover);
+                        });
+                    }
+                    crate::update::schedule_update_check(&ctx);
+                    ctx
+                })
+                .clone()
+        }
+    };
+
+    let init_for_activate = get_or_init_ctx.clone();
     app.connect_activate(move |app| {
-        app_activated.set(true);
-        let (window, ctx) = crate::ui::window::build_main_window(app);
-        window.present();
-        // Recover on the next idle, after the deferred language switch
-        // (queued while the window was built) has run, so the recovery
-        // note is shown in the user's language.
-        let ctx_recover = ctx.clone();
-        gtk4::glib::idle_add_local_once(move || {
-            crate::autosave::try_recover(&ctx_recover);
-        });
-        crate::update::schedule_update_check(&ctx);
+        let ctx = init_for_activate(app, true);
+        ctx.window.present();
+    });
+
+    // Open files handed to the (possibly already-running) instance, e.g.
+    // via "Open with" / double-click in the file manager.
+    let init_for_open = get_or_init_ctx.clone();
+    app.connect_open(move |app, files, _hint| {
+        let ctx = init_for_open(app, false);
+        ctx.window.present();
+
+        if let Some(file) = files.first()
+            && let Some(path) = file.path()
+        {
+            let ctx2 = ctx.clone();
+            gtk4::glib::idle_add_local_once(
+                move || match crate::ui::project_io::read_project_text(&path) {
+                    Ok(content) => {
+                        let effects = ctx2.core.process_event(Event::FileOpenResponse(
+                            FilePickerResponse::Opened {
+                                path: path.to_string_lossy().into_owned(),
+                                content,
+                            },
+                        ));
+                        crate::effects::process_effects(&ctx2, effects);
+                    }
+                    Err(err) => {
+                        eprintln!("chronos: could not open {}: {err:?}", path.display());
+                    }
+                },
+            );
+        }
     });
 
     let exit = app.run();
 
-    if !activated.get() {
+    if !activated.get() && std::env::args().count() <= 1 {
         eprintln!(
             "chronos: window forwarded to an already-running instance \
              with the same application id ({APP_ID}), which is probably \

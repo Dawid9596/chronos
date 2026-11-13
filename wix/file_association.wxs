@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="ChronosFileAssociation" Guid="8f4b2c1a-5d3e-4a9b-8c7d-1e2f3a4b5c6d" Win64="yes">
+        <RegistryKey Root="HKMU" Key="Software\Classes\.chr">
+          <RegistryValue Type="string" Value="Chronos.Project" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Content Type" Value="application/vnd.chronos.project+json" />
+          <RegistryKey Key="OpenWithProgids">
+            <RegistryValue Type="string" Name="Chronos.Project" Value="" />
+          </RegistryKey>
+        </RegistryKey>
+
+        <RegistryKey Root="HKMU" Key="Software\Classes\Chronos.Project">
+          <RegistryValue Type="string" Value="Chronos project file" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Type="string" Value="&quot;[INSTALLDIR]chronos.exe&quot;,0" />
+          </RegistryKey>
+          <RegistryKey Key="shell\open\command">
+            <RegistryValue Type="string" Value="&quot;[INSTALLDIR]chronos.exe&quot; &quot;%1&quot;" />
+          </RegistryKey>
+        </RegistryKey>
+
+        <RegistryKey Root="HKMU" Key="Software\Classes\Applications\chronos.exe">
+          <RegistryValue Type="string" Name="FriendlyAppName" Value="Chronos" />
+          <RegistryKey Key="SupportedTypes">
+            <RegistryValue Type="string" Name=".chr" Value="" />
+          </RegistryKey>
+          <RegistryKey Key="shell\open\command">
+            <RegistryValue Type="string" Value="&quot;[INSTALLDIR]chronos.exe&quot; &quot;%1&quot;" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

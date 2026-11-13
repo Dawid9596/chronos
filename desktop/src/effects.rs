@@ -2,6 +2,7 @@ use crate::context::AppContext;
 use crate::tool::Tool;
 use chronos::bridge::{Effect, Event, ExportPdfResponse};
 use chronos::bridge::{FilePickerRequest, FilePickerResponse};
+use chronos::project::PROJECT_FILE_EXTENSION;
 use chronos::i18n::Translations;
 use chronos::storage::StatusMessage;
 use glib::source::timeout_add_local_once;
@@ -195,15 +196,16 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                             } else {
                                 let dialog = gtk4::FileDialog::new();
                                 dialog.set_title(title);
-                                dialog.set_initial_name(Some("project.json"));
+                                dialog.set_initial_name(Some(&format!("project.{}", PROJECT_FILE_EXTENSION)));
 
                                 let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
                                 let filter = gtk4::FileFilter::new();
-                                filter.add_pattern("*.json");
-                                filter.add_suffix("json");
+                                filter.add_pattern(&format!("*.{}", PROJECT_FILE_EXTENSION));
+                                filter.add_suffix(PROJECT_FILE_EXTENSION);
                                 filter.set_name(Some(filter_name));
                                 filters.append(&filter);
                                 dialog.set_filters(Some(&filters));
+                                dialog.set_default_filter(Some(&filter));
 
                                 match dialog.save_future(Some(&ctx.window)).await {
                                     Ok(file) => match file.path() {

@@ -29,6 +29,7 @@ cp Cargo.toml Cargo.lock "$PKG_WORK_DIR/"
 cp -r "$PKG_NAME" "$PKG_WORK_DIR/"
 cp -r src "$PKG_WORK_DIR/"
 cp -r icons/* "$PKG_WORK_DIR/icons/"
+cp -r wix "$PKG_WORK_DIR/"
 
 echo "==> 3. Copying DLLs to $STAGE_DIR..."
 cp "$EXE_UNIX_PATH" "${PKG_WORK_DIR}/temp_bin.exe"

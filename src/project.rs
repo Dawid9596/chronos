@@ -27,6 +27,12 @@ use std::borrow::Cow;
 /// Bump when the format changes in a way older readers cannot handle.
 pub const PROJECT_FORMAT_VERSION: u32 = 1;
 
+pub const PROJECT_FILE_EXTENSION: &str = "chr";
+
+/// MIME type for Chronos project files. The `+json` suffix keeps them
+/// recognised as JSON by tools that inspect content types.
+pub const PROJECT_FILE_MIME_TYPE: &str = "application/vnd.chronos.project+json";
+
 /// Name of the attachment inside an exported PDF. The Typst template embeds
 /// the file under this name; which must be in sync
 pub const EMBEDDED_FILE_NAME: &str = "chronos-project.json";

@@ -43,6 +43,11 @@ long_description = "Stratigraphic layer and condition documentation tool for con
 icons = ["../icons/bitmap.png", "../icons/chronos-256.png"]
 out_dir = "../target/release/packager"
 
+file_associations = [
+  # Keep in sync with `PROJECT_FILE_EXTENSION`
+  { extensions = ["chr"], mime_type = "application/vnd.chronos.project+json", name = "ChronosProject", description = "Chronos project file" }
+]
+
 [package.metadata.packager.appimage]
 # linuxdeploy's bundled (old) strip chokes on .relr.dyn sections present in
 # modern system libs. Skipped instead in the release workflow via the
