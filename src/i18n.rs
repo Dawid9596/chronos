@@ -163,6 +163,10 @@ pub struct Translations {
     pub error_save_prefix: String,
     pub error_no_project_data: String,
     pub error_no_export_settings: String,
+    pub error_newer_format: String,
+    pub warning_document_sanitized: String,
+    pub warning_export_settings_sanitized: String,
+    pub warning_export_settings_unreadable_prefix: String,
     // Help & About documentation windows
     pub doc_about_title: String,
     pub doc_help_title: String,
@@ -280,6 +284,10 @@ impl Translations {
                 error_save_prefix: "Error saving file: ".into(),
                 error_no_project_data: "This PDF has no embedded project data. Only PDFs exported with project data embedded can be opened.".into(),
                 error_no_export_settings: "This file contains no export settings.".into(),
+                error_newer_format: "this file was written by a newer version of the program (file format {}, supported up to {})".into(),
+                warning_document_sanitized: "Document contained invalid values and was adjusted.".into(),
+                warning_export_settings_sanitized: "Export settings contained invalid values and were adjusted.".into(),
+                warning_export_settings_unreadable_prefix: "Export settings could not be read and were ignored: ".into(),
                 doc_about_title: "About Chronos".into(),
                 doc_help_title: "Chronos Help".into(),
                 // `{version}` is replaced with the program version on display;
@@ -490,6 +498,10 @@ Return to [Top of Help](#top) or read [About Conservation Editor](doc:about).
                 error_save_prefix: "Błąd zapisywania pliku: ".into(),
                 error_no_project_data: "Ten plik PDF nie zawiera osadzonych danych projektu. Można otworzyć tylko pliki PDF wyeksportowane z osadzonymi danymi projektu.".into(),
                 error_no_export_settings: "Ten plik nie zawiera ustawień eksportu.".into(),
+                error_newer_format: "ten plik został zapisany przez nowszą wersję programu (format pliku {}, obsługiwane do {})".into(),
+                warning_document_sanitized: "Dokument zawierał nieprawidłowe wartości i został dostosowany.".into(),
+                warning_export_settings_sanitized: "Ustawienia eksportu zawierały nieprawidłowe wartości, które zostały zignorowane.".into(),
+                warning_export_settings_unreadable_prefix: "Nie udało się odczytać ustawień eksportu i zostały zignorowane: ".into(),
                 doc_about_title: "O programie".into(),
                 doc_help_title: "Pomoc Chronos".into(),
                 about_markdown: r#"# Conservation Editor (Chronos)

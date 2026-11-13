@@ -142,7 +142,7 @@ mod tests {
         assert!(pdf.starts_with(b"%PDF"));
 
         let json = extract_project_json(&pdf).unwrap();
-        assert_eq!(ProjectFile::parse(&json).unwrap(), project);
+        assert_eq!(ProjectFile::parse(&json, Language::English).unwrap(), project);
     }
 
     #[test]

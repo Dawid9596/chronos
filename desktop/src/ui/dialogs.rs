@@ -376,20 +376,33 @@ async fn import_export_settings(ctx: &AppContext, parent: &gtk4::Window, widgets
     let outcome = read_project_text(&path)
         .map_err(|e| format!("{}{}", t.error_open_prefix, e.describe(&t)))
         .and_then(|text| {
-            ProjectFile::parse(&text).map_err(|e| format!("{}{}", t.error_parse_prefix, e))
-        })
-        .and_then(|project| {
-            project
-                .export_settings
-                .ok_or_else(|| t.error_no_export_settings.clone())
+            ProjectFile::parse(&text, ctx.current_lang.get())
+                .map_err(|e| format!("{}{}", t.error_parse_prefix, e))
         });
 
     match outcome {
-        Ok(settings) => {
-            *ctx.canvas_params.borrow_mut() = settings.canvas.clone();
-            widgets.show(&settings);
-            ctx.persist_settings();
-        }
+        Ok(project) => match project.export_settings {
+            Some(settings) => {
+                *ctx.canvas_params.borrow_mut() = settings.canvas.clone();
+                widgets.show(&settings);
+                ctx.persist_settings();
+                if !project.warnings.is_empty() {
+                    show_message(parent, &project.warnings.join("\n"));
+                }
+            }
+            None => {
+                let message = if project.warnings.is_empty() {
+                    t.error_no_export_settings.clone()
+                } else {
+                    format!(
+                        "{}\n{}",
+                        t.error_no_export_settings,
+                        project.warnings.join("\n")
+                    )
+                };
+                show_message(parent, &message);
+            }
+        },
         Err(message) => show_message(parent, &message),
     }
 }

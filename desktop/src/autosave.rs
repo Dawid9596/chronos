@@ -102,7 +102,7 @@ pub fn try_recover(ctx: &AppContext) {
             return;
         }
     };
-    match ProjectFile::parse(&text) {
+    match ProjectFile::parse(&text, ctx.current_lang.get()) {
         Ok(project) => {
             // Delete before dispatching: recovery does not go through the
             // file-picker effect, which is what normally clears the file.

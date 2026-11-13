@@ -19,6 +19,7 @@
 //!   whole file.
 
 use crate::context::{COLUMN_COUNT, CanvasParams};
+use crate::i18n::{Language, Translations};
 use crate::storage::ConservationDocument;
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +64,8 @@ pub struct ProjectFile {
     pub document: ConservationDocument,
     #[serde(default)]
     pub export_settings: Option<ExportSettings>,
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -80,6 +83,7 @@ impl ProjectFile {
             version: PROJECT_FORMAT_VERSION,
             document,
             export_settings: Some(export_settings),
+            warnings: Vec::new(),
         }
     }
 
@@ -88,47 +92,78 @@ impl ProjectFile {
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    /// Read a potentially legacy project from JSON.
-    /// Errors are short English technical messages meant to follow a
-    /// translated prefix such as `error_parse_prefix`.
-    pub fn parse(json: &str) -> Result<Self, String> {
+    /// Read a potentially legacy project from JSON using the
+    /// `lang` language for any non-fatal warnings.
+    pub fn parse(json: &str, lang: Language) -> Result<Self, String> {
+        let t = Translations::get(lang);
         let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
 
         let is_envelope = value.get("version").is_some() && value.get("document").is_some();
         if !is_envelope {
-            let document =
+            let mut document =
                 serde_json::from_value::<ConservationDocument>(value).map_err(|e| e.to_string())?;
+            let before = document.clone();
+            document.sanitize();
+            let warnings = if document != before {
+                vec![t.warning_document_sanitized.clone()]
+            } else {
+                Vec::new()
+            };
             return Ok(Self {
                 version: 0,
                 document,
                 export_settings: None,
+                warnings,
             });
         }
-
-        // TODO: Rather than always error on future format versions try to parse and either
-        // return a warning and the document or the error
 
         let raw = serde_json::from_value::<RawProject>(value).map_err(|e| e.to_string())?;
         if raw.version > PROJECT_FORMAT_VERSION {
-            return Err(format!(
-                "this file was written by a newer version of the program \
-                 (file format {}, supported up to {})",
-                raw.version, PROJECT_FORMAT_VERSION
-            ));
+            let message = t
+                .error_newer_format
+                .replacen("{}", &raw.version.to_string(), 1)
+                .replacen("{}", &PROJECT_FORMAT_VERSION.to_string(), 1);
+            return Err(message);
         }
-        let export_settings = raw
-            .export_settings
-            .and_then(|v| serde_json::from_value::<ExportSettings>(v).ok())
-            .map(|mut settings| {
-                settings.sanitize();
-                settings
-            });
 
-        Ok(Self {
+        let mut warnings = Vec::new();
+
+        let mut document = raw.document;
+        let document_before = document.clone();
+        document.sanitize();
+        if document != document_before {
+            warnings.push(t.warning_document_sanitized.clone());
+        }
+
+        let export_settings = match raw.export_settings {
+            None => None,
+            Some(value) => match serde_json::from_value::<ExportSettings>(value) {
+                Ok(mut settings) => {
+                    let before = settings.clone();
+                    settings.sanitize();
+                    if settings != before {
+                        warnings.push(t.warning_export_settings_sanitized.clone());
+                    }
+                    Some(settings)
+                }
+                Err(e) => {
+                    warnings.push(format!(
+                        "{}{e}",
+                        t.warning_export_settings_unreadable_prefix
+                    ));
+                    None
+                }
+            },
+        };
+
+        let mut project = Self {
             version: raw.version,
-            document: raw.document,
+            document,
             export_settings,
-        })
+            warnings: Vec::new(),
+        };
+        project.warnings = warnings;
+        Ok(project)
     }
 }
 
@@ -153,7 +188,7 @@ mod tests {
     fn round_trips() {
         let doc = sample_document();
         let project = ProjectFile::new(doc, sample_settings());
-        let back = ProjectFile::parse(&project.to_json()).unwrap();
+        let back = ProjectFile::parse(&project.to_json(), Language::English).unwrap();
         assert_eq!(back, project);
         assert_eq!(back.version, PROJECT_FORMAT_VERSION);
     }
@@ -162,7 +197,7 @@ mod tests {
     fn legacy_bare_document_still_opens() {
         let doc = sample_document();
         let legacy = serde_json::to_string(&doc).unwrap();
-        let project = ProjectFile::parse(&legacy).unwrap();
+        let project = ProjectFile::parse(&legacy, Language::English).unwrap();
         assert_eq!(project.document, doc);
         assert_eq!(project.version, 0);
         assert!(project.export_settings.is_none());
@@ -173,7 +208,7 @@ mod tests {
         let doc = sample_document();
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v["version"] = serde_json::json!(PROJECT_FORMAT_VERSION + 1);
-        let err = ProjectFile::parse(&v.to_string()).unwrap_err();
+        let err = ProjectFile::parse(&v.to_string(), Language::English).unwrap_err();
         assert!(err.contains("newer version"), "{err}");
     }
 
@@ -184,7 +219,7 @@ mod tests {
             serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default())).unwrap();
         v["something_from_the_future"] = serde_json::json!({ "a": 1 });
         v["export_settings"]["canvas"]["future_option"] = serde_json::json!(true);
-        let project = ProjectFile::parse(&v.to_string()).unwrap();
+        let project = ProjectFile::parse(&v.to_string(), Language::English).unwrap();
         assert_eq!(project.document, doc);
         assert!(project.export_settings.is_some());
     }
@@ -195,7 +230,7 @@ mod tests {
         let mut v =
             serde_json::to_value(ProjectFile::new(doc.clone(), ExportSettings::default())).unwrap();
         v["export_settings"] = serde_json::json!({ "visible_columns": "nope" });
-        let project = ProjectFile::parse(&v.to_string()).unwrap();
+        let project = ProjectFile::parse(&v.to_string(), Language::English).unwrap();
         assert_eq!(project.document, doc);
         assert!(project.export_settings.is_none());
     }
@@ -206,7 +241,7 @@ mod tests {
         let mut v = serde_json::to_value(ProjectFile::new(doc, ExportSettings::default())).unwrap();
         v.as_object_mut().unwrap().remove("export_settings");
         assert!(
-            ProjectFile::parse(&v.to_string())
+            ProjectFile::parse(&v.to_string(), Language::English)
                 .unwrap()
                 .export_settings
                 .is_none()
@@ -224,7 +259,7 @@ mod tests {
         v["export_settings"]["canvas"]["paper_size"] = serde_json::json!("tabloid");
         v["export_settings"]["canvas"]["column_ratios"] =
             serde_json::json!([0, 200, 5, 5, 5, 5, 5]);
-        let s = ProjectFile::parse(&v.to_string())
+        let s = ProjectFile::parse(&v.to_string(), Language::English)
             .unwrap()
             .export_settings
             .unwrap();
@@ -239,7 +274,7 @@ mod tests {
 
     #[test]
     fn garbage_is_an_error() {
-        assert!(ProjectFile::parse("not json").is_err());
-        assert!(ProjectFile::parse("{\"hello\": 1}").is_err());
+        assert!(ProjectFile::parse("not json", Language::English).is_err());
+        assert!(ProjectFile::parse("{\"hello\": 1}", Language::English).is_err());
     }
 }

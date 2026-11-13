@@ -859,8 +859,12 @@ impl App for ConservationApp {
                     FilePickerResponse::Opened { path, content } => {
                         // Only the document is taken. Export settings in the file are
                         // left for the canvas dialog's "Import from file".
-                        match ProjectFile::parse(&content) {
-                            Ok(ProjectFile { document: doc, .. }) => {
+                        match ProjectFile::parse(&content, model.language) {
+                            Ok(ProjectFile {
+                                document: doc,
+                                warnings,
+                                ..
+                            }) => {
                                 model.next_id =
                                     doc.entries.iter().map(|e| e.id).max().unwrap_or(0) + 1;
                                 model.document = doc;
@@ -869,10 +873,17 @@ impl App for ConservationApp {
                                 // must ask for a new JSON file, not overwrite the PDF.
                                 model.current_file_path =
                                     (!is_pdf_path(&path)).then(|| path.clone());
-                                model.last_error = Some(StatusMessage::Info(format!(
-                                    "{}{}",
-                                    t.status_loaded_prefix, path
-                                )));
+                                let message = if warnings.is_empty() {
+                                    format!("{}{}", t.status_loaded_prefix, path)
+                                } else {
+                                    format!(
+                                        "{}{} ({})",
+                                        t.status_loaded_prefix,
+                                        path,
+                                        warnings.join("; ")
+                                    )
+                                };
+                                model.last_error = Some(StatusMessage::Info(message));
                             }
                             Err(e) => {
                                 model.last_error = Some(StatusMessage::Error(format!(
@@ -1446,7 +1457,8 @@ mod tests {
         let settings = settings_with(31.0, 2);
         let request = pdf_export_request(&core, settings.clone(), true);
 
-        let project = ProjectFile::parse(&request.project_json.expect("embedded")).unwrap();
+        let project =
+            ProjectFile::parse(&request.project_json.expect("embedded"), Language::English).unwrap();
         assert_eq!(
             project.document.project_name,
             ConservationDocument::sample().project_name
@@ -1480,7 +1492,7 @@ mod tests {
         else {
             panic!("expected SaveFile");
         };
-        let project = ProjectFile::parse(&content).unwrap();
+        let project = ProjectFile::parse(&content, Language::English).unwrap();
         assert_eq!(project.export_settings, Some(settings));
         assert_eq!(project.document.entries.len(), 2);
     }

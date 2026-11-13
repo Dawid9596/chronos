@@ -374,6 +374,49 @@ pub struct ConservationEntry {
     pub dating_group: u32,
 }
 
+impl Slot {
+    pub fn sanitize(&mut self) {
+        if !self.start_pct.is_finite() {
+            self.start_pct = 0.0;
+        } else {
+            self.start_pct = self.start_pct.clamp(Slot::PCT_MIN, Slot::PCT_MAX);
+        }
+        if !self.end_pct.is_finite() {
+            self.end_pct = 0.0;
+        } else {
+            self.end_pct = self.end_pct.clamp(Slot::PCT_MIN, Slot::PCT_MAX);
+        }
+        if self.start_pct > self.end_pct {
+            std::mem::swap(&mut self.start_pct, &mut self.end_pct);
+        }
+    }
+}
+
+impl ConditionBar {
+    pub fn sanitize(&mut self) {
+        for slot in &mut self.slots {
+            slot.sanitize();
+        }
+        self.slots
+            .sort_by(|a, b| a.start_pct.total_cmp(&b.start_pct));
+    }
+}
+
+impl ConservationEntry {
+    pub fn sanitize(&mut self) {
+        self.graphical_representation.sanitize();
+        self.woven_trim.sanitize();
+    }
+}
+
+impl ConservationDocument {
+    pub fn sanitize(&mut self) {
+        for entry in &mut self.entries {
+            entry.sanitize();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{BarPattern, ConservationDocument, Slot, snap_add_position};

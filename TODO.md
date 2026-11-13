@@ -16,3 +16,4 @@ Add option to edit description in output pdf, prune out default template from de
 Animate dragging rows?
 
 Import custom .svg patterns?
+
