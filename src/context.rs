@@ -75,3 +75,28 @@ impl Default for CanvasParams {
         }
     }
 }
+
+impl CanvasParams {
+    pub fn sanitize(&mut self) {
+        // Explicitly choosing fields that may need sanitization
+        let Self {
+            paper_size,
+            landscape: _,
+            page_margin_mm,
+            cell_padding_mm,
+            bar_padding_mm,
+            column_ratios,
+            zero_width_line_pt,
+        } = self;
+
+        *paper_size = sanitize_paper_size(paper_size);
+        *page_margin_mm = clamp_finite_range(*page_margin_mm, PAGE_MARGIN_MM_RANGE);
+        *cell_padding_mm = clamp_finite_range(*cell_padding_mm, PADDING_MM_RANGE);
+        *bar_padding_mm = clamp_finite_range(*bar_padding_mm, PADDING_MM_RANGE);
+        *zero_width_line_pt = clamp_finite_range(*zero_width_line_pt, ZERO_WIDTH_LINE_PT_RANGE);
+
+        for ratio in column_ratios.iter_mut() {
+            *ratio = (*ratio).clamp(COLUMN_RATIO_RANGE.0, COLUMN_RATIO_RANGE.1);
+        }
+    }
+}

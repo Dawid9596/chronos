@@ -1,7 +1,7 @@
 Phase 3: Feature Completeness & Workspace Hygiene
 Tracking:Track a has_unsaved_changes: bool flag in AppState (set on document-mutating events, cleared on FileOpenResponse::Opened and FileSaveResponse::Saved). Append "\*" to the window/project title when dirty, and prompt the user in window.connect_close_request and before Event::RequestOpen so they don't accidentally lose work.
 
-When insufficient space, collapse Undo Redo to arrows
+Zero cell inner margin tepmlate quirks
 
 Import files by dragging them over
 

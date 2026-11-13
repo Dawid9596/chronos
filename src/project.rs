@@ -1,16 +1,16 @@
 //! The project file format
 //!
+//!
 //! ```json
 //! {
-//!   "version": 1,
-//!   "document": { "project_name": "...", "date": "...", "entries": [...] },
-//!   "export_settings": { "visible_columns": [...], "canvas": {...} }
+//!   "version": `PROJECT_FORMAT_VERSION`,
+//!   "document": { `json(ConservationDocument)` },
+//!   "export_settings": { `json(ExportSettings)` }
 //! }
 //! ```
 //!
-//! * `version` is [`PROJECT_FORMAT_VERSION`]. Files written before the
-//!   envelope existed are a bare document; they are still read, and report
-//!   version `0`.
+//! * Files written before the `PROJECT_FORMAT_VERSION` even existed
+//!   a bare document; they are still read, and report version `0`.
 //! * Opening a file only ever takes the `document`. `export_settings` are
 //!   there so the user can *choose* to import them (canvas dialog); they must
 //!   never silently replace the current ones.
@@ -18,10 +18,7 @@
 //!   UI allows, and unreadable settings are dropped instead of failing the
 //!   whole file.
 
-use crate::context::{
-    COLUMN_COUNT, COLUMN_RATIO_RANGE, CanvasParams, PADDING_MM_RANGE, PAGE_MARGIN_MM_RANGE,
-    ZERO_WIDTH_LINE_PT_RANGE, clamp_finite_range, sanitize_paper_size,
-};
+use crate::context::{COLUMN_COUNT, CanvasParams};
 use crate::storage::ConservationDocument;
 use serde::{Deserialize, Serialize};
 
@@ -50,16 +47,13 @@ impl Default for ExportSettings {
 
 impl ExportSettings {
     pub fn sanitize(&mut self) {
-        let canvas = &mut self.canvas;
-        canvas.paper_size = sanitize_paper_size(&canvas.paper_size);
-        canvas.page_margin_mm = clamp_finite_range(canvas.page_margin_mm, PAGE_MARGIN_MM_RANGE);
-        canvas.cell_padding_mm = clamp_finite_range(canvas.cell_padding_mm, PADDING_MM_RANGE);
-        canvas.bar_padding_mm = clamp_finite_range(canvas.bar_padding_mm, PADDING_MM_RANGE);
-        canvas.zero_width_line_pt =
-            clamp_finite_range(canvas.zero_width_line_pt, ZERO_WIDTH_LINE_PT_RANGE);
-        for ratio in canvas.column_ratios.iter_mut() {
-            *ratio = (*ratio).clamp(COLUMN_RATIO_RANGE.0, COLUMN_RATIO_RANGE.1);
-        }
+        // Explicitly choosing fields that may need sanitization
+        let Self {
+            visible_columns: _,
+            canvas,
+        } = self;
+
+        canvas.sanitize();
     }
 }
 
@@ -94,8 +88,8 @@ impl ProjectFile {
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    /// Read a project from JSON: the current envelope, or a legacy bare
-    /// document. Errors are short English technical messages meant to follow a
+    /// Read a potentially legacy project from JSON.
+    /// Errors are short English technical messages meant to follow a
     /// translated prefix such as `error_parse_prefix`.
     pub fn parse(json: &str) -> Result<Self, String> {
         let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
@@ -110,6 +104,9 @@ impl ProjectFile {
                 export_settings: None,
             });
         }
+
+        // TODO: Rather than always error on future format versions try to parse and either
+        // return a warning and the document or the error
 
         let raw = serde_json::from_value::<RawProject>(value).map_err(|e| e.to_string())?;
         if raw.version > PROJECT_FORMAT_VERSION {
@@ -126,6 +123,7 @@ impl ProjectFile {
                 settings.sanitize();
                 settings
             });
+
         Ok(Self {
             version: raw.version,
             document: raw.document,
