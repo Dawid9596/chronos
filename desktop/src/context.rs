@@ -1,6 +1,8 @@
+use crate::autosave::AutosaveState;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutRegistry;
 use crate::tool::Tool;
+use crate::ui::table::{DocumentTable, SplitOverlays};
 use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
 use chronos::context::COLUMN_COUNT;
@@ -97,10 +99,10 @@ pub struct AppContext {
     pub scrolled_window: ScrolledWindow,
     /// The grid currently shown in `scrolled_window` together with handles to
     /// its cells. `None` until the first call to `ui::table::sync_document_table`.
-    pub table: Rc<RefCell<Option<crate::ui::table::DocumentTable>>>,
+    pub table: Rc<RefCell<Option<DocumentTable>>>,
     /// Split-line overlays of the merged cells in the current grid; toggled
     /// by `ui::table::update_split_overlays` whenever `tool` changes.
-    pub split_overlays: crate::ui::table::SplitOverlays,
+    pub split_overlays: SplitOverlays,
     /// Tracks the last displayed message to avoid re-triggering identical renders.
     pub last_message: Rc<RefCell<Option<String>>>,
     /// Pending fade-out timer; canceled whenever a new message appears.
@@ -112,7 +114,7 @@ pub struct AppContext {
     /// Release version the user chose to skip (see `Settings`).
     pub skipped_version: Rc<RefCell<Option<String>>>,
     /// Crash-recovery autosave state (see `crate::autosave`).
-    pub autosave: Rc<RefCell<crate::autosave::AutosaveState>>,
+    pub autosave: Rc<RefCell<AutosaveState>>,
 }
 
 impl AppContext {

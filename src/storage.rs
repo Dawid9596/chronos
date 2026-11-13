@@ -4,8 +4,7 @@ use crate::history::History;
 use crate::i18n::Language;
 
 /// Minimum separation, in percent of the bar width, between the edges of two
-/// neighbouring slots. Enforced by the core when inserting or resizing slots
-/// and mirrored by the shell's live-drag preview; change in one place only.
+/// neighbouring slots.
 pub const MIN_GAP_PCT: f32 = 2.0;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
