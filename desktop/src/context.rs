@@ -50,21 +50,21 @@ pub struct MenuLabels {
 
 impl MenuLabels {
     pub fn update(&self, t: &Translations) {
-        self.file_btn.set_text(&t.menu_file);
-        self.edit_btn.set_text(&t.menu_edit);
-        self.help_btn.set_text(&t.menu_about);
-        self.help_help.set_text(&t.menu_help);
-        self.help_about.set_text(&t.menu_about);
-        self.help_check.set_text(&t.menu_check_updates);
-        self.file_open.set_text(&t.menu_open);
-        self.file_save.set_text(&t.menu_save);
-        self.file_save_as.set_text(&t.menu_save_as);
-        self.file_export.set_text(&t.menu_export);
-        self.edit_undo.set_text(&t.menu_undo);
-        self.edit_redo.set_text(&t.menu_redo);
-        self.edit_canvas.set_text(&t.menu_canvas_params);
-        self.edit_prefs.set_text(&t.menu_preferences);
-        self.edit_shortcuts.set_text(&t.menu_shortcuts);
+        self.file_btn.set_text(t.menu_file);
+        self.edit_btn.set_text(t.menu_edit);
+        self.help_btn.set_text(t.menu_about);
+        self.help_help.set_text(t.menu_help);
+        self.help_about.set_text(t.menu_about);
+        self.help_check.set_text(t.menu_check_updates);
+        self.file_open.set_text(t.menu_open);
+        self.file_save.set_text(t.menu_save);
+        self.file_save_as.set_text(t.menu_save_as);
+        self.file_export.set_text(t.menu_export);
+        self.edit_undo.set_text(t.menu_undo);
+        self.edit_redo.set_text(t.menu_redo);
+        self.edit_canvas.set_text(t.menu_canvas_params);
+        self.edit_prefs.set_text(t.menu_preferences);
+        self.edit_shortcuts.set_text(t.menu_shortcuts);
     }
 }
 

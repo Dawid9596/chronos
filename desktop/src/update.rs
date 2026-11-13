@@ -3,6 +3,7 @@
 //! Fired automatically at most once a day when the main window is opened.
 
 use crate::context::AppContext;
+use chronos::i18n::Translations;
 use gtk4::glib;
 use gtk4::prelude::*;
 
@@ -41,8 +42,8 @@ async fn run_check(ctx: &AppContext, kind: CheckKind) {
 
     let Some(latest) = latest else {
         if matches!(kind, CheckKind::Manual) {
-            let t = ctx.core.view().translations;
-            show_alert(ctx, &t.update_check_failed);
+            let t = Translations::get(ctx.core.view().language);
+            show_alert(ctx, t.update_check_failed);
         }
         return;
     };
@@ -58,7 +59,7 @@ async fn run_check(ctx: &AppContext, kind: CheckKind) {
         }
         show_update_dialog(ctx, &latest);
     } else if matches!(kind, CheckKind::Manual) {
-        let t = ctx.core.view().translations;
+        let t = Translations::get(ctx.core.view().language);
         show_alert(
             ctx,
             &t.update_up_to_date.replace("{current}", CURRENT_VERSION),
@@ -130,12 +131,12 @@ fn show_alert(ctx: &AppContext, message: &str) {
 }
 
 fn show_update_dialog(ctx: &AppContext, latest_version: &str) {
-    let t = ctx.core.view().translations;
+    let t = Translations::get(ctx.core.view().language);
 
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
-        .title(&t.update_available_title)
+        .title(t.update_available_title)
         .default_width(380)
         .resizable(false)
         .build();
@@ -166,12 +167,12 @@ fn show_update_dialog(ctx: &AppContext, latest_version: &str) {
         .halign(gtk4::Align::End)
         .build();
 
-    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    let close_btn = gtk4::Button::with_label(t.dialog_close);
     let win_close = win.clone();
     close_btn.connect_clicked(move |_| win_close.close());
     button_row.append(&close_btn);
 
-    let skip_btn = gtk4::Button::with_label(&t.update_skip_version);
+    let skip_btn = gtk4::Button::with_label(t.update_skip_version);
     {
         let ctx = ctx.clone();
         let win_skip = win.clone();
@@ -184,7 +185,7 @@ fn show_update_dialog(ctx: &AppContext, latest_version: &str) {
     }
     button_row.append(&skip_btn);
 
-    let open_btn = gtk4::Button::with_label(&t.update_open_releases);
+    let open_btn = gtk4::Button::with_label(t.update_open_releases);
     open_btn.add_css_class("suggested-action");
     let win_open = win.clone();
     open_btn.connect_clicked(move |_| {

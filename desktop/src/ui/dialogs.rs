@@ -8,10 +8,11 @@ use chronos::context::{
     COLUMN_COUNT, COLUMN_RATIO_RANGE, PADDING_MM_RANGE, PAGE_MARGIN_MM_RANGE, PAPER_SIZES,
     ZERO_WIDTH_LINE_PT_RANGE,
 };
-use chronos::i18n::Language;
+use chronos::i18n::{Language, Translations};
 use chronos::project::{ExportSettings, ProjectFile};
 use gtk4::glib;
 use gtk4::prelude::*;
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -25,12 +26,12 @@ fn paper_size_index(size: &str) -> u32 {
 
 pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let view = ctx.core.view();
-    let t = &view.translations;
+    let t = Translations::get(view.language);
 
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
-        .title(&t.menu_canvas_params)
+        .title(t.menu_canvas_params)
         .default_width(380)
         .build();
 
@@ -49,7 +50,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     // Paper Size
     let paper_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let paper_lbl = gtk4::Label::builder()
-        .label(&t.dialog_paper_size)
+        .label(t.dialog_paper_size)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -60,14 +61,14 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     vbox.append(&paper_row);
 
     // Landscape Orientation
-    let landscape_check = gtk4::CheckButton::with_label(&t.dialog_landscape);
+    let landscape_check = gtk4::CheckButton::with_label(t.dialog_landscape);
     landscape_check.set_active(params.landscape);
     vbox.append(&landscape_check);
 
     // Page Margin
     let margin_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let margin_lbl = gtk4::Label::builder()
-        .label(&t.dialog_page_margin)
+        .label(t.dialog_page_margin)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -81,7 +82,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     // Cell Padding
     let padding_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let padding_lbl = gtk4::Label::builder()
-        .label(&t.dialog_cell_padding)
+        .label(t.dialog_cell_padding)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -94,7 +95,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     // Bar / Pattern Cell Padding
     let bar_padding_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let bar_padding_lbl = gtk4::Label::builder()
-        .label(&t.dialog_bar_padding)
+        .label(t.dialog_bar_padding)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -108,7 +109,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     // Zero-Width Line
     let zero_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let zero_lbl = gtk4::Label::builder()
-        .label(&t.dialog_zero_width_line)
+        .label(t.dialog_zero_width_line)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -120,7 +121,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     vbox.append(&zero_row);
 
     // Embed the project data to exported PDFs
-    let embed_check = gtk4::CheckButton::with_label(&t.dialog_embed_project_data);
+    let embed_check = gtk4::CheckButton::with_label(t.dialog_embed_project_data);
     embed_check.set_active(ctx.embed_project_data.get());
     let ctx_embed = ctx.clone();
     embed_check.connect_toggled(move |c| {
@@ -188,7 +189,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     let col_heading = gtk4::Label::builder()
         .label(format!(
             "<b>{}</b>",
-            glib::markup_escape_text(&t.dialog_visible_columns_heading)
+            glib::markup_escape_text(t.dialog_visible_columns_heading)
         ))
         .use_markup(true)
         .halign(gtk4::Align::Start)
@@ -197,13 +198,13 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     vbox.append(&col_heading);
 
     let col_names = [
-        t.col_no.clone(),
-        t.col_graphical.clone(),
-        t.col_woven.clone(),
-        t.col_char.clone(),
-        t.col_thickness.clone(),
-        t.col_chrono.clone(),
-        t.col_dating.clone(),
+        t.col_no,
+        t.col_graphical,
+        t.col_woven,
+        t.col_char,
+        t.col_thickness,
+        t.col_chrono,
+        t.col_dating,
     ];
 
     for i in 0..COLUMN_COUNT {
@@ -212,7 +213,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
         check.set_active(flags[i]);
 
         let label = gtk4::Label::builder()
-            .label(&col_names[i])
+            .label(col_names[i])
             .halign(gtk4::Align::Start)
             .ellipsize(gtk4::pango::EllipsizeMode::End)
             .hexpand(true)
@@ -251,7 +252,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
 
     // Create the Restore Defaults button
     let restore_btn = gtk4::Button::builder()
-        .label(&t.dialog_restore_defaults)
+        .label(t.dialog_restore_defaults)
         .build();
 
     let paper_dropdown_clone2 = paper_dropdown_clone.clone();
@@ -282,7 +283,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     });
 
     // Import the export settings
-    let import_btn = gtk4::Button::with_label(&t.dialog_import_from_file);
+    let import_btn = gtk4::Button::with_label(t.dialog_import_from_file);
     let canvas_widgets = CanvasWidgets {
         paper: paper_dropdown.clone(),
         landscape: landscape_check.clone(),
@@ -311,7 +312,7 @@ pub fn show_canvas_params_dialog(ctx: &AppContext) {
     button_row.append(&import_btn);
     vbox.append(&button_row);
 
-    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    let close_btn = gtk4::Button::with_label(t.dialog_close);
     close_btn.set_halign(gtk4::Align::End);
     let win_close = win.clone();
     close_btn.connect_clicked(move |_| {
@@ -361,11 +362,11 @@ fn show_message(parent: &gtk4::Window, message: &str) {
 }
 
 async fn import_export_settings(ctx: &AppContext, parent: &gtk4::Window, widgets: &CanvasWidgets) {
-    let t = ctx.core.view().translations;
+    let t = Translations::get(ctx.core.view().language);
 
     let dialog = gtk4::FileDialog::new();
-    dialog.set_title(&t.dialog_open_title);
-    dialog.set_filters(Some(&project_file_filters(&t.filter_project_name)));
+    dialog.set_title(t.dialog_open_title);
+    dialog.set_filters(Some(&project_file_filters(t.filter_project_name)));
     let Ok(file) = dialog.open_future(Some(parent)).await else {
         return; // cancelled
     };
@@ -391,14 +392,14 @@ async fn import_export_settings(ctx: &AppContext, parent: &gtk4::Window, widgets
                 }
             }
             None => {
-                let message = if project.warnings.is_empty() {
-                    t.error_no_export_settings.clone()
+                let message: Cow<'_, str> = if project.warnings.is_empty() {
+                    Cow::Borrowed(t.error_no_export_settings)
                 } else {
-                    format!(
+                    Cow::Owned(format!(
                         "{}\n{}",
                         t.error_no_export_settings,
                         project.warnings.join("\n")
-                    )
+                    ))
                 };
                 show_message(parent, &message);
             }
@@ -409,11 +410,11 @@ async fn import_export_settings(ctx: &AppContext, parent: &gtk4::Window, widgets
 
 pub fn show_preferences_dialog(ctx: &AppContext) {
     let view = ctx.core.view();
-    let t = &view.translations;
+    let t = Translations::get(view.language);
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
-        .title(&t.menu_preferences)
+        .title(t.menu_preferences)
         .default_width(340)
         .build();
 
@@ -428,7 +429,7 @@ pub fn show_preferences_dialog(ctx: &AppContext) {
 
     let lang_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
     let lang_lbl = gtk4::Label::builder()
-        .label(&t.dialog_interface_language)
+        .label(t.dialog_interface_language)
         .halign(gtk4::Align::Start)
         .hexpand(true)
         .build();
@@ -442,7 +443,7 @@ pub fn show_preferences_dialog(ctx: &AppContext) {
             .unwrap_or(0) as u32,
     );
 
-    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    let close_btn = gtk4::Button::with_label(t.dialog_close);
     close_btn.set_halign(gtk4::Align::End);
 
     let ctx_lang = ctx.clone();
@@ -459,10 +460,10 @@ pub fn show_preferences_dialog(ctx: &AppContext) {
             glib::idle_add_local_once(move || {
                 let effects = ctx_idle.core.process_event(Event::ToggleLanguage);
                 crate::effects::process_effects(&ctx_idle, effects);
-                let new_t = &ctx_idle.core.view().translations;
-                win_idle.set_title(Some(&new_t.menu_preferences));
-                lbl_idle.set_text(&new_t.dialog_interface_language);
-                btn_idle.set_label(&new_t.dialog_close);
+                let new_t = Translations::get(ctx_idle.core.view().language);
+                win_idle.set_title(Some(new_t.menu_preferences));
+                lbl_idle.set_text(new_t.dialog_interface_language);
+                btn_idle.set_label(new_t.dialog_close);
             });
         }
     });
@@ -497,11 +498,11 @@ impl ShortcutDialogState {
     /// Re-reads every binding from the registry into the buttons.
     fn refresh(&self, ctx: &AppContext) {
         let view = ctx.core.view();
-        let t = &view.translations;
+        let t = Translations::get(view.language);
         let capturing = self.capturing.get();
         for (action, btn) in self.key_buttons.borrow().iter() {
             if capturing == Some(*action) {
-                btn.set_label(&t.shortcuts_press_new);
+                btn.set_label(t.shortcuts_press_new);
                 btn.add_css_class("suggested-action");
             } else {
                 btn.set_label(&ctx.shortcuts.label(*action));
@@ -524,17 +525,15 @@ impl ShortcutDialogState {
 
     fn show_error(&self, ctx: &AppContext, err: AssignError) {
         let view = ctx.core.view();
-        let t = &view.translations;
-        let text = match err {
-            AssignError::Invalid => t.shortcuts_err_invalid.clone(),
-            AssignError::NeedsModifier => t.shortcuts_err_needs_modifier.clone(),
-            AssignError::Conflict(other) => {
-                format!(
-                    "{}\"{}\".",
-                    t.shortcuts_err_conflict_prefix,
-                    other.display_name(t).replace('\n', " ")
-                )
-            }
+        let t = Translations::get(view.language);
+        let text: Cow<'_, str> = match err {
+            AssignError::Invalid => Cow::Borrowed(t.shortcuts_err_invalid),
+            AssignError::NeedsModifier => Cow::Borrowed(t.shortcuts_err_needs_modifier),
+            AssignError::Conflict(other) => Cow::Owned(format!(
+                "{}\"{}\".",
+                t.shortcuts_err_conflict_prefix,
+                other.display_name(&t).replace('\n', " ")
+            )),
         };
         self.set_message(&text, true);
     }
@@ -547,7 +546,7 @@ fn build_shortcut_row(
     name: &str,
 ) -> gtk4::Box {
     let view = ctx.core.view();
-    let t = &view.translations;
+    let t = Translations::get(view.language);
     let row = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
 
     let name_lbl = gtk4::Label::builder()
@@ -559,13 +558,13 @@ fn build_shortcut_row(
 
     let key_btn = gtk4::Button::builder()
         .width_request(170)
-        .tooltip_text(&t.shortcuts_click_tooltip)
+        .tooltip_text(t.shortcuts_click_tooltip)
         .build();
 
     let reset_btn = gtk4::Button::builder()
         .icon_name("edit-undo-symbolic")
         .has_frame(false)
-        .tooltip_text(&t.shortcuts_restore_default_tooltip)
+        .tooltip_text(t.shortcuts_restore_default_tooltip)
         .build();
     reset_btn.add_css_class("flat");
 
@@ -574,8 +573,8 @@ fn build_shortcut_row(
         let state = state.clone();
         key_btn.connect_clicked(move |_| {
             state.capturing.set(Some(action));
-            let prompt = ctx.core.view().translations.shortcuts_prompt_cancel.clone();
-            state.set_message(&prompt, false);
+            let prompt = Translations::get(ctx.core.view().language).shortcuts_prompt_cancel;
+            state.set_message(prompt, false);
             state.refresh(&ctx);
         });
     }
@@ -622,12 +621,12 @@ fn section_header(title: &str) -> gtk4::Label {
 
 pub fn show_shortcuts_dialog(ctx: &AppContext) {
     let view = ctx.core.view();
-    let t = &view.translations;
+    let t = Translations::get(view.language);
 
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
-        .title(&t.menu_shortcuts)
+        .title(t.menu_shortcuts)
         .default_width(460)
         .build();
 
@@ -650,27 +649,24 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
         .build();
 
     let sections: [(&str, &[Action]); 4] = [
-        (t.menu_file.as_str(), &Action::FILE[..]),
-        (t.menu_edit.as_str(), &Action::EDIT[..]),
-        (t.shortcuts_section_tools.as_str(), &Action::TOOLS[..]),
-        (t.shortcuts_section_variants.as_str(), &Action::VARIANTS[..]),
+        (t.menu_file, &Action::FILE[..]),
+        (t.menu_edit, &Action::EDIT[..]),
+        (t.shortcuts_section_tools, &Action::TOOLS[..]),
+        (t.shortcuts_section_variants, &Action::VARIANTS[..]),
     ];
     for (title, actions) in sections {
         list.append(&section_header(title));
         for &action in actions {
-            let name = action.display_name(t).replace('\n', " ");
+            let name = action.display_name(&t).replace('\n', " ");
             list.append(&build_shortcut_row(ctx, &state, action, &name));
         }
     }
 
     // Fixed gestures: shown for reference, not editable.
-    list.append(&section_header(&t.shortcuts_section_fixed));
+    list.append(&section_header(t.shortcuts_section_fixed));
     for (action, keys) in [
-        (
-            t.shortcuts_fixed_inline_edit.as_str(),
-            t.shortcuts_key_double_click.as_str(),
-        ),
-        (t.shortcuts_fixed_cancel_edit.as_str(), "Esc"),
+        (t.shortcuts_fixed_inline_edit, t.shortcuts_key_double_click),
+        (t.shortcuts_fixed_cancel_edit, "Esc"),
     ] {
         let row = gtk4::Box::new(gtk4::Orientation::Horizontal, 16);
         let act_lbl = gtk4::Label::builder()
@@ -769,7 +765,7 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
     }
     win.add_controller(mouse_ctrl);
 
-    let reset_all_btn = gtk4::Button::with_label(&t.shortcuts_restore_all);
+    let reset_all_btn = gtk4::Button::with_label(t.shortcuts_restore_all);
     {
         let ctx = ctx.clone();
         let state = state.clone();
@@ -781,7 +777,7 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
             state.refresh(&ctx);
         });
     }
-    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    let close_btn = gtk4::Button::with_label(t.dialog_close);
     let win_close = win.clone();
     close_btn.connect_clicked(move |_| {
         win_close.close();
@@ -815,13 +811,13 @@ pub fn show_shortcuts_dialog(ctx: &AppContext) {
 
 pub fn show_paint_toolbox_dialog(ctx: &AppContext) {
     let view = ctx.core.view();
-    let t = &view.translations;
+    let t = Translations::get(view.language);
     let lang = t.language;
 
     let win = gtk4::Window::builder()
         .transient_for(&ctx.window)
         .modal(true)
-        .title(&t.tool_paint)
+        .title(t.tool_paint)
         .default_width(360)
         .default_height(480)
         .build();
@@ -937,7 +933,7 @@ pub fn show_paint_toolbox_dialog(ctx: &AppContext) {
     });
     win.add_controller(key_ctrl);
 
-    let close_btn = gtk4::Button::with_label(&t.dialog_close);
+    let close_btn = gtk4::Button::with_label(t.dialog_close);
     close_btn.set_halign(gtk4::Align::End);
     let win_close = win.clone();
     close_btn.connect_clicked(move |_| {

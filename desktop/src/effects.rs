@@ -30,7 +30,7 @@ pub fn subtitle_markup(subtitle: &str, t: &Translations) -> String {
     if subtitle.is_empty() {
         format!(
             "<span foreground='gray' style='italic'>{}</span>",
-            glib::markup_escape_text(&t.subtitle_placeholder)
+            glib::markup_escape_text(t.subtitle_placeholder)
         )
     } else {
         chronos::richtext::to_pango(subtitle)
@@ -42,13 +42,13 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
         match effect {
             Effect::Render(_) => {
                 let view = ctx.core.view();
-                let t = &view.translations;
+                let t = Translations::get(view.language);
 
                 ctx.export_btn.set_sensitive(!view.is_exporting);
                 ctx.export_btn.set_tooltip_text(Some(if view.is_exporting {
-                    &t.exporting_pdf
+                    t.exporting_pdf
                 } else {
-                    &t.export_pdf
+                    t.export_pdf
                 }));
 
                 if let Some(msg) = &view.last_error {
@@ -78,7 +78,7 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                         "{}{}",
                         t.project_prefix,
                         if view.document.project_name.is_empty() {
-                            &t.project_untitled
+                            t.project_untitled
                         } else {
                             &view.document.project_name
                         }
@@ -86,7 +86,7 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                 }
 
                 ctx.subtitle
-                    .set_markup(&subtitle_markup(&view.document.subtitle, t));
+                    .set_markup(&subtitle_markup(&view.document.subtitle, &t));
 
                 if ctx.current_lang.get() != t.language {
                     ctx.current_lang.set(t.language);
@@ -98,13 +98,13 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                         btn.set_tooltip_text(Some(pattern.display_name(t.language)));
                     }
                 }
-                ctx.settings_label.set_markup(&t.settings_tooltip);
-                ctx.menu_labels.update(t);
-                ctx.shortcuts.update_translations(t);
-                ctx.history_buttons.update_translations(t);
+                ctx.settings_label.set_markup(t.settings_tooltip);
+                ctx.menu_labels.update(&t);
+                ctx.shortcuts.update_translations(&t);
+                ctx.history_buttons.update_translations(&t);
                 ctx.history_buttons.sync(view.can_undo, view.can_redo);
                 for (tool_variant, label) in ctx.tool_labels.iter() {
-                    label.set_text(tool_variant.label(t));
+                    label.set_text(tool_variant.label(&t));
                 }
 
                 crate::ui::table::sync_document_table(&view, ctx);
@@ -118,10 +118,12 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                     let file_name = request.operation.file_name.clone();
                     let view_model = request.operation.view_model.clone();
                     let project_json = request.operation.project_json.clone();
+                    let translations = Translations::get(ctx.core.view().language);
 
                     let response = gtk4::gio::spawn_blocking(move || {
                         let pdf_bytes = chronos::generate_pdf::typst_compile_to_bytes(
                             &view_model,
+                            &translations,
                             project_json.as_deref(),
                         )
                         .map_err(|e| format!("Error: {e}"))?;
@@ -169,9 +171,9 @@ pub fn process_effects(ctx: &AppContext, effects: Vec<Effect>) {
                                             Ok(content) => {
                                                 FilePickerResponse::Opened { path, content }
                                             }
-                                            Err(e) => FilePickerResponse::Error(
-                                                e.describe(&ctx.core.view().translations),
-                                            ),
+                                            Err(e) => FilePickerResponse::Error(e.describe(
+                                                &Translations::get(ctx.core.view().language),
+                                            )),
                                         }
                                     }
                                     None => FilePickerResponse::Error("Invalid file path".into()),

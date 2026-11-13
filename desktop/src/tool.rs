@@ -120,13 +120,13 @@ impl Tool {
 
     pub fn label(self, t: &Translations) -> &str {
         match self {
-            Tool::Edit => &t.tool_edit,
-            Tool::Create => &t.tool_create,
-            Tool::Delete => &t.tool_delete,
-            Tool::Paint(_) => &t.tool_paint,
-            Tool::Split => &t.tool_split,
-            Tool::Duplicate => &t.tool_duplicate,
-            Tool::Merge(_) => &t.tool_merge,
+            Tool::Edit => t.tool_edit,
+            Tool::Create => t.tool_create,
+            Tool::Delete => t.tool_delete,
+            Tool::Paint(_) => t.tool_paint,
+            Tool::Split => t.tool_split,
+            Tool::Duplicate => t.tool_duplicate,
+            Tool::Merge(_) => t.tool_merge,
         }
     }
 

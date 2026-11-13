@@ -5,6 +5,7 @@ use crate::ui::widgets::editable::EditableCell;
 use chronos::bridge::{BarType, EditableField, Event};
 use chronos::context::COLUMN_COUNT;
 use chronos::i18n::Language;
+use chronos::i18n::Translations;
 use chronos::view::AppViewModel;
 use gtk4::glib;
 use gtk4::prelude::*;
@@ -47,7 +48,7 @@ impl TableSignature {
             span: g.span,
         };
         Self {
-            language: app_view.translations.language,
+            language: app_view.language,
             visible,
             rows: app_view
                 .document
@@ -415,16 +416,16 @@ fn build_document_table(
         .build();
 
     let current_vis = ctx.vis.borrow();
-    let t = &app_view.translations;
+    let t = Translations::get(app_view.language);
     let headers = [
-        &t.col_no,
-        &t.col_graphical,
-        &t.col_woven,
-        &t.col_char,
-        &t.col_thickness,
-        &t.col_chrono,
-        &t.col_dating,
-        &String::new(),
+        t.col_no,
+        t.col_graphical,
+        t.col_woven,
+        t.col_char,
+        t.col_thickness,
+        t.col_chrono,
+        t.col_dating,
+        "",
     ];
 
     let mut total_visible_cols = 0;
@@ -699,7 +700,7 @@ fn build_document_table(
             .valign(gtk4::Align::Center)
             .margin_top(4)
             .margin_bottom(4)
-            .tooltip_text(&t.delete_label)
+            .tooltip_text(t.delete_label)
             .build();
         delete_btn.add_css_class("flat");
         delete_btn.add_css_class("destructive-action");

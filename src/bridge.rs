@@ -6,7 +6,7 @@ use crate::storage::StatusMessage;
 use crate::storage::{
     AppState, BarPattern, ConditionBar, ConservationDocument, ConservationEntry, MIN_GAP_PCT, Slot,
 };
-use crate::view::AppViewModel;
+use crate::view::{AppViewModel, DocumentViewModel};
 use crux_core::Command;
 use crux_core::capability::{CapabilityContext, Operation};
 use crux_core::{App, macros::Effect, render::Render};
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ExportPdfRequest {
     pub file_name: String,
-    pub view_model: crate::view::DocumentViewModel,
+    pub view_model: DocumentViewModel,
     pub project_json: Option<String>,
 }
 
@@ -46,7 +46,7 @@ where
     pub fn export(
         &self,
         file_name: String,
-        view_model: crate::view::DocumentViewModel,
+        view_model: DocumentViewModel,
         project_json: Option<String>,
         on_complete: impl Fn(ExportPdfResponse) -> Ev + Send + Sync + 'static,
     ) {
@@ -360,16 +360,14 @@ impl App for ConservationApp {
                 let t = Translations::get(model.language);
                 let project_json = embed_project_data
                     .then(|| ProjectFile::new(model.document.clone(), settings.clone()).to_json());
-                let display_name = if model.document.project_name.is_empty() {
-                    &t.project_untitled
+                let display_name: &str = if model.document.project_name.is_empty() {
+                    t.project_untitled
                 } else {
                     &model.document.project_name
                 };
-                let view_model = model.document.to_view_model(
-                    t.clone(),
-                    settings.visible_columns,
-                    settings.canvas,
-                );
+                let view_model = model
+                    .document
+                    .to_view_model(settings.visible_columns, settings.canvas);
                 let safe_stem: String = display_name
                     .chars()
                     .map(|c| {
@@ -811,7 +809,7 @@ impl App for ConservationApp {
                 // The recovered work belongs to no file: the first Save after
                 // recovery must ask for one, never overwrite the autosave.
                 model.current_file_path = None;
-                model.last_error = Some(StatusMessage::Info(t.status_recovered.clone()));
+                model.last_error = Some(StatusMessage::Info(t.status_recovered.into()));
                 caps.render.render();
                 // The restored work is unsaved and fileless; keep the crash
                 // net alive until the user saves or exits cleanly.
@@ -821,8 +819,8 @@ impl App for ConservationApp {
                 let t = Translations::get(model.language);
                 caps.file_picker.pick(
                     FilePickerRequest::OpenFile {
-                        title: t.dialog_open_title,
-                        filter_name: t.filter_project_name,
+                        title: t.dialog_open_title.into(),
+                        filter_name: t.filter_project_name.into(),
                     },
                     Event::FileOpenResponse,
                 );
@@ -834,8 +832,8 @@ impl App for ConservationApp {
                     FilePickerRequest::SaveFile {
                         path: model.current_file_path.clone(),
                         content,
-                        title: t.dialog_save_title,
-                        filter_name: t.filter_json_name,
+                        title: t.dialog_save_title.into(),
+                        filter_name: t.filter_json_name.into(),
                     },
                     Event::FileSaveResponse,
                 );
@@ -847,8 +845,8 @@ impl App for ConservationApp {
                     FilePickerRequest::SaveFile {
                         path: None, // Force "Save As" by clearing path
                         content,
-                        title: t.dialog_save_title,
-                        filter_name: t.filter_json_name,
+                        title: t.dialog_save_title.into(),
+                        filter_name: t.filter_json_name.into(),
                     },
                     Event::FileSaveResponse,
                 );
@@ -942,16 +940,13 @@ impl App for ConservationApp {
     }
 
     fn view(&self, model: &Self::Model) -> Self::ViewModel {
-        let t = Translations::get(model.language);
         AppViewModel {
-            document: model.document.to_view_model(
-                t.clone(),
-                [true; COLUMN_COUNT],
-                CanvasParams::default(),
-            ),
+            document: model
+                .document
+                .to_view_model([true; COLUMN_COUNT], CanvasParams::default()),
             last_error: model.last_error.clone(),
             is_exporting: model.is_exporting,
-            translations: t,
+            language: model.language,
             can_undo: model.history.can_undo(),
             can_redo: model.history.can_redo(),
         }
@@ -1458,7 +1453,8 @@ mod tests {
         let request = pdf_export_request(&core, settings.clone(), true);
 
         let project =
-            ProjectFile::parse(&request.project_json.expect("embedded"), Language::English).unwrap();
+            ProjectFile::parse(&request.project_json.expect("embedded"), Language::English)
+                .unwrap();
         assert_eq!(
             project.document.project_name,
             ConservationDocument::sample().project_name

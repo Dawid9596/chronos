@@ -18,7 +18,7 @@ impl ReadProjectError {
     pub fn describe(&self, t: &Translations) -> String {
         match self {
             Self::Io(e) => e.clone(),
-            Self::Pdf(PdfProjectError::NoProjectData) => t.error_no_project_data.clone(),
+            Self::Pdf(PdfProjectError::NoProjectData) => t.error_no_project_data.into(),
             Self::Pdf(other) => other.to_string(),
         }
     }

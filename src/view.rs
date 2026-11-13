@@ -1,6 +1,6 @@
 use crate::{
     context::{COLUMN_COUNT, CanvasParams},
-    i18n::Translations,
+    i18n::Language,
     storage::{ConditionBar, ConservationDocument, StatusMessage},
 };
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,6 @@ pub struct DocumentViewModel {
     pub project_name: String,
     pub subtitle: String,
     pub rows: Vec<RowViewModel>,
-    pub translations: Translations,
     pub visible_columns: [bool; COLUMN_COUNT],
     pub canvas_params: CanvasParams,
 }
@@ -38,7 +37,6 @@ pub struct GroupSpan {
 impl ConservationDocument {
     pub fn to_view_model(
         &self,
-        translations: Translations,
         visible_columns: [bool; COLUMN_COUNT],
         canvas_params: CanvasParams,
     ) -> DocumentViewModel {
@@ -49,7 +47,6 @@ impl ConservationDocument {
                 project_name: self.project_name.clone(),
                 subtitle: self.subtitle.clone(),
                 rows,
-                translations,
                 visible_columns,
                 canvas_params,
             };
@@ -127,7 +124,6 @@ impl ConservationDocument {
             project_name: self.project_name.clone(),
             subtitle: self.subtitle.clone(),
             rows,
-            translations,
             visible_columns,
             canvas_params,
         }
@@ -139,7 +135,7 @@ pub struct AppViewModel {
     pub document: DocumentViewModel,
     pub last_error: Option<StatusMessage>,
     pub is_exporting: bool,
-    pub translations: Translations,
+    pub language: Language,
     pub can_undo: bool,
     pub can_redo: bool,
 }

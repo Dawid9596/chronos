@@ -1,6 +1,7 @@
 use chronos::i18n::Translations;
 use gtk4::glib;
 use gtk4::prelude::*;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,9 +36,9 @@ pub fn show_markdown_window(
     let page_of = |doc_id: &str| -> (&str, &str) {
         // (page-id, window title)
         if doc_id == ABOUT_PAGE {
-            (ABOUT_PAGE, &t.doc_about_title)
+            (ABOUT_PAGE, t.doc_about_title)
         } else {
-            (HELP_PAGE, &t.doc_help_title)
+            (HELP_PAGE, t.doc_help_title)
         }
     };
 
@@ -60,19 +61,21 @@ pub fn show_markdown_window(
     }
 
     let (_, initial_title) = page_of(initial_doc_id);
-    let mut pages: HashMap<String, (String, String)> = HashMap::new();
+    let mut pages: HashMap<&'static str, (&'static str, Cow<'static, str>)> = HashMap::new();
     pages.insert(
-        ABOUT_PAGE.to_string(),
+        ABOUT_PAGE,
         (
-            t.doc_about_title.clone(),
-            t.about_markdown
-                .replace("{version}", APP_VERSION)
-                .replace("{authors}", &author_line()),
+            t.doc_about_title,
+            Cow::Owned(
+                t.about_markdown
+                    .replace("{version}", APP_VERSION)
+                    .replace("{authors}", &author_line()),
+            ),
         ),
     );
     pages.insert(
-        HELP_PAGE.to_string(),
-        (t.doc_help_title.clone(), t.help_markdown.clone()),
+        HELP_PAGE,
+        (t.doc_help_title, Cow::Borrowed(t.help_markdown)),
     );
     let pages = Rc::new(pages);
 
@@ -115,7 +118,7 @@ pub fn show_markdown_window(
             && let Some((title, md_source)) = pages_clone.get(doc_id)
         {
             if let Some(w) = win_weak.upgrade() {
-                w.set_title(Some(title));
+                w.set_title(Some(*title));
             }
             let content_box = render_markdown(md_source, nav_fn_clone.clone());
             scrolled_clone.set_child(Some(&content_box));

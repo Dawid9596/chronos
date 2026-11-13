@@ -362,7 +362,7 @@ pub struct ShortcutRegistry {
     shortcuts: RefCell<Vec<(Action, gtk4::Shortcut)>>,
     hint_labels: RefCell<Vec<(Action, gtk4::Label)>>,
     tooltips: RefCell<Vec<(Action, gtk4::Widget, bool)>>,
-    shortcut_prefix: RefCell<String>,
+    shortcut_prefix: RefCell<&'static str>,
     action_names: RefCell<HashMap<Action, String>>,
 }
 
@@ -418,7 +418,7 @@ impl ShortcutRegistry {
             shortcuts: RefCell::new(Vec::new()),
             hint_labels: RefCell::new(Vec::new()),
             tooltips: RefCell::new(Vec::new()),
-            shortcut_prefix: RefCell::new("Shortcut: ".to_string()),
+            shortcut_prefix: RefCell::new("Shortcut: "),
             action_names: RefCell::new(HashMap::new()),
         }
     }
@@ -524,7 +524,7 @@ impl ShortcutRegistry {
     }
 
     fn sync_translation_cache(&self, t: &Translations) {
-        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix.clone();
+        *self.shortcut_prefix.borrow_mut() = t.shortcut_tooltip_prefix;
         let mut names = self.action_names.borrow_mut();
         for a in Action::ALL {
             names.insert(a, a.display_name(t));

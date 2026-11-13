@@ -22,6 +22,7 @@ use crate::context::{COLUMN_COUNT, CanvasParams};
 use crate::i18n::{Language, Translations};
 use crate::storage::ConservationDocument;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// Bump when the format changes in a way older readers cannot handle.
 pub const PROJECT_FORMAT_VERSION: u32 = 1;
@@ -65,7 +66,7 @@ pub struct ProjectFile {
     #[serde(default)]
     pub export_settings: Option<ExportSettings>,
     #[serde(skip)]
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Cow<'static, str>>,
 }
 
 #[derive(Deserialize)]
@@ -105,7 +106,7 @@ impl ProjectFile {
             let before = document.clone();
             document.sanitize();
             let warnings = if document != before {
-                vec![t.warning_document_sanitized.clone()]
+                vec![t.warning_document_sanitized.into()]
             } else {
                 Vec::new()
             };
@@ -132,7 +133,7 @@ impl ProjectFile {
         let document_before = document.clone();
         document.sanitize();
         if document != document_before {
-            warnings.push(t.warning_document_sanitized.clone());
+            warnings.push(t.warning_document_sanitized.into());
         }
 
         let export_settings = match raw.export_settings {
@@ -142,15 +143,13 @@ impl ProjectFile {
                     let before = settings.clone();
                     settings.sanitize();
                     if settings != before {
-                        warnings.push(t.warning_export_settings_sanitized.clone());
+                        warnings.push(t.warning_export_settings_sanitized.into());
                     }
                     Some(settings)
                 }
                 Err(e) => {
-                    warnings.push(format!(
-                        "{}{e}",
-                        t.warning_export_settings_unreadable_prefix
-                    ));
+                    warnings
+                        .push(format!("{}{e}", t.warning_export_settings_unreadable_prefix).into());
                     None
                 }
             },

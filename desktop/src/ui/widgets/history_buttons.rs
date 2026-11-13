@@ -60,7 +60,7 @@ impl HistoryButtons {
             shortcuts,
             t,
             Action::Undo,
-            &t.menu_undo,
+            t.menu_undo,
             "edit-undo-symbolic",
             &send,
             Event::Undo,
@@ -69,7 +69,7 @@ impl HistoryButtons {
             shortcuts,
             t,
             Action::Redo,
-            &t.menu_redo,
+            t.menu_redo,
             "edit-redo-symbolic",
             &send,
             Event::Redo,
@@ -109,8 +109,8 @@ impl HistoryButtons {
     }
 
     pub fn update_translations(&self, t: &Translations) {
-        self.undo_label.set_text(&t.menu_undo);
-        self.redo_label.set_text(&t.menu_redo);
+        self.undo_label.set_text(t.menu_undo);
+        self.redo_label.set_text(t.menu_redo);
     }
 
     pub fn set_labels_visible(&self, visible: bool) {

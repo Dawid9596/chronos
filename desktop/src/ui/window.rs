@@ -5,6 +5,7 @@ use crate::shortcuts::{Action, ShortcutRegistry};
 use crate::tool::Tool;
 use crate::ui::widgets::history_buttons::HistoryButtons;
 use chronos::bridge::{ConservationApp, Event};
+use chronos::i18n::Translations;
 use crux_core::Core;
 use gtk4::prelude::*;
 use gtk4::{Align, glib};
@@ -152,7 +153,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     let shortcuts = Rc::new(ShortcutRegistry::new(&settings.shortcuts));
     let tool = Rc::new(Cell::new(Tool::Edit));
     let split_overlays: crate::ui::table::SplitOverlays = Rc::new(RefCell::new(Vec::new()));
-    let t = &core.view().translations;
+    let t = Translations::get(core.view().language);
 
     let ctx_holder: Rc<RefCell<Option<AppContext>>> = Rc::new(RefCell::new(None));
 
@@ -186,7 +187,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
 
     let (open_item, file_open_lbl) = build_menu_row(
-        &t.menu_open,
+        t.menu_open,
         Some((&*shortcuts, Action::Open)),
         &file_popover,
         {
@@ -204,7 +205,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     );
 
     let (save_item, file_save_lbl) = build_menu_row(
-        &t.menu_save,
+        t.menu_save,
         Some((&*shortcuts, Action::Save)),
         &file_popover,
         {
@@ -223,7 +224,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     );
 
     let (save_as_item, file_save_as_lbl) = build_menu_row(
-        &t.menu_save_as,
+        t.menu_save_as,
         Some((&*shortcuts, Action::SaveAs)),
         &file_popover,
         {
@@ -242,7 +243,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     );
 
     let (export_item, file_export_lbl) = build_menu_row(
-        &t.menu_export,
+        t.menu_export,
         Some((&*shortcuts, Action::Export)),
         &file_popover,
         {
@@ -267,7 +268,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     file_vbox.append(&export_item);
     file_popover.set_child(Some(&file_vbox));
 
-    let file_btn_label = gtk4::Label::new(Some(&t.menu_file));
+    let file_btn_label = gtk4::Label::new(Some(t.menu_file));
     let file_menu_btn = gtk4::MenuButton::builder()
         .child(&file_btn_label)
         .popover(&file_popover)
@@ -287,7 +288,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
 
     let (undo_item, edit_undo_lbl) = build_menu_row(
-        &t.menu_undo,
+        t.menu_undo,
         Some((&*shortcuts, Action::Undo)),
         &edit_popover,
         {
@@ -296,7 +297,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         },
     );
     let (redo_item, edit_redo_lbl) = build_menu_row(
-        &t.menu_redo,
+        t.menu_redo,
         Some((&*shortcuts, Action::Redo)),
         &edit_popover,
         {
@@ -306,7 +307,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     );
 
     let (canvas_item, edit_canvas_lbl) =
-        build_menu_row(&t.menu_canvas_params, None, &edit_popover, {
+        build_menu_row(t.menu_canvas_params, None, &edit_popover, {
             let holder = ctx_holder.clone();
             move || {
                 if let Some(ctx) = holder.borrow().as_ref() {
@@ -315,7 +316,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             }
         });
 
-    let (prefs_item, edit_prefs_lbl) = build_menu_row(&t.menu_preferences, None, &edit_popover, {
+    let (prefs_item, edit_prefs_lbl) = build_menu_row(t.menu_preferences, None, &edit_popover, {
         let holder = ctx_holder.clone();
         move || {
             if let Some(ctx) = holder.borrow().as_ref() {
@@ -325,7 +326,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     });
 
     let (shortcuts_item, edit_shortcuts_lbl) =
-        build_menu_row(&t.menu_shortcuts, None, &edit_popover, {
+        build_menu_row(t.menu_shortcuts, None, &edit_popover, {
             let holder = ctx_holder.clone();
             move || {
                 if let Some(ctx) = holder.borrow().as_ref() {
@@ -342,7 +343,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     edit_vbox.append(&shortcuts_item);
     edit_popover.set_child(Some(&edit_vbox));
 
-    let edit_btn_label = gtk4::Label::new(Some(&t.menu_edit));
+    let edit_btn_label = gtk4::Label::new(Some(t.menu_edit));
     let edit_menu_btn = gtk4::MenuButton::builder()
         .child(&edit_btn_label)
         .popover(&edit_popover)
@@ -361,28 +362,36 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .margin_end(4)
         .build();
 
-    let (help_help_item, help_help_lbl) = build_menu_row(&t.menu_help, None, &help_popover, {
+    let (help_help_item, help_help_lbl) = build_menu_row(t.menu_help, None, &help_popover, {
         let holder = ctx_holder.clone();
         move || {
             if let Some(ctx) = holder.borrow().as_ref() {
                 let view = ctx.core.view();
-                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "help");
+                crate::ui::markdown::show_markdown_window(
+                    &ctx.window,
+                    &Translations::get(view.language),
+                    "help",
+                );
             }
         }
     });
 
-    let (help_about_item, help_about_lbl) = build_menu_row(&t.menu_about, None, &help_popover, {
+    let (help_about_item, help_about_lbl) = build_menu_row(t.menu_about, None, &help_popover, {
         let holder = ctx_holder.clone();
         move || {
             if let Some(ctx) = holder.borrow().as_ref() {
                 let view = ctx.core.view();
-                crate::ui::markdown::show_markdown_window(&ctx.window, &view.translations, "about");
+                crate::ui::markdown::show_markdown_window(
+                    &ctx.window,
+                    &Translations::get(view.language),
+                    "about",
+                );
             }
         }
     });
 
     let (help_check_item, help_check_lbl) =
-        build_menu_row(&t.menu_check_updates, None, &help_popover, {
+        build_menu_row(t.menu_check_updates, None, &help_popover, {
             let holder = ctx_holder.clone();
             move || {
                 if let Some(ctx) = holder.borrow().as_ref() {
@@ -397,7 +406,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     help_vbox.append(&help_check_item);
     help_popover.set_child(Some(&help_vbox));
 
-    let help_btn_label = gtk4::Label::new(Some(&t.menu_help));
+    let help_btn_label = gtk4::Label::new(Some(t.menu_help));
     let help_menu_btn = gtk4::MenuButton::builder()
         .child(&help_btn_label)
         .popover(&help_popover)
@@ -430,7 +439,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
     // --- Existing Toolbar & Controls ---
     let export_btn = gtk4::Button::builder()
         .icon_name("media-floppy-symbolic")
-        .tooltip_text(&t.export_pdf)
+        .tooltip_text(t.export_pdf)
         .build();
 
     let settings_box = gtk4::Box::builder()
@@ -439,7 +448,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         .build();
     let settings_icon = gtk4::Image::from_icon_name("emblem-system-symbolic");
     let settings_label = gtk4::Label::builder()
-        .label(&t.settings_tooltip)
+        .label(t.settings_tooltip)
         .use_markup(true)
         .visible(false)
         .build();
@@ -506,7 +515,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             .build();
 
         let icon = gtk4::Image::from_icon_name(default_tool.icon_name());
-        let text_label = gtk4::Label::new(Some(default_tool.label(t)));
+        let text_label = gtk4::Label::new(Some(default_tool.label(&t)));
         btn_box.append(&icon);
         btn_box.append(&text_label);
         btn.set_child(Some(&btn_box));
@@ -555,7 +564,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
         }
 
         tool_labels.push((default_tool, text_label));
-        shortcuts.bind_named_tooltip(Action::for_tool(default_tool), &btn, t);
+        shortcuts.bind_named_tooltip(Action::for_tool(default_tool), &btn, &t);
         tool_buttons.push((default_tool, btn.clone()));
 
         let stack_page_name = format!("tool-variants-{tool_idx}");
@@ -728,7 +737,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let history_buttons = Rc::new(HistoryButtons::new(
         &shortcuts,
-        t,
+        &t,
         send_event.clone(),
         undo_item.clone(),
         redo_item.clone(),
@@ -741,7 +750,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             "{}{}",
             t.project_prefix,
             if current_project_name.is_empty() {
-                &t.project_untitled
+                t.project_untitled
             } else {
                 &current_project_name
             }
@@ -773,7 +782,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
     let current_subtitle = core.view().document.subtitle.clone();
     let (subtitle_stack, subtitle_label) = editable_label_stack(
-        &subtitle_markup(&current_subtitle, t),
+        &subtitle_markup(&current_subtitle, &t),
         "Double-click to edit the subtitle shown in the exported PDF",
         40,
         true,
@@ -891,9 +900,7 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
             // reserve `2 * max(left, right)` plus spacing, or at minimum `left + right`.
             // Use the expanded (labels-visible) history width even while collapsed so
             // the threshold reflects the worst case.
-            let expanded_right = left_nat.max(
-                last_expanded_history_width.get().max(right_nat),
-            );
+            let expanded_right = left_nat.max(last_expanded_history_width.get().max(right_nat));
             let side_reserve = expanded_right * 2 + 32;
             let needed_expanded = last_expanded_tools_width.get().max(tools_nat) + side_reserve;
 
@@ -938,19 +945,19 @@ pub fn build_main_window(app: &gtk4::Application) -> (gtk4::ApplicationWindow, A
 
         let current_vis = ctx_settings.vis.borrow().clone();
         let view = ctx_settings.core.view();
-        let t = &view.translations;
+        let t = Translations::get(view.language);
 
         let labels = [
-            &t.col_no,
-            &t.col_graphical,
-            &t.col_woven,
-            &t.col_char,
-            &t.col_thickness,
-            &t.col_chrono,
-            &t.col_dating,
+            t.col_no,
+            t.col_graphical,
+            t.col_woven,
+            t.col_char,
+            t.col_thickness,
+            t.col_chrono,
+            t.col_dating,
         ];
 
-        for (i, label_text) in labels.iter().enumerate() {
+        for (i, label_text) in labels.into_iter().enumerate() {
             let cb = gtk4::CheckButton::with_label(label_text);
             cb.set_active(current_vis.flags[i]);
             let ctx_cb = ctx_settings.clone();
